@@ -342,29 +342,8 @@ fun GameScreen(
                             floatingEmoji = if (uiState.activeFloatingEmoji?.first == topOpponent.name) uiState.activeFloatingEmoji?.second else null,
                             alignRight = false
                         )
-                    } else if (!isTwoPlayer && bluePlayer != null) {
-                        // 4-Player Top-Left: Blue Player with individual dice
-                        PlayerCornerSlotPanel(
-                            player = bluePlayer,
-                            slotLabel = if (isBlueHuman) youSlotName else bluePlayer.name,
-                            isActiveTurn = bluePlayer.color == activeColor,
-                            isHuman = isBlueHuman,
-                            isRolling = uiState.isRolling && (bluePlayer.color == activeColor),
-                            currentDiceValue = uiState.currentDiceValue,
-                            timeRemainingSec = uiState.turnTimeRemaining,
-                            consecutiveSixes = if (bluePlayer.color == activeColor) uiState.consecutiveSixes else 0,
-                            canRoll = isBlueHuman && isHumanTurn && uiState.turnPhase == TurnPhase.ROLL_DICE && !uiState.isRolling,
-                            onRollClick = if (isBlueHuman) { { viewModel.rollDice() } } else { {} },
-                            onProfileClick = if (isBlueHuman) { { viewModel.navigateTo(AppScreen.PROFILE) } } else { {} },
-                            floatingEmoji = if (uiState.activeFloatingEmoji?.first == bluePlayer.name) uiState.activeFloatingEmoji?.second else null,
-                            alignRight = false
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.width(40.dp))
-                    }
-
-                    // Top-Right: Red Player in 4-Player games
-                    if (!isTwoPlayer && redPlayer != null) {
+                    } else if (!isTwoPlayer && redPlayer != null) {
+                        // 4-Player Top-Left: Red Player with individual dice
                         PlayerCornerSlotPanel(
                             player = redPlayer,
                             slotLabel = if (isRedHuman) youSlotName else redPlayer.name,
@@ -378,6 +357,27 @@ fun GameScreen(
                             onRollClick = if (isRedHuman) { { viewModel.rollDice() } } else { {} },
                             onProfileClick = if (isRedHuman) { { viewModel.navigateTo(AppScreen.PROFILE) } } else { {} },
                             floatingEmoji = if (uiState.activeFloatingEmoji?.first == redPlayer.name) uiState.activeFloatingEmoji?.second else null,
+                            alignRight = false
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.width(40.dp))
+                    }
+
+                    // Top-Right: Green Player in 4-Player games
+                    if (!isTwoPlayer && greenPlayer != null) {
+                        PlayerCornerSlotPanel(
+                            player = greenPlayer,
+                            slotLabel = if (isGreenHuman) youSlotName else greenPlayer.name,
+                            isActiveTurn = greenPlayer.color == activeColor,
+                            isHuman = isGreenHuman,
+                            isRolling = uiState.isRolling && (greenPlayer.color == activeColor),
+                            currentDiceValue = uiState.currentDiceValue,
+                            timeRemainingSec = uiState.turnTimeRemaining,
+                            consecutiveSixes = if (greenPlayer.color == activeColor) uiState.consecutiveSixes else 0,
+                            canRoll = isGreenHuman && isHumanTurn && uiState.turnPhase == TurnPhase.ROLL_DICE && !uiState.isRolling,
+                            onRollClick = if (isGreenHuman) { { viewModel.rollDice() } } else { {} },
+                            onProfileClick = if (isGreenHuman) { { viewModel.navigateTo(AppScreen.PROFILE) } } else { {} },
+                            floatingEmoji = if (uiState.activeFloatingEmoji?.first == greenPlayer.name) uiState.activeFloatingEmoji?.second else null,
                             alignRight = true
                         )
                     }
@@ -444,21 +444,21 @@ fun GameScreen(
                         )
                     }
 
-                    // Bottom-Right: Green Player in 4-Player games
-                    if (!isTwoPlayer && greenPlayer != null) {
+                    // Bottom-Right: Blue Player in 4-Player games
+                    if (!isTwoPlayer && bluePlayer != null) {
                         PlayerCornerSlotPanel(
-                            player = greenPlayer,
-                            slotLabel = if (isGreenHuman) youSlotName else greenPlayer.name,
-                            isActiveTurn = greenPlayer.color == activeColor,
-                            isHuman = isGreenHuman,
-                            isRolling = uiState.isRolling && (greenPlayer.color == activeColor),
+                            player = bluePlayer,
+                            slotLabel = if (isBlueHuman) youSlotName else bluePlayer.name,
+                            isActiveTurn = bluePlayer.color == activeColor,
+                            isHuman = isBlueHuman,
+                            isRolling = uiState.isRolling && (bluePlayer.color == activeColor),
                             currentDiceValue = uiState.currentDiceValue,
                             timeRemainingSec = uiState.turnTimeRemaining,
-                            consecutiveSixes = if (greenPlayer.color == activeColor) uiState.consecutiveSixes else 0,
-                            canRoll = isGreenHuman && isHumanTurn && uiState.turnPhase == TurnPhase.ROLL_DICE && !uiState.isRolling,
-                            onRollClick = if (isGreenHuman) { { viewModel.rollDice() } } else { {} },
-                            onProfileClick = if (isGreenHuman) { { viewModel.navigateTo(AppScreen.PROFILE) } } else { {} },
-                            floatingEmoji = if (uiState.activeFloatingEmoji?.first == greenPlayer.name) uiState.activeFloatingEmoji?.second else null,
+                            consecutiveSixes = if (bluePlayer.color == activeColor) uiState.consecutiveSixes else 0,
+                            canRoll = isBlueHuman && isHumanTurn && uiState.turnPhase == TurnPhase.ROLL_DICE && !uiState.isRolling,
+                            onRollClick = if (isBlueHuman) { { viewModel.rollDice() } } else { {} },
+                            onProfileClick = if (isBlueHuman) { { viewModel.navigateTo(AppScreen.PROFILE) } } else { {} },
+                            floatingEmoji = if (uiState.activeFloatingEmoji?.first == bluePlayer.name) uiState.activeFloatingEmoji?.second else null,
                             alignRight = true
                         )
                     } else {

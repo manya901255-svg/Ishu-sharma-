@@ -201,7 +201,13 @@ fun RegalSettingsDialog(
                             SoundSettingItem(
                                 icon = Icons.Default.MusicNote,
                                 title = "Background Music",
-                                subtitle = if (isBgmEnabled && currentBgmTrack != null) "${currentBgmTrack.iconEmoji} ${currentBgmTrack.title}" else "All Background Songs Removed (SFX Only)",
+                                subtitle = if (isBgmEnabled && currentBgmTrack != null) {
+                                    "${currentBgmTrack.iconEmoji} ${currentBgmTrack.title} • ${currentBgmTrack.singer}"
+                                } else if (isBgmEnabled) {
+                                    "Tap to open Music Lounge (${bgmPlaylist.size} original songs)"
+                                } else {
+                                    "Music Paused • ${bgmPlaylist.size} original songs available"
+                                },
                                 isEnabled = isBgmEnabled,
                                 volume = bgmVolume,
                                 onToggle = onToggleBgm,
@@ -219,7 +225,7 @@ fun RegalSettingsDialog(
                                         .padding(10.dp)
                                 ) {
                                     Text(
-                                        text = "🔇 All songs have been removed from the background playlist. Only authentic sound effects and haptics will play.",
+                                        text = "🎵 44 Original Bollywood & Punjabi tracks available in Music Lounge.",
                                         color = Color(0xFFFFD54F),
                                         fontSize = 11.sp,
                                         lineHeight = 15.sp

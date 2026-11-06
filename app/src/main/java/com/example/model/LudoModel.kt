@@ -12,29 +12,29 @@ enum class LudoColor(
     val homeEntranceTrackPos: Int,
     val safeStarPos: Int
 ) {
-    BLUE(
-        title = "Blue",
-        primary = Color(0xFF039BE5),
-        dark = Color(0xFF0277BD),
-        light = Color(0xFFE1F5FE),
-        startTrackPos = 1,
-        homeEntranceTrackPos = 50,
-        safeStarPos = 1
-    ),
     RED(
         title = "Red",
         primary = Color(0xFFE53935),
         dark = Color(0xFFC62828),
         light = Color(0xFFFFCDD2),
-        startTrackPos = 14,
-        homeEntranceTrackPos = 11,
-        safeStarPos = 14
+        startTrackPos = 1,
+        homeEntranceTrackPos = 50,
+        safeStarPos = 1
     ),
     GREEN(
         title = "Green",
         primary = Color(0xFF43A047),
         dark = Color(0xFF2E7D32),
         light = Color(0xFFC8E6C9),
+        startTrackPos = 14,
+        homeEntranceTrackPos = 11,
+        safeStarPos = 14
+    ),
+    BLUE(
+        title = "Blue",
+        primary = Color(0xFF039BE5),
+        dark = Color(0xFF0277BD),
+        light = Color(0xFFE1F5FE),
         startTrackPos = 27,
         homeEntranceTrackPos = 24,
         safeStarPos = 27

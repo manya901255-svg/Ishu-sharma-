@@ -56,10 +56,10 @@ fun OnlineModeLobbyDialog(
     var wagerIndex by remember { mutableIntStateOf(6) } // default 50,000 matching screenshot
     val currentWager = wagers.getOrElse(wagerIndex) { 50000L }
 
-    val winningCoins = if (playerCount == 2) {
-        (currentWager * 1.9f).toLong()
-    } else {
-        (currentWager * 3.6f).toLong()
+    val winningCoins = when (playerCount) {
+        2 -> (currentWager * 1.9f).toLong()
+        3 -> (currentWager * 2.7f).toLong()
+        else -> (currentWager * 3.6f).toLong()
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "lobby_anim")
@@ -221,13 +221,14 @@ fun OnlineModeLobbyDialog(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // 2. 3D PILL TOGGLE: 2 PLAYERS vs 4 PLAYERS
+                    // 2. 3D PILL TOGGLE: 2 PLAYERS vs 3 PLAYERS vs 4 PLAYERS
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        // 2 PLAYERS
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -242,30 +243,30 @@ fun OnlineModeLobbyDialog(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(28.dp)
+                                            .size(26.dp)
                                             .clip(CircleShape)
                                             .background(Color(0xFFFFE0B2))
                                             .border(1.5.dp, Color(0xFF5D4037), CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text("👦", fontSize = 16.sp)
+                                        Text("👦", fontSize = 14.sp)
                                     }
                                     Box(
                                         modifier = Modifier
-                                            .size(30.dp)
+                                            .size(28.dp)
                                             .clip(CircleShape)
                                             .background(Color(0xFF0288D1))
                                             .border(1.5.dp, Color.White, CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text("🐱", fontSize = 17.sp)
+                                        Text("🐱", fontSize = 15.sp)
                                     }
                                 }
 
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(48.dp)
+                                        .height(46.dp)
                                         .shadow(
                                             elevation = if (playerCount == 2) 8.dp else 3.dp,
                                             shape = RoundedCornerShape(24.dp)
@@ -292,9 +293,9 @@ fun OnlineModeLobbyDialog(
                                     Text(
                                         text = "2 PLAYERS",
                                         color = Color.White,
-                                        fontSize = 15.sp,
+                                        fontSize = 13.sp,
                                         fontWeight = FontWeight.Black,
-                                        letterSpacing = 0.5.sp
+                                        letterSpacing = 0.3.sp
                                     )
                                 }
                             }
@@ -303,16 +304,16 @@ fun OnlineModeLobbyDialog(
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.TopStart)
-                                        .offset(x = 4.dp, y = 2.dp)
+                                        .offset(x = 2.dp, y = 2.dp)
                                         .shadow(4.dp, CircleShape)
                                         .clip(CircleShape)
                                         .background(Color.White)
-                                        .padding(3.dp),
+                                        .padding(2.5.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(20.dp)
+                                            .size(18.dp)
                                             .clip(CircleShape)
                                             .background(Color(0xFF00C853)),
                                         contentAlignment = Alignment.Center
@@ -321,13 +322,125 @@ fun OnlineModeLobbyDialog(
                                             imageVector = Icons.Default.Check,
                                             contentDescription = "Selected",
                                             tint = Color.White,
-                                            modifier = Modifier.size(14.dp)
+                                            modifier = Modifier.size(13.dp)
                                         )
                                     }
                                 }
                             }
                         }
 
+                        // 3 PLAYERS
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { playerCount = 3 }
+                                .testTag("select_3_players_3d")
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy((-6).dp),
+                                    verticalAlignment = Alignment.Bottom,
+                                    modifier = Modifier.offset(y = 6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFFFE0B2))
+                                            .border(1.5.dp, Color(0xFF5D4037), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("👦", fontSize = 13.sp)
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(26.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFE1BEE7))
+                                            .border(1.5.dp, Color(0xFF7B1FA2), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("👧", fontSize = 14.sp)
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF80CBC4))
+                                            .border(1.5.dp, Color(0xFF004D40), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("🐱", fontSize = 13.sp)
+                                    }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(46.dp)
+                                        .shadow(
+                                            elevation = if (playerCount == 3) 8.dp else 3.dp,
+                                            shape = RoundedCornerShape(24.dp)
+                                        )
+                                        .clip(RoundedCornerShape(24.dp))
+                                        .background(
+                                            if (playerCount == 3) {
+                                                Brush.verticalGradient(
+                                                    listOf(Color(0xFF26A69A), Color(0xFF00897B), Color(0xFF004D40))
+                                                )
+                                            } else {
+                                                Brush.verticalGradient(
+                                                    listOf(Color(0xFF80CBC4), Color(0xFF4DB6AC), Color(0xFF00897B))
+                                                )
+                                            }
+                                        )
+                                        .border(
+                                            width = if (playerCount == 3) 2.5.dp else 1.2.dp,
+                                            color = if (playerCount == 3) Color.White else Color(0xFFB2DFDB),
+                                            shape = RoundedCornerShape(24.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "3 PLAYERS",
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 0.3.sp
+                                    )
+                                }
+                            }
+
+                            if (playerCount == 3) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .offset(x = 2.dp, y = 2.dp)
+                                        .shadow(4.dp, CircleShape)
+                                        .clip(CircleShape)
+                                        .background(Color.White)
+                                        .padding(2.5.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(18.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF00C853)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 4 PLAYERS
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -342,40 +455,40 @@ fun OnlineModeLobbyDialog(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(26.dp)
+                                            .size(24.dp)
                                             .clip(CircleShape)
                                             .background(Color(0xFFFFCCBC))
                                             .border(1.5.dp, Color(0xFFD84315), CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text("🧔", fontSize = 14.sp)
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFFF8BBD0))
-                                            .border(1.5.dp, Color(0xFFC2185B), CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("👧", fontSize = 15.sp)
+                                        Text("🧔", fontSize = 13.sp)
                                     }
                                     Box(
                                         modifier = Modifier
                                             .size(26.dp)
                                             .clip(CircleShape)
+                                            .background(Color(0xFFF8BBD0))
+                                            .border(1.5.dp, Color(0xFFC2185B), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("👧", fontSize = 14.sp)
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
                                             .background(Color(0xFFFFF9C4))
                                             .border(1.5.dp, Color(0xFFF57F17), CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text("🧒", fontSize = 14.sp)
+                                        Text("🧒", fontSize = 13.sp)
                                     }
                                 }
 
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(48.dp)
+                                        .height(46.dp)
                                         .shadow(
                                             elevation = if (playerCount == 4) 8.dp else 3.dp,
                                             shape = RoundedCornerShape(24.dp)
@@ -402,9 +515,9 @@ fun OnlineModeLobbyDialog(
                                     Text(
                                         text = "4 PLAYERS",
                                         color = if (playerCount == 4) Color(0xFF3E2723) else Color(0xFF5D4037),
-                                        fontSize = 15.sp,
+                                        fontSize = 13.sp,
                                         fontWeight = FontWeight.Black,
-                                        letterSpacing = 0.5.sp
+                                        letterSpacing = 0.3.sp
                                     )
                                 }
                             }
@@ -413,16 +526,16 @@ fun OnlineModeLobbyDialog(
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.TopStart)
-                                        .offset(x = 4.dp, y = 2.dp)
+                                        .offset(x = 2.dp, y = 2.dp)
                                         .shadow(4.dp, CircleShape)
                                         .clip(CircleShape)
                                         .background(Color.White)
-                                        .padding(3.dp),
+                                        .padding(2.5.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(20.dp)
+                                            .size(18.dp)
                                             .clip(CircleShape)
                                             .background(Color(0xFF00C853)),
                                         contentAlignment = Alignment.Center
@@ -431,7 +544,7 @@ fun OnlineModeLobbyDialog(
                                             imageVector = Icons.Default.Check,
                                             contentDescription = "Selected",
                                             tint = Color.White,
-                                            modifier = Modifier.size(14.dp)
+                                            modifier = Modifier.size(13.dp)
                                         )
                                     }
                                 }

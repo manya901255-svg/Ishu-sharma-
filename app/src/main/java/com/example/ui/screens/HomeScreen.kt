@@ -597,9 +597,9 @@ fun HomeScreen(
             PrivateRoomDialog(
                 roomCode = uiState.roomCode,
                 onDismiss = { viewModel.closePrivateRoomDialog() },
-                onCreateRoom = {
+                onCreateRoom = { count ->
                     viewModel.closePrivateRoomDialog()
-                    viewModel.startNewGame(GameMode.PRIVATE_ROOM, 4)
+                    viewModel.startNewGame(GameMode.PRIVATE_ROOM, count)
                 },
                 onJoinRoom = { code ->
                     viewModel.closePrivateRoomDialog()
@@ -2090,11 +2090,12 @@ private fun ModeSetupDialog(
 private fun PrivateRoomDialog(
     roomCode: String,
     onDismiss: () -> Unit,
-    onCreateRoom: () -> Unit,
+    onCreateRoom: (Int) -> Unit,
     onJoinRoom: (String) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var roomCodeInput by remember { mutableStateOf("") }
+    var selectedPlayerCount by remember { mutableIntStateOf(4) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -2123,15 +2124,51 @@ private fun PrivateRoomDialog(
                     fontSize = 12.sp
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "SELECT PLAYERS:",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(2, 3, 4).forEach { count ->
+                        val isSelected = selectedPlayerCount == count
+                        Button(
+                            onClick = { selectedPlayerCount = count },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(38.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isSelected) RoyalGold else Color(0xFF1E3A70)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                "$count Players",
+                                color = if (isSelected) Color(0xFF3E2723) else Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Button(
-                    onClick = onCreateRoom,
+                    onClick = { onCreateRoom(selectedPlayerCount) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = LudoClubHeaderBlue)
                 ) {
-                    Text("CREATE NEW ROOM", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("CREATE NEW ROOM ($selectedPlayerCount PLAYERS)", color = Color.White, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))

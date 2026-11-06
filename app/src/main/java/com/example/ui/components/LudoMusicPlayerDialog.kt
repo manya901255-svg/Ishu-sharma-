@@ -149,7 +149,7 @@ fun LudoMusicPlayerDialog(
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
                                     Text(
-                                        text = "INSTRUMENTAL",
+                                        text = "ORIGINAL TRACKS",
                                         color = Color(0xFF00E676),
                                         fontSize = 8.sp,
                                         fontWeight = FontWeight.Black
@@ -157,7 +157,7 @@ fun LudoMusicPlayerDialog(
                                 }
                             }
                             Text(
-                                text = "Soothing Bollywood Background Melodies",
+                                text = "Original Bollywood & Punjabi Songs • Authentic Singers",
                                 color = RoyalGoldLight,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium

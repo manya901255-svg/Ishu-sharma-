@@ -5,7 +5,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,7 +23,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -42,14 +40,16 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Authentic 2D Royal Ludo Board View crafted to exactly match the MG Ludo reference screenshot.
- * Features:
- * - 4 Gradient Corner Quadrants (Top-Left: Blue, Top-Right: Red, Bottom-Left: Yellow, Bottom-Right: Green)
- * - Inset rounded white cards with 4 translucent frosted circular pawn sockets
- * - Clean white track cells with subtle borders and colored home runways
- * - 8 Embossed 3D Golden Star Medallions at exact standard positions
- * - 4-Color Center Finish triangles crowned with a central 3D golden sphere and star apex
- * - Jewel-glass crown pawns with golden pedestal bases, drop shadows, and active turn glow
+ * Authentic Normal Classic Ludo Board View.
+ * Matches traditional physical Indian and international Ludo boards:
+ * - 4 Classic corner home quadrants (Top-Left: Blue, Top-Right: Red, Bottom-Left: Yellow, Bottom-Right: Green)
+ * - Inner white cards with 4 solid circular token bases
+ * - Colored Starting Tiles (Blue, Red, Green, Yellow) with crisp stars
+ * - 4 Colored Directional Entrance Arrows pointing into home runways
+ * - 8 Safe Star positions clearly marked
+ * - 4 Clean colored 5-step home stretch runways
+ * - 4 Vibrant center finishing triangles (Blue, Red, Green, Yellow)
+ * - Authentic 3D Ludo gotis (tokens) with multi-token stacking offsets & turn glow
  */
 @Composable
 fun RoyalBoardView(
@@ -62,15 +62,15 @@ fun RoyalBoardView(
     BoxWithConstraints(
         modifier = modifier
             .aspectRatio(1f)
-            .shadow(16.dp, RoundedCornerShape(20.dp))
-            .clip(RoundedCornerShape(20.dp))
+            .shadow(16.dp, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(Color.White)
             .border(
                 width = 3.dp,
                 brush = Brush.linearGradient(
-                    listOf(Color(0xFFE2E8F0), Color(0xFFCBD5E1), Color(0xFF94A3B8))
+                    listOf(Color(0xFFB0BEC5), Color(0xFF78909C), Color(0xFF455A64))
                 ),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(16.dp)
             )
             .testTag("royal_board_2d_view"),
         contentAlignment = Alignment.Center
@@ -78,119 +78,200 @@ fun RoyalBoardView(
         val boardSize = maxWidth
         val cellSize = boardSize / 15f
 
-        // 1. Canvas Layer: Board background, 15x15 grid, home stretches, safe stars, bases, apex
+        // 1. Canvas Layer: Board background, 15x15 grid, home stretches, safe stars, bases, center triangles
         Canvas(modifier = Modifier.fillMaxSize()) {
             val cellPx = size.width / 15f
-            val w = size.width
-            val h = size.height
 
-            // Board Canvas Base Background (Pure White)
-            drawRect(color = Color.White)
+            // Board Canvas Base Background (Clean Off-White)
+            drawRect(color = Color(0xFFFAFBFD))
 
-            // 1A. Four Colored Home Quadrants with Inset White Cards and Frosted Sockets
+            // 1A. Four Classic Colored Home Quadrants (6x6 each)
             // Top-Left: Blue
-            drawAuthenticHomeQuadrant(
-                color = LudoColor.BLUE,
+            // 1A. Four Classic Colored Home Quadrants (6x6 each)
+            // Top-Left: Red
+            drawClassicHomeQuadrant(
+                color = LudoColor.RED,
                 topLeft = Offset(0f, 0f),
                 size = Size(cellPx * 6f, cellPx * 6f),
                 cellPx = cellPx,
-                gradient = listOf(Color(0xFF2979FF), Color(0xFF1976D2), Color(0xFF0D47A1)),
-                socketTint = Color(0xFF29B6F6),
-                socketBorder = Color(0xFF64B5F6)
+                primaryColor = Color(0xFFE53935),
+                darkColor = Color(0xFFC62828),
+                socketColor = Color(0xFFE53935)
             )
 
-            // Top-Right: Red
-            drawAuthenticHomeQuadrant(
-                color = LudoColor.RED,
+            // Top-Right: Green
+            drawClassicHomeQuadrant(
+                color = LudoColor.GREEN,
                 topLeft = Offset(cellPx * 9f, 0f),
                 size = Size(cellPx * 6f, cellPx * 6f),
                 cellPx = cellPx,
-                gradient = listOf(Color(0xFFFF1744), Color(0xFFD50000), Color(0xFFB71C1C)),
-                socketTint = Color(0xFFFF5252),
-                socketBorder = Color(0xFFE57373)
+                primaryColor = Color(0xFF43A047),
+                darkColor = Color(0xFF2E7D32),
+                socketColor = Color(0xFF43A047)
             )
 
             // Bottom-Left: Yellow
-            drawAuthenticHomeQuadrant(
+            drawClassicHomeQuadrant(
                 color = LudoColor.YELLOW,
                 topLeft = Offset(0f, cellPx * 9f),
                 size = Size(cellPx * 6f, cellPx * 6f),
                 cellPx = cellPx,
-                gradient = listOf(Color(0xFFFFD600), Color(0xFFFFAB00), Color(0xFFFF8F00)),
-                socketTint = Color(0xFFFFD54F),
-                socketBorder = Color(0xFFFFCA28)
+                primaryColor = Color(0xFFFDD835),
+                darkColor = Color(0xFFF9A825),
+                socketColor = Color(0xFFFBC02D)
             )
 
-            // Bottom-Right: Green
-            drawAuthenticHomeQuadrant(
-                color = LudoColor.GREEN,
+            // Bottom-Right: Blue
+            drawClassicHomeQuadrant(
+                color = LudoColor.BLUE,
                 topLeft = Offset(cellPx * 9f, cellPx * 9f),
                 size = Size(cellPx * 6f, cellPx * 6f),
                 cellPx = cellPx,
-                gradient = listOf(Color(0xFF00E676), Color(0xFF00C853), Color(0xFF1B5E20)),
-                socketTint = Color(0xFF69F0AE),
-                socketBorder = Color(0xFF81C784)
+                primaryColor = Color(0xFF1E88E5),
+                darkColor = Color(0xFF1565C0),
+                socketColor = Color(0xFF1E88E5)
             )
 
-            // 1B. Draw 52 Outer Track Cell Outlines
-            val trackGridColor = Color(0xFFD1D5DB)
-            for (pos in StandardLudoBoardLayout.TRACK_COORDINATES) {
-                val x = pos.first * cellPx
-                val y = pos.second * cellPx
-                drawRect(
-                    color = trackGridColor,
-                    topLeft = Offset(x, y),
-                    size = Size(cellPx, cellPx),
-                    style = Stroke(width = 1.2f)
-                )
-            }
+            // 1B. Four Colored Starting Cells (The universal hallmark of classic normal Ludo)
+            // Red start at (1, 6)
+            drawRect(
+                color = Color(0xFFE53935),
+                topLeft = Offset(1 * cellPx, 6 * cellPx),
+                size = Size(cellPx, cellPx)
+            )
+            // Green start at (8, 1)
+            drawRect(
+                color = Color(0xFF43A047),
+                topLeft = Offset(8 * cellPx, 1 * cellPx),
+                size = Size(cellPx, cellPx)
+            )
+            // Blue start at (13, 8)
+            drawRect(
+                color = Color(0xFF1E88E5),
+                topLeft = Offset(13 * cellPx, 8 * cellPx),
+                size = Size(cellPx, cellPx)
+            )
+            // Yellow start at (6, 13)
+            drawRect(
+                color = Color(0xFFFDD835),
+                topLeft = Offset(6 * cellPx, 13 * cellPx),
+                size = Size(cellPx, cellPx)
+            )
 
-            // 1C. Four Colored Home Runways (Home Stretches leading to Center)
-            // Top: Red runway (col 7, rows 1..5)
+            // 1C. Four Colored Home Runways (5 steps leading into center)
+            // Left: Red runway (cols 1..5, row 7)
             for (step in 1..5) {
-                val x = 7 * cellPx
-                val y = step * cellPx
                 drawRect(
-                    color = Color(0xFFEF5350),
-                    topLeft = Offset(x + 0.8f, y + 0.8f),
-                    size = Size(cellPx - 1.6f, cellPx - 1.6f)
+                    color = Color(0xFFE53935),
+                    topLeft = Offset(step * cellPx, 7 * cellPx),
+                    size = Size(cellPx, cellPx)
                 )
             }
 
-            // Left: Blue runway (cols 1..5, row 7)
+            // Top: Green runway (col 7, rows 1..5)
             for (step in 1..5) {
-                val x = step * cellPx
-                val y = 7 * cellPx
                 drawRect(
-                    color = Color(0xFF29B6F6),
-                    topLeft = Offset(x + 0.8f, y + 0.8f),
-                    size = Size(cellPx - 1.6f, cellPx - 1.6f)
+                    color = Color(0xFF43A047),
+                    topLeft = Offset(7 * cellPx, step * cellPx),
+                    size = Size(cellPx, cellPx)
                 )
             }
 
-            // Right: Green runway (cols 9..13, row 7)
+            // Right: Blue runway (cols 9..13, row 7)
             for (col in 9..13) {
-                val x = col * cellPx
-                val y = 7 * cellPx
                 drawRect(
-                    color = Color(0xFF4CAF50),
-                    topLeft = Offset(x + 0.8f, y + 0.8f),
-                    size = Size(cellPx - 1.6f, cellPx - 1.6f)
+                    color = Color(0xFF1E88E5),
+                    topLeft = Offset(col * cellPx, 7 * cellPx),
+                    size = Size(cellPx, cellPx)
                 )
             }
 
             // Bottom: Yellow runway (col 7, rows 9..13)
             for (row in 9..13) {
-                val x = 7 * cellPx
-                val y = row * cellPx
                 drawRect(
                     color = Color(0xFFFDD835),
-                    topLeft = Offset(x + 0.8f, y + 0.8f),
-                    size = Size(cellPx - 1.6f, cellPx - 1.6f)
+                    topLeft = Offset(7 * cellPx, row * cellPx),
+                    size = Size(cellPx, cellPx)
                 )
             }
 
-            // 1D. Central Finish Area with 4 Triangles
+            // 1D. Crisp Classic Grid Lines over all 52 track cells + home runways
+            val gridBorderColor = Color(0xFF90A4AE)
+            for (pos in StandardLudoBoardLayout.TRACK_COORDINATES) {
+                drawRect(
+                    color = gridBorderColor,
+                    topLeft = Offset(pos.first * cellPx, pos.second * cellPx),
+                    size = Size(cellPx, cellPx),
+                    style = Stroke(width = 1.3f)
+                )
+            }
+
+            // Home runway internal grid lines
+            for (step in 1..5) {
+                // Red (Left arm)
+                drawRect(
+                    color = Color.White.copy(alpha = 0.85f),
+                    topLeft = Offset(step * cellPx, 7 * cellPx),
+                    size = Size(cellPx, cellPx),
+                    style = Stroke(width = 1.2f)
+                )
+                // Green (Top arm)
+                drawRect(
+                    color = Color.White.copy(alpha = 0.85f),
+                    topLeft = Offset(7 * cellPx, step * cellPx),
+                    size = Size(cellPx, cellPx),
+                    style = Stroke(width = 1.2f)
+                )
+                // Blue (Right arm)
+                drawRect(
+                    color = Color.White.copy(alpha = 0.85f),
+                    topLeft = Offset((8 + step) * cellPx, 7 * cellPx),
+                    size = Size(cellPx, cellPx),
+                    style = Stroke(width = 1.2f)
+                )
+                // Yellow (Bottom arm)
+                drawRect(
+                    color = Color.White.copy(alpha = 0.85f),
+                    topLeft = Offset(7 * cellPx, (8 + step) * cellPx),
+                    size = Size(cellPx, cellPx),
+                    style = Stroke(width = 1.2f)
+                )
+            }
+
+            // 1E. Directional Arrows at Home Entrances (Classic Normal Ludo Feature)
+            // Red Entrance Arrow at (0, 7) pointing Right
+            drawDirectionalArrow(
+                center = Offset(0.5f * cellPx, 7.5f * cellPx),
+                size = cellPx * 0.45f,
+                direction = ArrowDirection.RIGHT,
+                color = Color(0xFFE53935)
+            )
+
+            // Green Entrance Arrow at (7, 0) pointing Down
+            drawDirectionalArrow(
+                center = Offset(7.5f * cellPx, 0.5f * cellPx),
+                size = cellPx * 0.45f,
+                direction = ArrowDirection.DOWN,
+                color = Color(0xFF43A047)
+            )
+
+            // Blue Entrance Arrow at (14, 7) pointing Left
+            drawDirectionalArrow(
+                center = Offset(14.5f * cellPx, 7.5f * cellPx),
+                size = cellPx * 0.45f,
+                direction = ArrowDirection.LEFT,
+                color = Color(0xFF1E88E5)
+            )
+
+            // Yellow Entrance Arrow at (7, 14) pointing Up
+            drawDirectionalArrow(
+                center = Offset(7.5f * cellPx, 14.5f * cellPx),
+                size = cellPx * 0.45f,
+                direction = ArrowDirection.UP,
+                color = Color(0xFFF57F17)
+            )
+
+            // 1F. Central Finish Area with 4 Vibrant Triangles (Center 3x3 square)
             val centerLeft = 6 * cellPx
             val centerTop = 6 * cellPx
             val centerRight = 9 * cellPx
@@ -198,32 +279,32 @@ fun RoyalBoardView(
             val cx = 7.5f * cellPx
             val cy = 7.5f * cellPx
 
-            // Top Triangle (Red)
-            val redTriangle = Path().apply {
+            // Top Triangle (Green)
+            val greenTriangle = Path().apply {
                 moveTo(centerLeft, centerTop)
                 lineTo(centerRight, centerTop)
                 lineTo(cx, cy)
                 close()
             }
-            drawPath(path = redTriangle, color = Color(0xFFE53935))
+            drawPath(path = greenTriangle, color = Color(0xFF43A047))
 
-            // Left Triangle (Blue)
-            val blueTriangle = Path().apply {
+            // Left Triangle (Red)
+            val redTriangle = Path().apply {
                 moveTo(centerLeft, centerTop)
                 lineTo(centerLeft, centerBottom)
                 lineTo(cx, cy)
                 close()
             }
-            drawPath(path = blueTriangle, color = Color(0xFF1E88E5))
+            drawPath(path = redTriangle, color = Color(0xFFE53935))
 
-            // Right Triangle (Green)
-            val greenTriangle = Path().apply {
+            // Right Triangle (Blue)
+            val blueTriangle = Path().apply {
                 moveTo(centerRight, centerTop)
                 lineTo(centerRight, centerBottom)
                 lineTo(cx, cy)
                 close()
             }
-            drawPath(path = greenTriangle, color = Color(0xFF43A047))
+            drawPath(path = blueTriangle, color = Color(0xFF1E88E5))
 
             // Bottom Triangle (Yellow)
             val yellowTriangle = Path().apply {
@@ -232,48 +313,59 @@ fun RoyalBoardView(
                 lineTo(cx, cy)
                 close()
             }
-            drawPath(path = yellowTriangle, color = Color(0xFFFBC02D))
+            drawPath(path = yellowTriangle, color = Color(0xFFFDD835))
 
-            // Central Finish Separator Lines
+            // Center Diagonal Separator Lines
             drawLine(
-                color = Color.White.copy(alpha = 0.8f),
+                color = Color.White,
                 start = Offset(centerLeft, centerTop),
                 end = Offset(centerRight, centerBottom),
-                strokeWidth = 1.5f
+                strokeWidth = 2.dp.toPx()
             )
             drawLine(
-                color = Color.White.copy(alpha = 0.8f),
+                color = Color.White,
                 start = Offset(centerRight, centerTop),
                 end = Offset(centerLeft, centerBottom),
-                strokeWidth = 1.5f
+                strokeWidth = 2.dp.toPx()
             )
 
-            // 1E. Central 3D Golden Sphere Medallion with Star
-            drawCentralGoldenSphere(cx, cy, cellPx * 0.78f)
+            // Center Finish Outer Border
+            drawRect(
+                color = gridBorderColor,
+                topLeft = Offset(centerLeft, centerTop),
+                size = Size(3 * cellPx, 3 * cellPx),
+                style = Stroke(width = 2.dp.toPx())
+            )
 
-            // 1F. Eight 3D Golden Safe Star Medallions
-            val safeStarCoords = listOf(
-                1 to 6,   // Blue Start
+            // Elegant Compact Golden Center Star (Keeps triangles wide open and authentic)
+            drawCompactCenterStar(cx, cy, cellPx * 0.40f)
+
+            // 1G. Eight Standard Safe Stars
+            // 4 Starting cells with white stars
+            drawStarIcon((1 + 0.5f) * cellPx, (6 + 0.5f) * cellPx, cellPx * 0.32f, Color.White, Color(0x66000000))
+            drawStarIcon((8 + 0.5f) * cellPx, (1 + 0.5f) * cellPx, cellPx * 0.32f, Color.White, Color(0x66000000))
+            drawStarIcon((13 + 0.5f) * cellPx, (8 + 0.5f) * cellPx, cellPx * 0.32f, Color.White, Color(0x66000000))
+            drawStarIcon((6 + 0.5f) * cellPx, (13 + 0.5f) * cellPx, cellPx * 0.32f, Color(0xFF424242), Color(0x33000000))
+
+            // 4 Safe track squares with classic golden stars
+            val safeSquareCoords = listOf(
                 6 to 2,   // Red approach star
-                8 to 1,   // Red Start
                 12 to 6,  // Green approach star
-                13 to 8,  // Green Start
                 8 to 12,  // Yellow approach star
-                6 to 13,  // Yellow Start
                 2 to 8    // Blue approach star
             )
-
-            for ((sc, sr) in safeStarCoords) {
+            for ((sc, sr) in safeSquareCoords) {
                 val starCenterX = (sc + 0.5f) * cellPx
                 val starCenterY = (sr + 0.5f) * cellPx
-                drawAuthenticGoldenStarMedallion(starCenterX, starCenterY, cellPx * 0.38f)
+                drawStarIcon(starCenterX, starCenterY, cellPx * 0.35f, Color(0xFFFFB300), Color(0xFFE65100))
             }
         }
 
-        // 2. Interactive Pawns Layer matching Screenshot aesthetics
+        // 2. Interactive Pawns Layer with Multi-Token Stacking
         val allPawns = players.flatMap { it.pawns }
 
-        val pawnPositions = remember(allPawns) {
+        // Compute base grid coordinates
+        val rawPawnPositions = remember(allPawns) {
             allPawns.map { pawn ->
                 val (gridX, gridY) = when (pawn.state) {
                     PawnState.IN_BASE -> StandardLudoBoardLayout.getBasePocketFloatPosition(pawn.color, pawn.id)
@@ -292,8 +384,35 @@ fun RoyalBoardView(
             }
         }
 
-        pawnPositions.forEach { (pawn, colFloat, rowFloat) ->
-            RoyalAuthenticPawn(
+        // Apply slight visual offsets when multiple tokens occupy the exact same track cell
+        val stackedPawns = remember(rawPawnPositions) {
+            val cellGroups = rawPawnPositions.groupBy { (it.second * 10).toInt() to (it.third * 10).toInt() }
+            rawPawnPositions.map { triple ->
+                val key = (triple.second * 10).toInt() to (triple.third * 10).toInt()
+                val group = cellGroups[key] ?: listOf(triple)
+                val indexInGroup = group.indexOf(triple)
+                val (offsetX, offsetY) = if (group.size > 1 && triple.first.state != PawnState.IN_BASE) {
+                    when (group.size) {
+                        2 -> if (indexInGroup == 0) -0.14f to -0.14f else 0.14f to 0.14f
+                        3 -> when (indexInGroup) {
+                            0 -> 0f to -0.16f
+                            1 -> -0.16f to 0.14f
+                            else -> 0.16f to 0.14f
+                        }
+                        else -> when (indexInGroup) {
+                            0 -> -0.15f to -0.15f
+                            1 -> 0.15f to -0.15f
+                            2 -> -0.15f to 0.15f
+                            else -> 0.15f to 0.15f
+                        }
+                    }
+                } else 0f to 0f
+                Triple(triple.first, triple.second + offsetX, triple.third + offsetY)
+            }
+        }
+
+        stackedPawns.forEach { (pawn, colFloat, rowFloat) ->
+            ClassicLudoPawn(
                 pawn = pawn,
                 colFloat = colFloat,
                 rowFloat = rowFloat,
@@ -305,25 +424,64 @@ fun RoyalBoardView(
     }
 }
 
+private enum class ArrowDirection { UP, DOWN, LEFT, RIGHT }
+
 /**
- * Draws an authentic Home Quadrant matching the reference screenshot:
- * Rich gradient background, rounded corners, inner white card, and 4 frosted circular sockets.
+ * Draws a sharp directional entrance arrow inside a track cell.
  */
-private fun DrawScope.drawAuthenticHomeQuadrant(
+private fun DrawScope.drawDirectionalArrow(
+    center: Offset,
+    size: Float,
+    direction: ArrowDirection,
+    color: Color
+) {
+    val half = size * 0.5f
+    val path = Path()
+    when (direction) {
+        ArrowDirection.RIGHT -> {
+            path.moveTo(center.x - half, center.y - half * 0.7f)
+            path.lineTo(center.x + half, center.y)
+            path.lineTo(center.x - half, center.y + half * 0.7f)
+        }
+        ArrowDirection.DOWN -> {
+            path.moveTo(center.x - half * 0.7f, center.y - half)
+            path.lineTo(center.x, center.y + half)
+            path.lineTo(center.x + half * 0.7f, center.y - half)
+        }
+        ArrowDirection.LEFT -> {
+            path.moveTo(center.x + half, center.y - half * 0.7f)
+            path.lineTo(center.x - half, center.y)
+            path.lineTo(center.x + half, center.y + half * 0.7f)
+        }
+        ArrowDirection.UP -> {
+            path.moveTo(center.x - half * 0.7f, center.y + half)
+            path.lineTo(center.x, center.y - half)
+            path.lineTo(center.x + half * 0.7f, center.y + half)
+        }
+    }
+    path.close()
+    drawPath(path = path, color = color)
+}
+
+/**
+ * Draws a classic home quadrant (6x6):
+ * Solid colored border, white inner card, and 4 circular colored token bases.
+ */
+private fun DrawScope.drawClassicHomeQuadrant(
     color: LudoColor,
     topLeft: Offset,
     size: Size,
     cellPx: Float,
-    gradient: List<Color>,
-    socketTint: Color,
-    socketBorder: Color
+    primaryColor: Color,
+    darkColor: Color,
+    socketColor: Color
 ) {
-    val cornerRadius = CornerRadius(18.dp.toPx(), 18.dp.toPx())
+    val cornerRadius = CornerRadius(14.dp.toPx(), 14.dp.toPx())
 
-    // 1. Quadrant Base with Gradient
+    // 1. Solid Outer Base
     drawRoundRect(
         brush = Brush.verticalGradient(
-            colors = gradient,
+            colors = listOf(primaryColor, darkColor),
             startY = topLeft.y,
             endY = topLeft.y + size.height
         ),
@@ -333,21 +491,21 @@ private fun DrawScope.drawAuthenticHomeQuadrant(
     )
 
     // 2. Inner White Card
-    val cardInset = cellPx * 0.72f
+    val cardInset = cellPx * 0.70f
     val cardWidth = size.width - (cardInset * 2f)
     val cardHeight = size.height - (cardInset * 2f)
     val cardTopLeft = Offset(topLeft.x + cardInset, topLeft.y + cardInset)
-    val cardCornerRadius = CornerRadius(16.dp.toPx(), 16.dp.toPx())
+    val cardCornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx())
 
-    // Subtle drop shadow under white card
+    // Subtle drop shadow
     drawRoundRect(
-        color = Color(0x33000000),
+        color = Color(0x2A000000),
         topLeft = Offset(cardTopLeft.x + 1f, cardTopLeft.y + 2f),
         size = Size(cardWidth, cardHeight),
         cornerRadius = cardCornerRadius
     )
 
-    // White Card Surface
+    // White Card
     drawRoundRect(
         color = Color.White,
         topLeft = cardTopLeft,
@@ -355,8 +513,17 @@ private fun DrawScope.drawAuthenticHomeQuadrant(
         cornerRadius = cardCornerRadius
     )
 
-    // 3. Four Frosted Circular Sockets
-    val socketRadius = cellPx * 0.68f
+    // Card border
+    drawRoundRect(
+        color = Color(0xFFCFD8DC),
+        topLeft = cardTopLeft,
+        size = Size(cardWidth, cardHeight),
+        cornerRadius = cardCornerRadius,
+        style = Stroke(width = 1.2f)
+    )
+
+    // 3. Four Classic Solid Circular Sockets
+    val socketRadius = cellPx * 0.72f
     val colOffset1 = cardTopLeft.x + (cardWidth * 0.28f)
     val colOffset2 = cardTopLeft.x + (cardWidth * 0.72f)
     val rowOffset1 = cardTopLeft.y + (cardHeight * 0.28f)
@@ -370,128 +537,86 @@ private fun DrawScope.drawAuthenticHomeQuadrant(
     )
 
     for (center in centers) {
-        // Soft outer shadow ring
+        // Outer dark ring
         drawCircle(
-            color = Color(0x18000000),
+            color = Color(0x33000000),
             radius = socketRadius + 1.5f,
             center = Offset(center.x, center.y + 1f)
         )
 
-        // Frosted radial gradient filling
+        // Solid circular socket
         drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.9f),
-                    socketTint.copy(alpha = 0.22f),
-                    socketTint.copy(alpha = 0.45f)
-                ),
-                center = center,
-                radius = socketRadius
-            ),
+            color = socketColor,
             radius = socketRadius,
             center = center
         )
 
-        // Inner rim stroke
+        // Inner white concentric circle
         drawCircle(
-            color = socketBorder.copy(alpha = 0.75f),
-            radius = socketRadius,
-            center = center,
-            style = Stroke(width = 2.dp.toPx())
+            color = Color.White,
+            radius = socketRadius * 0.65f,
+            center = center
+        )
+
+        // Inner small colored center dot
+        drawCircle(
+            color = socketColor,
+            radius = socketRadius * 0.28f,
+            center = center
         )
     }
 }
 
 /**
- * Draws the prominent 3D Central Golden Sphere Medallion with star apex.
+ * Draws a compact center golden star leaving the 4 colored triangles visible.
  */
-private fun DrawScope.drawCentralGoldenSphere(
+private fun DrawScope.drawCompactCenterStar(
     cx: Float,
     cy: Float,
     radius: Float
 ) {
     // Drop shadow
     drawCircle(
-        color = Color(0x55000000),
-        radius = radius + 3f,
-        center = Offset(cx, cy + 2.5f)
+        color = Color(0x44000000),
+        radius = radius + 2f,
+        center = Offset(cx, cy + 1.5f)
     )
 
-    // 3D Sphere Radial Gradient (convex orb appearance)
+    // Golden circular base
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(
-                Color(0xFFFFFDE7),
-                Color(0xFFFFEE58),
-                Color(0xFFFFB300),
-                Color(0xFFF57F17),
-                Color(0xFF8D6E63)
-            ),
-            center = Offset(cx - radius * 0.25f, cy - radius * 0.25f),
-            radius = radius * 1.15f
+            colors = listOf(Color(0xFFFFF9C4), Color(0xFFFFD54F), Color(0xFFFFB300), Color(0xFFE65100)),
+            center = Offset(cx - radius * 0.2f, cy - radius * 0.2f),
+            radius = radius
         ),
         radius = radius,
         center = Offset(cx, cy)
     )
 
-    // Gold Outer Rim
     drawCircle(
-        color = Color(0xFFFFA000),
+        color = Color(0xFFFF8F00),
         radius = radius,
         center = Offset(cx, cy),
-        style = Stroke(width = 2.dp.toPx())
+        style = Stroke(width = 1.5f)
     )
 
-    // Embossed Center Star
-    draw5PointedStar(cx, cy, radius * 0.46f, Color(0xFF6B4500), Color.White)
+    // Center 5-pointed star
+    draw5PointedStar(cx, cy, radius * 0.52f, Color(0xFF5D4037), Color.White)
 }
 
 /**
- * Draws an authentic 3D embossed Golden Star Medallion.
+ * Draws a clean star icon inside safe cells.
  */
-private fun DrawScope.drawAuthenticGoldenStarMedallion(
+private fun DrawScope.drawStarIcon(
     cx: Float,
     cy: Float,
-    radius: Float
+    radius: Float,
+    starColor: Color,
+    shadowColor: Color
 ) {
-    // Drop shadow
-    drawCircle(
-        color = Color(0x38000000),
-        radius = radius + 1.5f,
-        center = Offset(cx, cy + 1.2f)
-    )
-
-    // Golden Coin Base
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(
-                Color(0xFFFFF9C4),
-                Color(0xFFFFD54F),
-                Color(0xFFFF8F00),
-                Color(0xFFB78103)
-            ),
-            center = Offset(cx - radius * 0.28f, cy - radius * 0.28f),
-            radius = radius * 1.15f
-        ),
-        radius = radius,
-        center = Offset(cx, cy)
-    )
-
-    // Gold Rim
-    drawCircle(
-        color = Color(0xFFFFB300),
-        radius = radius,
-        center = Offset(cx, cy),
-        style = Stroke(width = 1.2.dp.toPx())
-    )
-
-    // Crisp Center 5-Pointed Star
-    draw5PointedStar(cx, cy, radius * 0.65f, Color(0x66B78103), Color.White)
+    draw5PointedStar(cx, cy, radius, shadowColor, starColor)
 }
 
-/**
- * Helper to draw a 5-pointed star path.
- */
 private fun DrawScope.draw5PointedStar(
     cx: Float,
     cy: Float,
@@ -516,17 +641,16 @@ private fun DrawScope.draw5PointedStar(
         return path
     }
 
-    // Shadow
     drawPath(path = buildStarPath(offsetY = 1f), color = shadowColor)
-    // Star Body
     drawPath(path = buildStarPath(), color = starColor)
 }
 
 /**
- * High-fidelity Pawn Item matching the glass jewel crown pawns in the reference screenshot.
+ * Classic Normal Ludo Gotis (Tokens).
+ * Features authentic 3D wooden/plastic rounded head, flanged base, drop shadow, and active turn pulsing glow.
  */
 @Composable
-private fun RoyalAuthenticPawn(
+private fun ClassicLudoPawn(
     pawn: Pawn,
     colFloat: Float,
     rowFloat: Float,
@@ -537,7 +661,7 @@ private fun RoyalAuthenticPawn(
     val infiniteTransition = rememberInfiniteTransition(label = "pawnGlow")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = if (pawn.isMovable) 1.2f else 1f,
+        targetValue = if (pawn.isMovable) 1.22f else 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -547,7 +671,7 @@ private fun RoyalAuthenticPawn(
 
     val xOffset = cellSize * colFloat
     val yOffset = cellSize * rowFloat
-    val pawnDiameter = cellSize * 0.92f
+    val pawnDiameter = cellSize * 0.90f
 
     Box(
         modifier = Modifier
@@ -561,52 +685,50 @@ private fun RoyalAuthenticPawn(
                 modifier = Modifier
                     .size(pawnDiameter * pulseScale)
                     .clip(CircleShape)
-                    .background(Color(0x66FFD700))
+                    .background(Color(0x77FFD700))
                     .border(2.dp, Color(0xFFFFEB3B), CircleShape)
             )
         }
 
-        // Authentic Glass Jewel Pawn Token
+        // Classic 3D Pawn Body
         Box(
             modifier = Modifier
-                .size(pawnDiameter * 0.88f)
+                .size(pawnDiameter * 0.86f)
                 .shadow(elevation = if (pawn.isMovable) 6.dp else 3.dp, shape = CircleShape)
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
                         colors = when (pawn.color) {
                             LudoColor.BLUE -> listOf(
-                                Color(0xFFE1F5FE),
-                                Color(0xFF42A5F5),
-                                Color(0xFF0288D1),
-                                Color(0xFF01579B)
+                                Color(0xFFBBDEFB),
+                                Color(0xFF2196F3),
+                                Color(0xFF1565C0),
+                                Color(0xFF0D47A1)
                             )
                             LudoColor.RED -> listOf(
-                                Color(0xFFFFEBEE),
-                                Color(0xFFFF5252),
-                                Color(0xFFD50000),
+                                Color(0xFFFFCDD2),
+                                Color(0xFFF44336),
+                                Color(0xFFC62828),
                                 Color(0xFF8E0000)
                             )
                             LudoColor.YELLOW -> listOf(
-                                Color(0xFFFFFDE7),
+                                Color(0xFFFFF9C4),
                                 Color(0xFFFFEE58),
-                                Color(0xFFFFB300),
+                                Color(0xFFFBC02D),
                                 Color(0xFFF57F17)
                             )
                             LudoColor.GREEN -> listOf(
-                                Color(0xFFE8F5E9),
-                                Color(0xFF69F0AE),
-                                Color(0xFF00C853),
+                                Color(0xFFC8E6C9),
+                                Color(0xFF4CAF50),
+                                Color(0xFF2E7D32),
                                 Color(0xFF1B5E20)
                             )
                         }
                     )
                 )
                 .border(
-                    width = 2.dp,
-                    brush = Brush.linearGradient(
-                        listOf(RoyalGoldLight, RoyalGold, RoyalGoldDark)
-                    ),
+                    width = 1.8.dp,
+                    color = Color.White.copy(alpha = 0.85f),
                     shape = CircleShape
                 )
                 .clickable(enabled = pawn.isMovable) {
@@ -615,21 +737,22 @@ private fun RoyalAuthenticPawn(
                 .testTag("pawn_${pawn.color.name.lowercase()}_${pawn.id}"),
             contentAlignment = Alignment.Center
         ) {
-            // Top Gloss Specular Highlight
+            // Specular 3D Highlight at Top
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 2.dp)
-                    .width(pawnDiameter * 0.44f)
-                    .height(pawnDiameter * 0.18f)
+                    .width(pawnDiameter * 0.40f)
+                    .height(pawnDiameter * 0.16f)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White.copy(alpha = 0.65f))
+                    .background(Color.White.copy(alpha = 0.70f))
             )
 
-            // Center Golden Crown / Royal Emblem
+            // Inner Center Token Pin / Crown Emblem
             Text(
-                text = pawnCrownEmoji,
-                fontSize = (cellSize.value * 0.46f).sp,
+                text = if (pawnCrownEmoji.isNotBlank() && pawnCrownEmoji != "👑") pawnCrownEmoji else "★",
+                color = if (pawn.color == LudoColor.YELLOW) Color(0xFF5D4037) else Color.White,
+                fontSize = (cellSize.value * 0.42f).sp,
                 fontWeight = FontWeight.Black
             )
         }

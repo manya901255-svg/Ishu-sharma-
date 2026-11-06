@@ -58,10 +58,10 @@ object StandardLudoBoardLayout {
     fun getHomeStretchGridPosition(color: LudoColor, step: Int): Pair<Int, Int> {
         val clampedStep = step.coerceIn(1, 5)
         return when (color) {
-            LudoColor.BLUE -> clampedStep to 7              // Right from left (cols 1..5, row 7)
-            LudoColor.RED -> 7 to clampedStep              // Down from top (col 7, rows 1..5)
-            LudoColor.GREEN -> (14 - clampedStep) to 7     // Left from right (cols 13..9, row 7)
-            LudoColor.YELLOW -> 7 to (14 - clampedStep)    // Up from bottom (col 7, rows 13..9)
+            LudoColor.RED -> clampedStep to 7              // Right from left (cols 1..5, row 7) - Left Arm
+            LudoColor.GREEN -> 7 to clampedStep            // Down from top (col 7, rows 1..5) - Top Arm
+            LudoColor.BLUE -> (14 - clampedStep) to 7     // Left from right (cols 13..9, row 7) - Right Arm
+            LudoColor.YELLOW -> 7 to (14 - clampedStep)    // Up from bottom (col 7, rows 13..9) - Bottom Arm
         }
     }
 
@@ -69,29 +69,29 @@ object StandardLudoBoardLayout {
     fun getBasePocketFloatPosition(color: LudoColor, pocketIndex: Int): Pair<Float, Float> {
         val idx = pocketIndex.coerceIn(0, 3)
         return when (color) {
-            LudoColor.BLUE -> when (idx) {
+            LudoColor.RED -> when (idx) { // Top-Left (0..5, 0..5)
                 0 -> 1.75f to 1.75f
                 1 -> 3.75f to 1.75f
                 2 -> 1.75f to 3.75f
                 else -> 3.75f to 3.75f
             }
-            LudoColor.RED -> when (idx) {
+            LudoColor.GREEN -> when (idx) { // Top-Right (9..14, 0..5)
                 0 -> 10.75f to 1.75f
                 1 -> 12.75f to 1.75f
                 2 -> 10.75f to 3.75f
                 else -> 12.75f to 3.75f
             }
-            LudoColor.GREEN -> when (idx) {
-                0 -> 10.75f to 10.75f
-                1 -> 12.75f to 10.75f
-                2 -> 10.75f to 12.75f
-                else -> 12.75f to 12.75f
-            }
-            LudoColor.YELLOW -> when (idx) {
+            LudoColor.YELLOW -> when (idx) { // Bottom-Left (0..5, 9..14)
                 0 -> 1.75f to 10.75f
                 1 -> 3.75f to 10.75f
                 2 -> 1.75f to 12.75f
                 else -> 3.75f to 12.75f
+            }
+            LudoColor.BLUE -> when (idx) { // Bottom-Right (9..14, 9..14)
+                0 -> 10.75f to 10.75f
+                1 -> 12.75f to 10.75f
+                2 -> 10.75f to 12.75f
+                else -> 12.75f to 12.75f
             }
         }
     }

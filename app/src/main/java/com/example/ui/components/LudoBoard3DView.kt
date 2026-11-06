@@ -71,10 +71,10 @@ fun getHomeStretchCoordinate(color: LudoColor, step: Int): Pair<Int, Int> {
 }
 
 val BASE_PAWN_SLOTS: Map<LudoColor, List<Pair<Float, Float>>> = mapOf(
-    LudoColor.BLUE to listOf(2f to 2f, 2f to 4f, 4f to 2f, 4f to 4f),
-    LudoColor.RED to listOf(2f to 11f, 2f to 13f, 4f to 11f, 4f to 13f),
-    LudoColor.GREEN to listOf(11f to 11f, 11f to 13f, 13f to 11f, 13f to 13f),
-    LudoColor.YELLOW to listOf(11f to 2f, 11f to 4f, 13f to 2f, 13f to 4f)
+    LudoColor.RED to listOf(2f to 2f, 2f to 4f, 4f to 2f, 4f to 4f),
+    LudoColor.GREEN to listOf(11f to 2f, 11f to 4f, 13f to 2f, 13f to 4f),
+    LudoColor.YELLOW to listOf(2f to 11f, 2f to 13f, 4f to 11f, 4f to 13f),
+    LudoColor.BLUE to listOf(11f to 11f, 11f to 13f, 13f to 11f, 13f to 13f)
 )
 
 @Composable
@@ -279,19 +279,19 @@ fun LudoBoard3DView(
 
             // 1A. Four 3D Colored Home Quadrants (6x6 cells each)
             draw3DHomeQuadrant(
-                color = LudoColor.BLUE,
+                color = LudoColor.RED,
                 topLeft = Offset(0f, 0f),
                 size = Size(6f * cellPx, 6f * cellPx),
                 cellPx = cellPx,
-                playerName = bluePlayer?.name ?: "Blue"
+                playerName = redPlayer?.name ?: "Red"
             )
 
             draw3DHomeQuadrant(
-                color = LudoColor.RED,
+                color = LudoColor.GREEN,
                 topLeft = Offset(9f * cellPx, 0f),
                 size = Size(6f * cellPx, 6f * cellPx),
                 cellPx = cellPx,
-                playerName = redPlayer?.name ?: "Red"
+                playerName = greenPlayer?.name ?: "Green"
             )
 
             draw3DHomeQuadrant(
@@ -303,11 +303,11 @@ fun LudoBoard3DView(
             )
 
             draw3DHomeQuadrant(
-                color = LudoColor.GREEN,
+                color = LudoColor.BLUE,
                 topLeft = Offset(9f * cellPx, 9f * cellPx),
                 size = Size(6f * cellPx, 6f * cellPx),
                 cellPx = cellPx,
-                playerName = greenPlayer?.name ?: "Green"
+                playerName = bluePlayer?.name ?: "Blue"
             )
 
             // 1B. 52 3D Outer Track Cells with Beveled Relief
@@ -353,9 +353,9 @@ fun LudoBoard3DView(
 
                 // Start Cells colored indicators
                 when (index) {
-                    1 -> draw3DStartCell(x, y, cellPx, LudoColor.BLUE)
-                    14 -> draw3DStartCell(x, y, cellPx, LudoColor.RED)
-                    27 -> draw3DStartCell(x, y, cellPx, LudoColor.GREEN)
+                    1 -> draw3DStartCell(x, y, cellPx, LudoColor.RED)
+                    14 -> draw3DStartCell(x, y, cellPx, LudoColor.GREEN)
+                    27 -> draw3DStartCell(x, y, cellPx, LudoColor.BLUE)
                     40 -> draw3DStartCell(x, y, cellPx, LudoColor.YELLOW)
                 }
 
@@ -646,16 +646,17 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.draw3DCentralFinish
         lineTo(left, bottom)
         close()
     }
+    // 1. Red Triangle (Left)
     drawPath(
         path = bluePath,
         brush = Brush.linearGradient(
-            colors = listOf(Color(0xFF039BE5), Color(0xFF0277BD)),
+            colors = listOf(Color(0xFFE53935), Color(0xFFC62828)),
             start = Offset(left, centerY),
             end = Offset(centerX, centerY)
         )
     )
 
-    // 2. Red Triangle (Top)
+    // 2. Green Triangle (Top)
     val redPath = Path().apply {
         moveTo(left, top)
         lineTo(right, top)
@@ -665,13 +666,13 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.draw3DCentralFinish
     drawPath(
         path = redPath,
         brush = Brush.linearGradient(
-            colors = listOf(Color(0xFFE53935), Color(0xFFC62828)),
+            colors = listOf(Color(0xFF43A047), Color(0xFF2E7D32)),
             start = Offset(centerX, top),
             end = Offset(centerX, centerY)
         )
     )
 
-    // 3. Green Triangle (Right)
+    // 3. Blue Triangle (Right)
     val greenPath = Path().apply {
         moveTo(right, top)
         lineTo(right, bottom)
@@ -681,7 +682,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.draw3DCentralFinish
     drawPath(
         path = greenPath,
         brush = Brush.linearGradient(
-            colors = listOf(Color(0xFF43A047), Color(0xFF2E7D32)),
+            colors = listOf(Color(0xFF039BE5), Color(0xFF0277BD)),
             start = Offset(right, centerY),
             end = Offset(centerX, centerY)
         )

@@ -1006,14 +1006,14 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
 
         val colors = if (playerCount == 2) {
             val opposite = when (chosenColor) {
-                LudoColor.BLUE -> LudoColor.YELLOW
-                LudoColor.YELLOW -> LudoColor.BLUE
-                LudoColor.RED -> LudoColor.GREEN
-                LudoColor.GREEN -> LudoColor.RED
+                LudoColor.RED -> LudoColor.BLUE
+                LudoColor.GREEN -> LudoColor.YELLOW
+                LudoColor.YELLOW -> LudoColor.GREEN
+                LudoColor.BLUE -> LudoColor.RED
             }
             listOf(chosenColor, opposite)
         } else {
-            val remaining = listOf(LudoColor.BLUE, LudoColor.YELLOW, LudoColor.RED, LudoColor.GREEN).filter { it != chosenColor }
+            val remaining = listOf(LudoColor.RED, LudoColor.GREEN, LudoColor.YELLOW, LudoColor.BLUE).filter { it != chosenColor }
             listOf(chosenColor) + remaining.take(playerCount - 1)
         }
 

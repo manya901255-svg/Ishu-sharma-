@@ -83,4 +83,20 @@ class ExampleRobolectricTest {
     soundManager.selectTrack(0)
     org.junit.Assert.assertEquals(0, soundManager.currentTrackIndex)
   }
+
+  @Test
+  fun `verify classic ludo quadrant and start positions`() {
+    assertEquals(1, com.example.model.LudoColor.RED.startTrackPos)
+    assertEquals(14, com.example.model.LudoColor.GREEN.startTrackPos)
+    assertEquals(27, com.example.model.LudoColor.BLUE.startTrackPos)
+    assertEquals(40, com.example.model.LudoColor.YELLOW.startTrackPos)
+
+    val redBase0 = com.example.ui.components.StandardLudoBoardLayout.getBasePocketFloatPosition(com.example.model.LudoColor.RED, 0)
+    assertEquals(1.75f, redBase0.first, 0.01f)
+    assertEquals(1.75f, redBase0.second, 0.01f)
+
+    val greenBase0 = com.example.ui.components.StandardLudoBoardLayout.getBasePocketFloatPosition(com.example.model.LudoColor.GREEN, 0)
+    assertEquals(10.75f, greenBase0.first, 0.01f)
+    assertEquals(1.75f, greenBase0.second, 0.01f)
+  }
 }
