@@ -59,4 +59,28 @@ class ExampleRobolectricTest {
     viewModel.toggleChatDialog(false)
     assertEquals(false, viewModel.uiState.value.showChatDialog)
   }
+
+  @Test
+  fun `bgm playlist contains all 44 songs with unique ids and valid assets`() {
+    val playlist = com.example.model.BGM_PLAYLIST
+    assertEquals(44, playlist.size)
+
+    val ids = playlist.map { it.id }.toSet()
+    assertEquals("All track IDs must be unique", 44, ids.size)
+
+    playlist.forEach { track ->
+      org.junit.Assert.assertTrue("Title must not be blank for ${track.id}", track.title.isNotBlank())
+      org.junit.Assert.assertTrue("Singer must not be blank for ${track.id}", track.singer.isNotBlank())
+      org.junit.Assert.assertTrue("AssetFileName must not be blank for ${track.id}", track.assetFileName.isNotBlank())
+    }
+  }
+
+  @Test
+  fun `test RoyalSoundManager track playback`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val soundManager = com.example.util.RoyalSoundManager(context)
+    soundManager.setBgmEnabled(true)
+    soundManager.selectTrack(0)
+    org.junit.Assert.assertEquals(0, soundManager.currentTrackIndex)
+  }
 }

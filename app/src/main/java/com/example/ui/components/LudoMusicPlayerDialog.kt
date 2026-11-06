@@ -335,7 +335,7 @@ fun LudoMusicPlayerDialog(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = if (BGM_PLAYLIST.isEmpty()) {
-                                        "All songs have been removed from the playlist.\nOnly sound effects (SFX) & haptics will play."
+                                        "No songs found in playlist."
                                     } else if (showFavoritesOnly) {
                                         "No favorite tracks saved yet.\nTap the heart icon on any track to add!"
                                     } else {
@@ -412,27 +412,27 @@ private fun NowPlayingCard(
                         .border(1.5.dp, Color(0xFF546E7A), RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("🔇", fontSize = 28.sp)
+                    Text("🎵", fontSize = 28.sp)
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "All Songs Removed",
+                        text = "Royal Music Lounge",
                         color = Color.White,
                         fontSize = 14.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Background music playlist has no songs",
+                        text = "Choose any Bollywood melody to play",
                         color = RoyalGoldLight,
                         fontSize = 11.5.sp
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "🔊 Sound Effects & Haptics Only",
+                        text = "🎶 44 Songs • Tap any track to play",
                         color = Color(0xFF90CAF9),
                         fontSize = 10.5.sp
                     )

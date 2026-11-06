@@ -46,10 +46,10 @@ class ProfilePreferences(private val context: Context) {
         const val DEFAULT_PAWN_CROWN_AVATAR = "crown_imperial_gold"
         const val DEFAULT_BOARD_THEME = "imperial_navy"
         const val DEFAULT_SFX_PRESET = "royal_court"
-        const val DEFAULT_BGM_ENABLED = false
+        const val DEFAULT_BGM_ENABLED = true
         const val DEFAULT_SFX_ENABLED = true
         const val DEFAULT_HAPTICS_ENABLED = true
-        const val DEFAULT_BGM_VOLUME = 0.0f
+        const val DEFAULT_BGM_VOLUME = 0.80f
         const val DEFAULT_SFX_VOLUME = 0.85f
         const val DEFAULT_REPEAT_MODE = "ALL"
     }
@@ -63,7 +63,10 @@ class ProfilePreferences(private val context: Context) {
     fun isHapticsEnabled(): Boolean = prefs.getBoolean(KEY_HAPTICS_ENABLED, DEFAULT_HAPTICS_ENABLED)
     fun setHapticsEnabled(enabled: Boolean) = prefs.edit().putBoolean(KEY_HAPTICS_ENABLED, enabled).apply()
 
-    fun getBgmVolume(): Float = prefs.getFloat(KEY_BGM_VOLUME, DEFAULT_BGM_VOLUME)
+    fun getBgmVolume(): Float {
+        val vol = prefs.getFloat(KEY_BGM_VOLUME, DEFAULT_BGM_VOLUME)
+        return if (vol <= 0.01f) DEFAULT_BGM_VOLUME else vol
+    }
     fun setBgmVolume(volume: Float) = prefs.edit().putFloat(KEY_BGM_VOLUME, volume).apply()
 
     fun getSfxVolume(): Float = prefs.getFloat(KEY_SFX_VOLUME, DEFAULT_SFX_VOLUME)

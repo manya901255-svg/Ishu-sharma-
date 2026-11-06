@@ -88,11 +88,11 @@ data class LudoUiState(
     val totalCaptures: Int = 89,
     val winStreak: Int = 4,
     val equippedPawnCrownAvatar: String = "crown_imperial_gold",
-    // Audio & Atmosphere - Continuous Background Music Sequential Playlist (All songs removed)
-    val isBgmEnabled: Boolean = false,
+    // Audio & Atmosphere - Continuous Background Music Sequential Playlist (44 Songs)
+    val isBgmEnabled: Boolean = true,
     val isSfxEnabled: Boolean = true,
     val isHapticsEnabled: Boolean = true,
-    val bgmVolume: Float = 0.0f,
+    val bgmVolume: Float = 0.80f,
     val sfxVolume: Float = 0.85f,
     val sfxPreset: String = "royal_court",
     val currentBgmTrack: com.example.model.BgmTrack? = null,
@@ -325,7 +325,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // All background music songs removed per user request
+        // Continuous Royal Background Music Playlist
         soundAndHaptics.soundManager.setOnTrackChangeListener { track, index ->
             _uiState.update {
                 it.copy(
@@ -337,7 +337,9 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         soundAndHaptics.soundManager.setOnPlaybackStateListener { isPlaying ->
             _uiState.update { it.copy(isMusicPlaying = isPlaying) }
         }
-        soundAndHaptics.soundManager.stopAmbientBgm()
+        if (bgmOn && com.example.model.BGM_PLAYLIST.isNotEmpty()) {
+            soundAndHaptics.soundManager.startAmbientBgm()
+        }
 
         // Observe In-Game Voice Chat live flows
         viewModelScope.launch {
@@ -1748,16 +1750,38 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     fun playNextBgmTrack() {
         soundAndHaptics.vibrateClick()
         soundAndHaptics.soundManager.playNextTrack()
+        _uiState.update {
+            it.copy(
+                isMusicPlaying = soundAndHaptics.soundManager.isPlaying(),
+                currentBgmTrack = soundAndHaptics.soundManager.getCurrentTrack(),
+                currentBgmTrackIndex = soundAndHaptics.soundManager.currentTrackIndex
+            )
+        }
     }
 
     fun playPreviousBgmTrack() {
         soundAndHaptics.vibrateClick()
         soundAndHaptics.soundManager.playPreviousTrack()
+        _uiState.update {
+            it.copy(
+                isMusicPlaying = soundAndHaptics.soundManager.isPlaying(),
+                currentBgmTrack = soundAndHaptics.soundManager.getCurrentTrack(),
+                currentBgmTrackIndex = soundAndHaptics.soundManager.currentTrackIndex
+            )
+        }
     }
 
     fun selectBgmTrack(index: Int) {
         soundAndHaptics.vibrateClick()
         soundAndHaptics.soundManager.selectTrack(index)
+        _uiState.update {
+            it.copy(
+                isBgmEnabled = true,
+                isMusicPlaying = soundAndHaptics.soundManager.isPlaying(),
+                currentBgmTrack = soundAndHaptics.soundManager.getCurrentTrack(),
+                currentBgmTrackIndex = index
+            )
+        }
     }
 
     fun setBgmVolume(volume: Float) {

@@ -84,7 +84,13 @@ class RoyalSoundManager(private val context: Context) {
 
     init {
         initSoundPool()
-        // All background music removed as requested by user
+        if (isBgmEnabled && BGM_PLAYLIST.isNotEmpty()) {
+            try {
+                initBgmPlayerForTrack(0)
+            } catch (e: Exception) {
+                Log.e("RoyalSoundManager", "Error initializing first BGM track", e)
+            }
+        }
     }
 
     private fun initSoundPool() {
@@ -246,20 +252,47 @@ class RoyalSoundManager(private val context: Context) {
 
             var prepared = false
             if (track.assetFileName.isNotBlank()) {
+                // Strategy 1: Direct AssetFileDescriptor
                 try {
                     val afd = context.assets.openFd("bgm/${track.assetFileName}")
                     bgmPlayer?.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
                     afd.close()
+                    bgmPlayer?.prepare()
                     prepared = true
                 } catch (e: Exception) {
-                    Log.e("RoyalSoundManager", "Failed to load asset for track ${track.title}", e)
+                    Log.w("RoyalSoundManager", "Direct assetFd failed for ${track.title}, falling back to cache extraction: ${e.message}")
+                }
+
+                // Strategy 2: If direct fd failed, stream asset into cache file and play
+                if (!prepared) {
+                    try {
+                        bgmPlayer?.reset()
+                        val cacheFile = java.io.File(context.cacheDir, "bgm_${track.assetFileName}")
+                        if (!cacheFile.exists() || cacheFile.length() < 1024) {
+                            context.assets.open("bgm/${track.assetFileName}").use { input ->
+                                cacheFile.outputStream().use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                        }
+                        if (cacheFile.exists() && cacheFile.length() > 0) {
+                            bgmPlayer?.setDataSource(cacheFile.absolutePath)
+                            bgmPlayer?.prepare()
+                            prepared = true
+                        }
+                    } catch (e2: Exception) {
+                        Log.e("RoyalSoundManager", "Cached file playback failed for ${track.title}", e2)
+                    }
                 }
             }
+
             if (!prepared && track.rawResId != 0) {
                 try {
+                    bgmPlayer?.reset()
                     val afd = context.resources.openRawResourceFd(track.rawResId)
                     bgmPlayer?.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
                     afd.close()
+                    bgmPlayer?.prepare()
                     prepared = true
                 } catch (e: Exception) {
                     Log.e("RoyalSoundManager", "Failed to load raw res for track ${track.title}", e)
@@ -267,9 +300,10 @@ class RoyalSoundManager(private val context: Context) {
             }
 
             if (prepared) {
-                bgmPlayer?.setVolume(bgmVolume, bgmVolume)
-                bgmPlayer?.prepare()
                 isBgmPrepared = true
+                val effectiveVol = if (bgmVolume > 0.05f) bgmVolume else 0.80f
+                bgmVolume = effectiveVol
+                bgmPlayer?.setVolume(effectiveVol, effectiveVol)
 
                 if (isBgmEnabled) {
                     requestAudioFocus()
@@ -328,6 +362,11 @@ class RoyalSoundManager(private val context: Context) {
 
     fun selectTrack(index: Int) {
         if (index in BGM_PLAYLIST.indices) {
+            isBgmEnabled = true
+            profilePreferences.setBgmEnabled(true)
+            if (bgmVolume <= 0.05f) {
+                setBgmVolume(0.80f)
+            }
             initBgmPlayerForTrack(index)
         }
     }
