@@ -1,0 +1,62 @@
+package com.example
+
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import org.junit.Assert.assertEquals
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
+class ExampleRobolectricTest {
+
+  @Test
+  fun `read string from context`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val appName = context.getString(R.string.app_name)
+    assertEquals("MG Ludo", appName)
+  }
+
+  @Test
+  fun `save and retrieve profile preferences`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val prefs = com.example.util.ProfilePreferences(context)
+    prefs.saveFullProfile("Maharaja Veer", "crown_kohinoor_diamond", "Shahenshah")
+
+    assertEquals("Maharaja Veer", prefs.getNickname())
+    assertEquals("crown_kohinoor_diamond", prefs.getCrownAvatar())
+    assertEquals("Shahenshah", prefs.getRoyalTitle())
+  }
+
+  @Test
+  fun `sendChatMessage adds message with player color and enforces 100 char limit`() {
+    val application = ApplicationProvider.getApplicationContext<android.app.Application>()
+    val viewModel = com.example.viewmodel.LudoViewModel(application)
+    viewModel.startNewGame(com.example.model.GameMode.VS_AI)
+
+    val longMessage = "A".repeat(150)
+    viewModel.sendChatMessage(longMessage)
+
+    val messages = viewModel.uiState.value.chatMessages
+    org.junit.Assert.assertTrue("Messages should not be empty", messages.isNotEmpty())
+    val lastMsg = messages.last()
+    org.junit.Assert.assertTrue("Length should be at most 100", lastMsg.text.length <= 100)
+    org.junit.Assert.assertNotNull("Sender color should be assigned", lastMsg.senderColor)
+  }
+
+  @Test
+  fun `toggleChatDialog clears unread chat count`() {
+    val application = ApplicationProvider.getApplicationContext<android.app.Application>()
+    val viewModel = com.example.viewmodel.LudoViewModel(application)
+    viewModel.startNewGame(com.example.model.GameMode.VS_AI)
+
+    viewModel.toggleChatDialog(true)
+    assertEquals(0, viewModel.uiState.value.unreadChatCount)
+    assertEquals(true, viewModel.uiState.value.showChatDialog)
+
+    viewModel.toggleChatDialog(false)
+    assertEquals(false, viewModel.uiState.value.showChatDialog)
+  }
+}

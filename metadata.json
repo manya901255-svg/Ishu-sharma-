@@ -1,0 +1,6 @@
+{
+  "name": "MG Ludo",
+  "description": "Royal Ancient Kingdom (Maharaja Style) Ludo with Crown Pawns, Realistic Rolling Dice, Online & AI Multiplayer, Rush Mode, and Tech Blueprint",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
