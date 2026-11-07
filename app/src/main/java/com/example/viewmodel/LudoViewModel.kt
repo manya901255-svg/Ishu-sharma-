@@ -116,6 +116,7 @@ data class LudoUiState(
     val showMusicPlayerDialog: Boolean = false,
     val isMusicPlaying: Boolean = false,
     val musicRepeatMode: com.example.model.MusicRepeatMode = com.example.model.MusicRepeatMode.ALL,
+    val isMusicShuffleEnabled: Boolean = false,
     val favoriteSongIds: Set<String> = emptySet(),
     val onlineGamesPlayedCount: Int = 0,
     val showSpecialOfferDialog: Boolean = false,
@@ -201,6 +202,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 sfxPreset = savedSfxPreset,
                 bgmPlaylist = com.example.model.BGM_PLAYLIST,
                 musicRepeatMode = savedRepeatMode,
+                isMusicShuffleEnabled = profilePreferences.isMusicShuffleEnabled(),
                 favoriteSongIds = savedFavorites,
                 savedReplays = listOf(
                     com.example.model.MatchReplaySession(
@@ -866,6 +868,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             val (coins, gems) = repository.claimTodayReward()
             if (coins > 0) {
                 soundAndHaptics.vibrateVictory()
+                soundAndHaptics.playCoinReward()
                 triggerCelebration(CelebrationType.MATCH_WON)
                 val updatedStatus = repository.getDailyRewardStatus()
                 _uiState.update { s ->
@@ -886,6 +889,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun claimDailySpinReward(coins: Long, gems: Int) {
         soundAndHaptics.vibrateVictory()
+        soundAndHaptics.playCoinReward()
         val now = System.currentTimeMillis()
         viewModelScope.launch {
             repository.updateDailySpinTimestamp(now)
@@ -906,6 +910,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun rewardUserForAd(coins: Long = 1000L, gems: Int = 0) {
         soundAndHaptics.vibrateVictory()
+        soundAndHaptics.playCoinReward()
         _uiState.update {
             val newCoins = it.userCoins + coins
             val newGems = it.userGems + gems
@@ -928,6 +933,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             return false
         }
         soundAndHaptics.vibrateVictory()
+        soundAndHaptics.playCoinReward()
         _uiState.update {
             val newGems = it.userGems - gemCost
             val newCoins = it.userCoins + coinsReward
@@ -1733,6 +1739,12 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         soundAndHaptics.vibrateClick()
         val next = soundAndHaptics.soundManager.cycleRepeatMode()
         _uiState.update { it.copy(musicRepeatMode = next) }
+    }
+
+    fun toggleMusicShuffle() {
+        soundAndHaptics.vibrateClick()
+        val next = soundAndHaptics.soundManager.toggleShuffle()
+        _uiState.update { it.copy(isMusicShuffleEnabled = next) }
     }
 
     fun toggleFavoriteSong(songId: String) {

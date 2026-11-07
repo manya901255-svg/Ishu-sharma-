@@ -82,13 +82,22 @@ class RoyalSoundManager(private val context: Context) {
         }
     }
 
+    // List of actual bundled audio assets in assets/bgm directory
+    private val availableBgmAssets: List<String> by lazy {
+        try {
+            context.assets.list("bgm")?.filter { it.endsWith(".mp3", ignoreCase = true) } ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
     init {
         initSoundPool()
         if (isBgmEnabled && BGM_PLAYLIST.isNotEmpty()) {
             try {
                 initBgmPlayerForTrack(0)
             } catch (e: Exception) {
-                Log.e("RoyalSoundManager", "Error initializing first BGM track", e)
+                Log.w("RoyalSoundManager", "Notice: First BGM track initialization: ${e.message}")
             }
         }
     }
@@ -191,6 +200,9 @@ class RoyalSoundManager(private val context: Context) {
     }
         private set
 
+    var isShuffleEnabled: Boolean = profilePreferences.isMusicShuffleEnabled()
+        private set
+
     fun cycleRepeatMode(): com.example.model.MusicRepeatMode {
         val next = when (repeatMode) {
             com.example.model.MusicRepeatMode.ALL -> com.example.model.MusicRepeatMode.ONE
@@ -200,6 +212,12 @@ class RoyalSoundManager(private val context: Context) {
         repeatMode = next
         profilePreferences.setMusicRepeatMode(next.name)
         return next
+    }
+
+    fun toggleShuffle(): Boolean {
+        isShuffleEnabled = !isShuffleEnabled
+        profilePreferences.setMusicShuffleEnabled(isShuffleEnabled)
+        return isShuffleEnabled
     }
 
     fun isSongFavorite(id: String): Boolean = profilePreferences.getFavoriteSongIds().contains(id)
@@ -251,25 +269,33 @@ class RoyalSoundManager(private val context: Context) {
             }
 
             var prepared = false
-            if (track.assetFileName.isNotBlank()) {
+            // Strictly check the custom playlist track's exact audio file in assets/bgm
+            val assetFileToPlay = if (track.assetFileName.isNotBlank() && availableBgmAssets.contains(track.assetFileName)) {
+                track.assetFileName
+            } else {
+                Log.e("RoyalSoundManager", "Audio asset 'bgm/${track.assetFileName}' not found for song '${track.title}'. Refusing to substitute other audio.")
+                null
+            }
+
+            if (!assetFileToPlay.isNullOrBlank()) {
                 // Strategy 1: Direct AssetFileDescriptor
                 try {
-                    val afd = context.assets.openFd("bgm/${track.assetFileName}")
+                    val afd = context.assets.openFd("bgm/$assetFileToPlay")
                     bgmPlayer?.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
                     afd.close()
                     bgmPlayer?.prepare()
                     prepared = true
                 } catch (e: Exception) {
-                    Log.w("RoyalSoundManager", "Direct assetFd failed for ${track.title}, falling back to cache extraction: ${e.message}")
+                    Log.w("RoyalSoundManager", "Direct assetFd failed for $assetFileToPlay: ${e.message}")
                 }
 
                 // Strategy 2: If direct fd failed, stream asset into cache file and play
                 if (!prepared) {
                     try {
                         bgmPlayer?.reset()
-                        val cacheFile = java.io.File(context.cacheDir, "bgm_${track.assetFileName}")
+                        val cacheFile = java.io.File(context.cacheDir, "bgm_$assetFileToPlay")
                         if (!cacheFile.exists() || cacheFile.length() < 1024) {
-                            context.assets.open("bgm/${track.assetFileName}").use { input ->
+                            context.assets.open("bgm/$assetFileToPlay").use { input ->
                                 cacheFile.outputStream().use { output ->
                                     input.copyTo(output)
                                 }
@@ -281,7 +307,7 @@ class RoyalSoundManager(private val context: Context) {
                             prepared = true
                         }
                     } catch (e2: Exception) {
-                        Log.e("RoyalSoundManager", "Cached file playback failed for ${track.title}", e2)
+                        Log.e("RoyalSoundManager", "Cached file playback fallback notice for $assetFileToPlay: ${e2.message}")
                     }
                 }
             }
@@ -346,17 +372,33 @@ class RoyalSoundManager(private val context: Context) {
         }
     }
 
-    // --- Sequential Ambient Background Music Control ---
+    // --- Sequential & Shuffle Ambient Background Music Control ---
 
     fun playNextTrack() {
         if (BGM_PLAYLIST.isEmpty()) return
-        val nextIdx = (currentTrackIndex + 1) % BGM_PLAYLIST.size
+        val nextIdx = if (isShuffleEnabled && BGM_PLAYLIST.size > 1) {
+            var candidate: Int
+            do {
+                candidate = kotlin.random.Random.nextInt(BGM_PLAYLIST.size)
+            } while (candidate == currentTrackIndex)
+            candidate
+        } else {
+            (currentTrackIndex + 1) % BGM_PLAYLIST.size
+        }
         initBgmPlayerForTrack(nextIdx)
     }
 
     fun playPreviousTrack() {
         if (BGM_PLAYLIST.isEmpty()) return
-        val prevIdx = if (currentTrackIndex - 1 < 0) BGM_PLAYLIST.lastIndex else currentTrackIndex - 1
+        val prevIdx = if (isShuffleEnabled && BGM_PLAYLIST.size > 1) {
+            var candidate: Int
+            do {
+                candidate = kotlin.random.Random.nextInt(BGM_PLAYLIST.size)
+            } while (candidate == currentTrackIndex)
+            candidate
+        } else {
+            if (currentTrackIndex - 1 < 0) BGM_PLAYLIST.lastIndex else currentTrackIndex - 1
+        }
         initBgmPlayerForTrack(prevIdx)
     }
 
@@ -407,8 +449,7 @@ class RoyalSoundManager(private val context: Context) {
                 onPlaybackStateListener?.invoke(true)
             }
         } catch (e: Exception) {
-            Log.e("RoyalSoundManager", "Error starting BGM", e)
-            initBgmPlayerForTrack(0)
+            Log.w("RoyalSoundManager", "Notice: startAmbientBgm encountered: ${e.message}")
         }
     }
 

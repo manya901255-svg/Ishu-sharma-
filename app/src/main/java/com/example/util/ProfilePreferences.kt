@@ -33,11 +33,13 @@ class ProfilePreferences(private val context: Context) {
         private const val KEY_CUSTOM_PHOTO_URI = "pref_custom_photo_uri"
         private const val KEY_ONLINE_GAMES_PLAYED = "pref_online_games_played"
         private const val KEY_MUSIC_REPEAT_MODE = "pref_music_repeat_mode"
+        private const val KEY_MUSIC_SHUFFLE_ENABLED = "pref_music_shuffle_enabled"
         private const val KEY_FAVORITE_SONG_IDS = "pref_favorite_song_ids"
 
         const val DEFAULT_NICKNAME = "Ishu"
         const val DEFAULT_CROWN_AVATAR = "crown_imperial_gold"
         const val DEFAULT_ROYAL_TITLE = "Maharaja"
+        const val DEFAULT_SHUFFLE_ENABLED = false
         const val DEFAULT_PLAYER_LEVEL = 18
         const val DEFAULT_TOTAL_WINS = 28
         const val DEFAULT_GAMES_PLAYED = 42
@@ -77,6 +79,9 @@ class ProfilePreferences(private val context: Context) {
 
     fun getMusicRepeatMode(): String = prefs.getString(KEY_MUSIC_REPEAT_MODE, DEFAULT_REPEAT_MODE) ?: DEFAULT_REPEAT_MODE
     fun setMusicRepeatMode(mode: String) = prefs.edit().putString(KEY_MUSIC_REPEAT_MODE, mode).apply()
+
+    fun isMusicShuffleEnabled(): Boolean = prefs.getBoolean(KEY_MUSIC_SHUFFLE_ENABLED, DEFAULT_SHUFFLE_ENABLED)
+    fun setMusicShuffleEnabled(enabled: Boolean) = prefs.edit().putBoolean(KEY_MUSIC_SHUFFLE_ENABLED, enabled).apply()
 
     fun getFavoriteSongIds(): Set<String> = prefs.getStringSet(KEY_FAVORITE_SONG_IDS, emptySet()) ?: emptySet()
     fun setFavoriteSongIds(ids: Set<String>) = prefs.edit().putStringSet(KEY_FAVORITE_SONG_IDS, ids).apply()

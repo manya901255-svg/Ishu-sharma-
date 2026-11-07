@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.components.RewardedAdDialog
 import com.example.ui.components.formatCompactCoins
+import com.example.ui.components.MgLudoRoyalBackground
 import com.example.ui.theme.*
 import com.example.viewmodel.LudoUiState
 import com.example.viewmodel.LudoViewModel
@@ -246,13 +247,8 @@ fun RoyalShopScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Woodgrain Background
-            Image(
-                painter = painterResource(id = R.drawable.bg_purple_wood),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+            // MG Ludo Royal Deep Blue Background
+            MgLudoRoyalBackground()
 
             when (selectedTab) {
                 // ==========================================

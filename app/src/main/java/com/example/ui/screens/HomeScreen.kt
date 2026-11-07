@@ -63,27 +63,12 @@ fun HomeScreen(
             .fillMaxSize()
             .testTag("home_screen")
     ) {
-        // 1. Authentic Purple Woodgrain Texture Background (Ludo Club Theme)
+        // 1. Restored Classic Purple Woodgrain Background (Screenshot 1, 2, 3)
         Image(
             painter = painterResource(id = R.drawable.bg_purple_wood),
-            contentDescription = null,
+            contentDescription = "Royal Purple Wood Background",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
-        )
-
-        // Subtle Ambient Vignette
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0x33000000),
-                            Color.Transparent,
-                            Color(0x55000000)
-                        )
-                    )
-                )
         )
 
         // 2. Main Scrollable Lobby Area
@@ -94,7 +79,7 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // A. Top Header Bar (Player Profile, Rocket, Coins, Cash, Settings)
+            // A. Top Header Bar (Avatar, Name, Online Status, Level, Wallets, Bell, Settings)
             LudoClubTopHeader(
                 playerName = uiState.playerNickname,
                 crownAvatarId = uiState.playerCrownAvatar,
@@ -116,9 +101,9 @@ fun HomeScreen(
                 }
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // B. Top Event Pills Row (Ranking, Leaderboard, Tournaments, Golden Key)
+            // B. Top 4 Action Cards (Ranking, Leaderboard, Tournaments, Golden Key)
             LudoClubTopEventPills(
                 onRankingClick = { viewModel.navigateTo(AppScreen.LEADERBOARD) },
                 onLeaderboardClick = { viewModel.navigateTo(AppScreen.LEADERBOARD) },
@@ -126,27 +111,26 @@ fun HomeScreen(
                 onVaultKeyClick = { showVaultKeyDialog = true }
             )
 
+            Spacer(modifier = Modifier.height(8.dp))
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // C. Center Court Carousel & Side Action Buttons
+            // C. Center Carousel & Side Action Badges (Screenshot 1, 2, 3)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 6.dp)
             ) {
-                // Left Column Buttons (Get 1K ad, Key Quest 3 friends, Trials, Like, Invite, Offer)
+                // Left Column Action Badges (Get 1K, Keys, Trials, Like, Avatar, Quests, Friends, OFFER)
                 Column(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(top = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(top = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     LudoClubActionBadge(
                         icon = "🎬",
                         label = "Get 1K",
                         badge = "AD",
-                        badgeColor = Color(0xFF00C853)
+                        badgeColor = Color(0xFF00E676)
                     ) {
                         adRewardTitle = "1,000 Gold Coins"
                         showRewardedAdDialog = true
@@ -155,8 +139,8 @@ fun HomeScreen(
                     LudoClubActionBadge(
                         icon = "🔑",
                         label = "Keys",
-                        badge = "${uiState.keysReceivedCount}/3",
-                        badgeColor = if (uiState.keysReceivedCount >= 3) Color(0xFF00E676) else RoyalGold
+                        badge = "${uiState.keysReceivedCount}/7",
+                        badgeColor = Color(0xFFFFD600)
                     ) {
                         showVaultKeyDialog = true
                     }
@@ -165,7 +149,7 @@ fun HomeScreen(
                         icon = "🎯",
                         label = "Trials",
                         badge = "BOUNTY",
-                        badgeColor = Color(0xFFFF5252)
+                        badgeColor = Color(0xFFFF1744)
                     ) {
                         showChallengesDialog = true
                     }
@@ -179,10 +163,10 @@ fun HomeScreen(
                     }
 
                     LudoClubActionBadge(
-                        icon = getCrownAvatarEmoji(uiState.playerCrownAvatar),
+                        icon = "👑",
                         label = "Avatar",
                         badge = "REGAL",
-                        badgeColor = RoyalGold
+                        badgeColor = Color(0xFFFFD600)
                     ) {
                         viewModel.toggleDynamicProfileDialog(true)
                     }
@@ -190,8 +174,7 @@ fun HomeScreen(
                     LudoClubActionBadge(
                         icon = "📜",
                         label = "Quests",
-                        badge = "${uiState.dailyMissions.count { it.isCompleted }}",
-                        badgeColor = Color(0xFF00E676)
+                        badge = null
                     ) {
                         viewModel.toggleDailyMissionsDialog(true)
                     }
@@ -200,7 +183,7 @@ fun HomeScreen(
                         icon = "👥",
                         label = "Friends",
                         badge = "ONLINE",
-                        badgeColor = Color(0xFF00C853)
+                        badgeColor = Color(0xFF00E676)
                     ) {
                         viewModel.toggleFriendsDialog(true)
                     }
@@ -209,80 +192,85 @@ fun HomeScreen(
                         icon = "🔨",
                         label = "OFFER",
                         badge = "HOT",
-                        badgeColor = Color(0xFFFF9100)
+                        badgeColor = Color(0xFFFF6D00)
                     ) {
                         showOfferDialog = true
                     }
                 }
 
-                // Center Game Mode Cards (Large cards with authentic illustrations, vines, pumpkins)
-                Row(
+                // Center Featured Modes Carousel (Play Online, 2 vs 2 Battle, Quick Rush, vs AI Mode, Private Room)
+                Column(
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(horizontal = 56.dp)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        .align(Alignment.TopCenter)
+                        .padding(horizontal = 54.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Card 1: Play Online
-                    LudoClubImageCard(
-                        imageRes = R.drawable.card_play_online,
-                        title = "Play Online",
-                        onClick = { selectedModeForSetup = GameMode.ONLINE_MULTIPLAYER }
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        // Card 1: Authentic Play Online Card (Screenshot 2)
+                        LudoClubImageCard(
+                            imageRes = R.drawable.card_play_online,
+                            title = "Play Online",
+                            onClick = { selectedModeForSetup = GameMode.ONLINE_MULTIPLAYER }
+                        )
 
-                    // Card 2: 2 vs 2 Team Up
-                    LudoClubImageCard(
-                        imageRes = R.drawable.card_two_vs_two,
-                        title = "2 vs 2",
-                        onClick = { selectedModeForSetup = GameMode.PASS_AND_PLAY }
-                    )
+                        // Card 2: 2 vs 2 Battle Card (Screenshot 2)
+                        LudoClubImageCard(
+                            imageRes = R.drawable.card_two_vs_two,
+                            title = "2 vs 2 Battle",
+                            onClick = { selectedModeForSetup = GameMode.PASS_AND_PLAY }
+                        )
 
-                    // Card 3: Quick Rush Blitz
-                    LudoClubProceduralCard(
-                        title = "Quick Rush",
-                        subtitle = "1 Pawn Home to Win!",
-                        bgGradient = listOf(Color(0xFFFF9100), Color(0xFFFF3D00)),
-                        icon = "⚡",
-                        decorEmoji = "🔥🎲",
-                        badge = "BLITZ",
-                        onClick = { selectedModeForSetup = GameMode.QUICK_RUSH }
-                    )
+                        // Card 3: Quick Rush Blitz Card (Screenshot 3)
+                        LudoClubProceduralCard(
+                            title = "Quick Rush",
+                            subtitle = "1 Pawn Home to Win!",
+                            bgGradient = listOf(Color(0xFFFF9100), Color(0xFFFF3D00)),
+                            icon = "🔥",
+                            decorEmoji = "🎲",
+                            badge = "BLITZ",
+                            onClick = { selectedModeForSetup = GameMode.QUICK_RUSH }
+                        )
 
-                    // Card 4: vs AI Court
-                    LudoClubProceduralCard(
-                        title = "vs AI Mode",
-                        subtitle = "Offline Royal Court",
-                        bgGradient = listOf(Color(0xFF7C4DFF), Color(0xFF4527A0)),
-                        icon = "🤖",
-                        decorEmoji = "👑✨",
-                        badge = "OFFLINE",
-                        onClick = { selectedModeForSetup = GameMode.VS_AI }
-                    )
+                        // Card 4: vs AI Match (Screenshot 3)
+                        LudoClubProceduralCard(
+                            title = "vs AI Mode",
+                            subtitle = "Offline Royal",
+                            bgGradient = listOf(Color(0xFF7E57C2), Color(0xFF512DA8)),
+                            icon = "🤖",
+                            decorEmoji = "👑",
+                            badge = "OFFLINE",
+                            onClick = { selectedModeForSetup = GameMode.VS_AI }
+                        )
 
-                    // Card 5: Private Room
-                    LudoClubProceduralCard(
-                        title = "Private Room",
-                        subtitle = "Play with Friends",
-                        bgGradient = listOf(Color(0xFFFF4081), Color(0xFFC2185B)),
-                        icon = "🔑",
-                        decorEmoji = "🏰💎",
-                        badge = "CODE",
-                        onClick = { viewModel.openPrivateRoomDialog() }
-                    )
+                        // Card 5: Private Room (Screenshot 1)
+                        LudoClubProceduralCard(
+                            title = "Private Room",
+                            subtitle = "Play with Friends",
+                            bgGradient = listOf(Color(0xFFFF4081), Color(0xFFE91E63)),
+                            icon = "🔑",
+                            decorEmoji = "🏰 💎",
+                            badge = "CODE",
+                            onClick = { viewModel.openPrivateRoomDialog() }
+                        )
+                    }
                 }
 
-                // Right Column Buttons (Daily Reward, Match History, Tasks checklist, Mail envelope)
+                // Right Column Action Badges (Daily, History, Tasks, Mail, Blueprint)
                 Column(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(top = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     LudoClubActionBadge(
                         icon = "🎁",
                         label = "Daily",
-                        badge = if (uiState.dailyRewardStatus?.isClaimedToday == false) "FREE" else null,
-                        badgeColor = LudoClubRedBadge
+                        badge = null
                     ) {
                         viewModel.toggleDailyRewardDialog(true)
                     }
@@ -290,8 +278,7 @@ fun HomeScreen(
                     LudoClubActionBadge(
                         icon = "📜",
                         label = "History",
-                        badge = if (uiState.recentMatches.isNotEmpty()) "${minOf(uiState.recentMatches.size, 10)}" else null,
-                        badgeColor = Color(0xFF1976D2)
+                        badge = null
                     ) {
                         viewModel.toggleMatchHistoryDialog(true)
                     }
@@ -308,7 +295,7 @@ fun HomeScreen(
                         icon = "✉️",
                         label = "Mail",
                         badge = "1",
-                        badgeColor = LudoClubRedBadge
+                        badgeColor = Color(0xFFFF1744)
                     ) {
                         showMailDialog = true
                     }
@@ -324,163 +311,154 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // D. Lower Left Events Hub Target + Fortune Spin Wheel trigger
+            // D. EVENTS HUB & DAILY SPIN Buttons (Screenshot 1)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp),
+                    .padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // EVENTS HUB Button with Red-White Target & Coin Sacks
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color(0xFFFFA000), Color(0xFFFF6F00))
-                            )
-                        )
-                        .border(2.dp, RoyalGoldLight, RoundedCornerShape(16.dp))
-                        .clickable { showEventsDialog = true }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                        .testTag("events_hub_button"),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_events_hub),
-                        contentDescription = "Events Hub",
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Column {
-                        Text(
-                            text = "EVENTS HUB",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Text(
-                            text = "Live Tournaments",
-                            color = RoyalGoldLight,
-                            fontSize = 9.sp
-                        )
-                    }
-                }
-
-                // Fortune Daily Spin Button
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color(0xFF7C4DFF), Color(0xFF512DA8))
-                            )
-                        )
-                        .border(1.5.dp, RoyalGold, RoundedCornerShape(16.dp))
-                        .clickable { viewModel.toggleDailySpin(true) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                        .testTag("daily_spin_trigger"),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("🎡", fontSize = 20.sp)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "DAILY SPIN",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // E. Bottom 5 Chest Slots Tray (4 Standard Slots + 1 Season Pass Locked Slot)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                // 4 Standard Chest Slots
-                repeat(4) { slotIndex ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(88.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF381A63).copy(alpha = 0.5f))
-                            .border(1.2.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
-                            .clickable { showChestDialog = slotIndex }
-                            .padding(4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(if (slotIndex == 0) "📦" else "📭", fontSize = 24.sp)
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (slotIndex == 0) "Ready!" else "Chest\nSlot",
-                                color = if (slotIndex == 0) RoyalGold else TextMuted,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 11.sp
-                            )
-                        }
-                    }
-                }
-
-                // 5th Season Pass Locked Slot
+                // EVENTS HUB Button
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(88.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF280E4B))
-                        .border(2.dp, RoyalGoldDark, RoundedCornerShape(12.dp))
-                        .clickable { viewModel.toggleSeasonPassDialog(true) }
-                        .padding(4.dp),
-                    contentAlignment = Alignment.Center
+                        .height(52.dp)
+                        .shadow(6.dp, RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFFFFB300), Color(0xFFFF6F00))
+                            )
+                        )
+                        .border(1.5.dp, Color(0xFFFFE082), RoundedCornerShape(16.dp))
+                        .clickable { showEventsDialog = true }
+                        .padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.CenterStart
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("🔒", fontSize = 22.sp)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Box(
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_events_hub),
+                            contentDescription = "Events Hub",
                             modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0xFF7B1FA2))
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                        ) {
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, Color.White, CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
                             Text(
-                                text = "Season Pass",
-                                color = RoyalGoldLight,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold
+                                "EVENTS HUB",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                            Text(
+                                "Live Tournaments",
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Medium
                             )
                         }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // DAILY SPIN Button
+                Box(
+                    modifier = Modifier
+                        .height(52.dp)
+                        .shadow(6.dp, RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF7E57C2), Color(0xFF512DA8))
+                            )
+                        )
+                        .border(1.5.dp, Color(0xFFD1C4E9), RoundedCornerShape(16.dp))
+                        .clickable { viewModel.toggleDailySpin(true) }
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("🎡", fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Chest Slot",
-                            color = TextMuted,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Medium
+                            "DAILY SPIN",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Black
                         )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // E. 4 Chest Slots + 1 Season Pass Slot Row (Screenshot 1)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Slot 0: Ready!
+                ChestSlotCard(
+                    icon = "📦",
+                    label = "Ready!",
+                    isReady = true,
+                    modifier = Modifier.weight(1f),
+                    onClick = { showChestDialog = 0 }
+                )
+
+                // Slot 1: Chest Slot
+                ChestSlotCard(
+                    icon = "📬",
+                    label = "Chest\nSlot",
+                    isReady = false,
+                    modifier = Modifier.weight(1f),
+                    onClick = { showChestDialog = 1 }
+                )
+
+                // Slot 2: Chest Slot
+                ChestSlotCard(
+                    icon = "📬",
+                    label = "Chest\nSlot",
+                    isReady = false,
+                    modifier = Modifier.weight(1f),
+                    onClick = { showChestDialog = 2 }
+                )
+
+                // Slot 3: Chest Slot
+                ChestSlotCard(
+                    icon = "📬",
+                    label = "Chest\nSlot",
+                    isReady = false,
+                    modifier = Modifier.weight(1f),
+                    onClick = { showChestDialog = 3 }
+                )
+
+                // Slot 4: Season Pass Locked Slot
+                SeasonPassSlotCard(
+                    modifier = Modifier.weight(1.15f),
+                    onClick = { viewModel.toggleSeasonPassDialog(true) }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // 3. Iconic Ludo Club 5-Tab Glossy Blue Bottom Dock
+        // 3. 5-Tab Authentic Glossy Blue Bottom Dock (Screenshot 1)
         LudoClubBottomDock(
             currentScreen = uiState.currentScreen,
             onScreenSelected = { viewModel.navigateTo(it) },
             onInventoryClick = { viewModel.navigateTo(AppScreen.SHOP) },
-            onClubClick = { showEventsDialog = true },
             onFriendsClick = { viewModel.toggleFriendsDialog(true) },
+            onClubClick = { showEventsDialog = true },
             modifier = Modifier.align(Alignment.BottomCenter)
         )
 
@@ -873,7 +851,8 @@ private fun LudoClubTopHeader(
             .fillMaxWidth()
             .height(58.dp)
             .shadow(8.dp),
-        color = LudoClubHeaderBlue
+        color = Color(0xFF0A2254),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x6600E5FF))
     ) {
         Row(
             modifier = Modifier
@@ -882,7 +861,7 @@ private fun LudoClubTopHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Player Profile on Left (Square Avatar + Level Badge + Progress bar)
+            // Player Profile on Left (Square Avatar + Online Dot + Level Badge + Progress bar)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -892,9 +871,9 @@ private fun LudoClubTopHeader(
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(RoyalGold)
-                        .border(1.5.dp, Color.White, RoundedCornerShape(8.dp)),
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF0D2D68))
+                        .border(1.5.dp, RoyalGoldLight, RoundedCornerShape(10.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (!customPhotoUri.isNullOrBlank()) {
@@ -903,12 +882,23 @@ private fun LudoClubTopHeader(
                             contentDescription = "Custom Profile Photo",
                             modifier = Modifier
                                 .fillMaxSize()
-                                .clip(RoundedCornerShape(7.dp)),
+                                .clip(RoundedCornerShape(9.dp)),
                             contentScale = ContentScale.Crop
                         )
                     } else {
                         Text(getCrownAvatarEmoji(crownAvatarId), fontSize = 24.sp)
                     }
+
+                    // Green online indicator dot
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(x = 2.dp, y = 2.dp)
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF00E676))
+                            .border(1.dp, Color(0xFF040A1A), CircleShape)
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(6.dp))
@@ -969,8 +959,8 @@ private fun LudoClubTopHeader(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF0D3CA8))
-                        .border(1.dp, Color(0xFF42A5F5), RoundedCornerShape(16.dp))
+                        .background(Color(0xFF061A3D))
+                        .border(1.2.dp, Color(0xFF00E5FF).copy(alpha = 0.7f), RoundedCornerShape(16.dp))
                         .clickable { onAddCoins() }
                         .padding(horizontal = 6.dp, vertical = 3.dp)
                 ) {
@@ -1001,8 +991,8 @@ private fun LudoClubTopHeader(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF0D3CA8))
-                        .border(1.dp, Color(0xFF42A5F5), RoundedCornerShape(16.dp))
+                        .background(Color(0xFF061A3D))
+                        .border(1.2.dp, Color(0xFF00E5FF).copy(alpha = 0.7f), RoundedCornerShape(16.dp))
                         .clickable { onAddGems() }
                         .padding(horizontal = 6.dp, vertical = 3.dp)
                 ) {
@@ -1112,10 +1102,10 @@ private fun LudoClubTopEventPills(
                 .clip(RoundedCornerShape(12.dp))
                 .background(
                     Brush.verticalGradient(
-                        listOf(LudoClubCyanPill, LudoClubCyanPillDark)
+                        listOf(Color(0xFF0F4588), Color(0xFF0A2E62))
                     )
                 )
-                .border(1.5.dp, Color.White, RoundedCornerShape(12.dp))
+                .border(1.5.dp, RoyalGoldLight, RoundedCornerShape(12.dp))
                 .clickable { onVaultKeyClick() },
             contentAlignment = Alignment.Center
         ) {
@@ -1151,10 +1141,10 @@ private fun EventPillButton(
             .clip(RoundedCornerShape(14.dp))
             .background(
                 Brush.verticalGradient(
-                    listOf(LudoClubCyanPill, LudoClubCyanPillDark)
+                    listOf(Color(0xFF0F4588), Color(0xFF0A2E62))
                 )
             )
-            .border(1.5.dp, Color(0xFFE1F5FE), RoundedCornerShape(14.dp))
+            .border(1.5.dp, Color(0xFF00E5FF).copy(alpha = 0.8f), RoundedCornerShape(14.dp))
             .clickable { onClick() }
             .padding(horizontal = 4.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center
@@ -1202,13 +1192,14 @@ private fun LudoClubActionBadge(
     Box(
         modifier = Modifier
             .size(48.dp)
+            .shadow(4.dp, RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
             .background(
                 Brush.verticalGradient(
-                    listOf(Color(0xFF42A5F5), Color(0xFF1565C0))
+                    listOf(Color(0xFF1E88E5), Color(0xFF0D47A1), Color(0xFF0A255C))
                 )
             )
-            .border(1.5.dp, Color.White, RoundedCornerShape(12.dp))
+            .border(1.5.dp, Color(0xFF00E5FF).copy(alpha = 0.85f), RoundedCornerShape(12.dp))
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -1368,8 +1359,8 @@ private fun LudoClubBottomDock(
             .fillMaxWidth()
             .height(68.dp)
             .shadow(16.dp),
-        color = LudoClubDockBlue,
-        border = androidx.compose.foundation.BorderStroke(1.5.dp, LudoClubDockBlueLight)
+        color = Color(0xFF081C44),
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, RoyalGold.copy(alpha = 0.7f))
     ) {
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -1396,19 +1387,19 @@ private fun LudoClubBottomDock(
                 onInventoryClick()
             }
 
-            // Tab 3: HOME (Raised central tab)
+            // Tab 3: HOME (Raised central tab with glowing gold/cyan border)
             Box(
                 modifier = Modifier
                     .offset(y = (-8).dp)
                     .size(62.dp)
-                    .shadow(8.dp, RoundedCornerShape(16.dp))
-                    .clip(RoundedCornerShape(16.dp))
+                    .shadow(10.dp, RoundedCornerShape(18.dp))
+                    .clip(RoundedCornerShape(18.dp))
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color(0xFF42A5F5), LudoClubDockActive)
+                            listOf(Color(0xFF00E5FF), Color(0xFF0288D1), Color(0xFF0D47A1))
                         )
                     )
-                    .border(2.dp, Color.White, RoundedCornerShape(16.dp))
+                    .border(2.dp, RoyalGoldLight, RoundedCornerShape(18.dp))
                     .clickable { onScreenSelected(AppScreen.HOME) },
                 contentAlignment = Alignment.Center
             ) {
@@ -1471,7 +1462,104 @@ private fun DockTabButton(
                     .align(Alignment.TopEnd)
                     .size(10.dp)
                     .clip(CircleShape)
-                    .background(LudoClubRedBadge)
+            )
+        }
+    }
+}
+
+/**
+ * 4 Chest Slots matching Screenshot 1 (Ready!, Chest Slot 1, 2, 3)
+ */
+@Composable
+private fun ChestSlotCard(
+    icon: String,
+    label: String,
+    isReady: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .height(86.dp)
+            .shadow(4.dp, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isReady) Color(0xFF1B1938).copy(alpha = 0.85f) else Color(0xFF141933).copy(alpha = 0.75f)
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            width = if (isReady) 1.5.dp else 1.dp,
+            color = if (isReady) Color(0xFFFFD54F) else Color(0xFF2E4575)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(text = icon, fontSize = 24.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                color = if (isReady) Color(0xFFFFD54F) else Color(0xFFB0BEC5),
+                fontSize = 10.sp,
+                fontWeight = if (isReady) FontWeight.ExtraBold else FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                lineHeight = 11.sp
+            )
+        }
+    }
+}
+
+/**
+ * Season Pass Locked Slot matching Screenshot 1
+ */
+@Composable
+private fun SeasonPassSlotCard(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .height(86.dp)
+            .shadow(6.dp, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF28103F).copy(alpha = 0.9f)),
+        border = androidx.compose.foundation.BorderStroke(1.8.dp, RoyalGold)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 4.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(text = "🔒", fontSize = 20.sp)
+            Spacer(modifier = Modifier.height(3.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFF8E24AA))
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "Season Pass",
+                    color = RoyalGoldLight,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = "Chest Slot",
+                color = Color(0xFFCE93D8),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }

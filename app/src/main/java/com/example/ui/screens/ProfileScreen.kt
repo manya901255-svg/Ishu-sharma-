@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import com.example.ui.components.MgLudoRoyalBackground
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -166,20 +167,8 @@ fun ProfileScreen(
             .fillMaxSize()
             .testTag("player_profile_screen")
     ) {
-        // Authentic Purple Woodgrain Texture Background
-        Image(
-            painter = painterResource(id = R.drawable.bg_purple_wood),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
-
-        // Semi-transparent overlay
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0x88000000))
-        )
+        // MG Ludo Royal Deep Blue Background
+        MgLudoRoyalBackground()
 
         // Centered Player Profile Card (matching Screenshot 5 & 12)
         Column(
