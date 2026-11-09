@@ -896,6 +896,7 @@ fun GameScreen(
                 onVolumeChange = { viewModel.setBgmVolume(it) },
                 onToggleFavorite = { viewModel.toggleFavoriteSong(it) },
                 onToggleFavoriteTrack = { viewModel.toggleFavoriteTrack(it) },
+                onRestoreDefaultPlaylist = { viewModel.restoreDefaultPlaylist() },
                 onDismiss = { viewModel.toggleMusicPlayerDialog(false) }
             )
         }

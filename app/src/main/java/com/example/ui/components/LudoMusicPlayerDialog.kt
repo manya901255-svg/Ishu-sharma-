@@ -468,20 +468,21 @@ private fun ExploreTabContent(
     Column(modifier = Modifier.fillMaxSize()) {
         // Categories Horizontal Scrollable Chips with regional Indian languages
         val categories = listOf(
+            MusicCategory.TRENDING,
+            MusicCategory.BOLLYWOOD_NEW,
+            MusicCategory.BOLLYWOOD_OLD,
             MusicCategory.HINDI,
             MusicCategory.PUNJABI,
-            MusicCategory.BHOJPURI,
             MusicCategory.HARYANVI,
-            MusicCategory.MARATHI,
+            MusicCategory.BHOJPURI,
             MusicCategory.RAJASTHANI,
+            MusicCategory.MARATHI,
             MusicCategory.SOUTH_INDIAN,
             MusicCategory.DEVOTIONAL,
-            MusicCategory.INSTRUMENTAL,
-            MusicCategory.TRENDING,
-            MusicCategory.BOLLYWOOD_OLD,
-            MusicCategory.BOLLYWOOD_NEW,
             MusicCategory.ROMANTIC,
-            MusicCategory.PARTY_DJ
+            MusicCategory.SAD,
+            MusicCategory.PARTY_DJ,
+            MusicCategory.INSTRUMENTAL
         )
 
         LazyRow(

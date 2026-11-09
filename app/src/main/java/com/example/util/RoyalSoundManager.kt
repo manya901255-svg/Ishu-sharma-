@@ -313,11 +313,12 @@ class RoyalSoundManager(private val context: Context) {
                         handleTrackCompletion()
                     }
                     setOnErrorListener { _, what, extra ->
-                        Log.e("RoyalSoundManager", "MediaPlayer error: what=$what, extra=$extra")
+                        Log.e("RoyalSoundManager", "MediaPlayer streaming error: what=$what, extra=$extra. Advancing to next track.")
                         isBuffering = false
                         isBgmPrepared = false
                         onBufferingListener?.invoke(false)
                         onPlaybackStateListener?.invoke(false)
+                        playNextTrack()
                         true
                     }
                 }
