@@ -90,6 +90,18 @@ class SoundAndHaptics(context: Context) {
         soundManager.setGameActive(active)
     }
 
+    fun playTrack(track: com.example.model.BgmTrack, playlist: List<com.example.model.BgmTrack> = emptyList()) {
+        soundManager.playTrack(track, playlist)
+    }
+
+    fun seekTo(positionMs: Int) {
+        soundManager.seekTo(positionMs)
+    }
+
+    fun getCurrentPosition(): Int = soundManager.getCurrentPosition()
+    fun getDuration(): Int = soundManager.getDuration()
+    fun isBuffering(): Boolean = soundManager.isBuffering
+
     fun getSfxPreset(): String = soundEffectManager.preset
 
     fun release() {

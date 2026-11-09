@@ -118,6 +118,18 @@ data class LudoUiState(
     val musicRepeatMode: com.example.model.MusicRepeatMode = com.example.model.MusicRepeatMode.ALL,
     val isMusicShuffleEnabled: Boolean = false,
     val favoriteSongIds: Set<String> = emptySet(),
+    val onlineSearchQuery: String = "",
+    val onlineSearchResults: List<com.example.model.BgmTrack> = emptyList(),
+    val isSearchingMusic: Boolean = false,
+    val isMusicBuffering: Boolean = false,
+    val selectedMusicCategory: com.example.model.MusicCategory = com.example.model.MusicCategory.HINDI,
+    val categoryTracks: List<com.example.model.BgmTrack> = emptyList(),
+    val isLoadingCategoryMusic: Boolean = false,
+    val recentlyPlayedTracks: List<com.example.model.BgmTrack> = emptyList(),
+    val userPlaylists: List<com.example.model.UserPlaylist> = emptyList(),
+    val favoriteTracks: List<com.example.model.BgmTrack> = emptyList(),
+    val playbackPositionMs: Int = 0,
+    val playbackDurationMs: Int = 0,
     val onlineGamesPlayedCount: Int = 0,
     val showSpecialOfferDialog: Boolean = false,
     val savedReplays: List<com.example.model.MatchReplaySession> = emptyList(),
@@ -137,6 +149,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
 
     val soundAndHaptics = SoundAndHaptics(application)
     val voiceChatManager = com.example.util.LudoVoiceChatManager(application)
+    val indianMusicRepository = com.example.network.IndianMusicRepository()
     private val profilePreferences = com.example.util.ProfilePreferences(application)
     private val repository = com.example.data.LudoRepository(application)
 
@@ -145,6 +158,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
 
     private var turnTimerJob: Job? = null
     private var aiTurnJob: Job? = null
+    private var musicSearchJob: Job? = null
 
     init {
         // Initial fair seeds
@@ -335,10 +349,33 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                     currentBgmTrackIndex = index
                 )
             }
+            if (track != null) {
+                recordTrackPlayed(track)
+            }
         }
         soundAndHaptics.soundManager.setOnPlaybackStateListener { isPlaying ->
             _uiState.update { it.copy(isMusicPlaying = isPlaying) }
         }
+        soundAndHaptics.soundManager.setOnBufferingListener { isBuffering ->
+            _uiState.update { it.copy(isMusicBuffering = isBuffering) }
+        }
+
+        // Live playback progress ticker (updates seek bar position & duration every 500ms)
+        viewModelScope.launch {
+            while (true) {
+                if (_uiState.value.isMusicPlaying) {
+                    val pos = soundAndHaptics.getCurrentPosition()
+                    val dur = soundAndHaptics.getDuration()
+                    _uiState.update { it.copy(playbackPositionMs = pos, playbackDurationMs = dur) }
+                }
+                delay(500L)
+            }
+        }
+
+        // Load Initial Indian Online Music (Hindi) and Saved Playlists
+        loadSavedMusicData()
+        selectMusicCategory(com.example.model.MusicCategory.HINDI)
+
         if (bgmOn && com.example.model.BGM_PLAYLIST.isNotEmpty()) {
             soundAndHaptics.soundManager.startAmbientBgm()
         }
@@ -543,6 +580,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     fun claimMaharajaVaultReward() {
         if (_uiState.value.keysReceivedCount < 3) return
         soundAndHaptics.vibrateVictory()
+        soundAndHaptics.playCoinReward()
         triggerCelebration(CelebrationType.MATCH_WON)
         val vaultCoins = 500000L
         val vaultGems = 5000
@@ -568,6 +606,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun claimEventReward(coins: Long, gems: Int, eventName: String) {
         soundAndHaptics.vibrateVictory()
+        soundAndHaptics.playCoinReward()
         triggerCelebration(CelebrationType.MATCH_WON)
         val newCoins = _uiState.value.userCoins + coins
         val newGems = _uiState.value.userGems + gems
@@ -637,6 +676,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun claimSeasonPassRewards(coins: Long, gems: Int) {
         soundAndHaptics.vibrateVictory()
+        soundAndHaptics.playCoinReward()
         triggerCelebration(CelebrationType.MATCH_WON)
         _uiState.update {
             val newCoins = it.userCoins + coins
@@ -1364,8 +1404,11 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
 
             if (isWinner) {
                 soundAndHaptics.vibrateVictory()
-                triggerCelebration(CelebrationType.MATCH_WON)
                 val isHumanWin = updatedCurrentPlayer.id == "p_0"
+                if (isHumanWin) {
+                    soundAndHaptics.playCoinReward()
+                }
+                triggerCelebration(CelebrationType.MATCH_WON)
                 profilePreferences.recordGameFinished(isWin = isHumanWin, captures = captures.size)
                 
                 if (updatedCurrentPlayer.color == com.example.model.LudoColor.YELLOW) {
@@ -1794,6 +1837,315 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 currentBgmTrackIndex = index
             )
         }
+    }
+
+    /**
+     * Directly plays any BgmTrack (supporting live online CDN streaming and local audio)
+     * and sets the active dynamic playlist context.
+     */
+    fun playTrackDirect(track: com.example.model.BgmTrack, playlist: List<com.example.model.BgmTrack> = emptyList()) {
+        soundAndHaptics.vibrateClick()
+        soundAndHaptics.playTrack(track, playlist)
+        recordTrackPlayed(track)
+        _uiState.update {
+            it.copy(
+                isBgmEnabled = true,
+                isMusicPlaying = true,
+                currentBgmTrack = track,
+                currentBgmTrackIndex = if (playlist.isNotEmpty()) playlist.indexOfFirst { p -> p.id == track.id }.coerceAtLeast(0) else 0
+            )
+        }
+    }
+
+    /**
+     * Seeks playback position to specific millisecond timestamp.
+     */
+    fun seekMusicPosition(positionMs: Int) {
+        soundAndHaptics.seekTo(positionMs)
+        _uiState.update { it.copy(playbackPositionMs = positionMs) }
+    }
+
+    /**
+     * Search Indian songs online by title, singer, album, or movie with live debounce.
+     */
+    fun searchOnlineMusic(query: String) {
+        _uiState.update { it.copy(onlineSearchQuery = query) }
+        musicSearchJob?.cancel()
+        if (query.trim().isEmpty()) {
+            _uiState.update { it.copy(onlineSearchResults = emptyList(), isSearchingMusic = false) }
+            return
+        }
+        musicSearchJob = viewModelScope.launch {
+            delay(350L) // Debounce typing
+            _uiState.update { it.copy(isSearchingMusic = true) }
+            val result = indianMusicRepository.searchSongs(query)
+            val songs = result.getOrDefault(emptyList())
+            _uiState.update {
+                it.copy(
+                    onlineSearchResults = songs,
+                    isSearchingMusic = false
+                )
+            }
+        }
+    }
+
+    fun clearOnlineMusicSearch() {
+        musicSearchJob?.cancel()
+        _uiState.update {
+            it.copy(
+                onlineSearchQuery = "",
+                onlineSearchResults = emptyList(),
+                isSearchingMusic = false
+            )
+        }
+    }
+
+    /**
+     * Selects and loads an Indian music genre / language category.
+     */
+    fun selectMusicCategory(category: com.example.model.MusicCategory) {
+        _uiState.update { it.copy(selectedMusicCategory = category) }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingCategoryMusic = true) }
+            val result = indianMusicRepository.getCategorySongs(category)
+            val tracks = result.getOrDefault(emptyList())
+            _uiState.update {
+                it.copy(
+                    categoryTracks = tracks,
+                    isLoadingCategoryMusic = false
+                )
+            }
+        }
+    }
+
+    /**
+     * Creates a custom user playlist and persists it.
+     */
+    fun createUserPlaylist(name: String) {
+        if (name.trim().isEmpty()) return
+        soundAndHaptics.vibrateClick()
+        val newPl = com.example.model.UserPlaylist(
+            id = "user_pl_${System.currentTimeMillis()}",
+            name = name.trim(),
+            trackIds = emptyList(),
+            iconEmoji = "🎵"
+        )
+        val updated = _uiState.value.userPlaylists + newPl
+        _uiState.update { it.copy(userPlaylists = updated) }
+        saveUserPlaylists(updated)
+    }
+
+    fun addTrackToUserPlaylist(playlistId: String, track: com.example.model.BgmTrack) {
+        soundAndHaptics.vibrateClick()
+        val currentPlaylists = _uiState.value.userPlaylists.map { pl ->
+            if (pl.id == playlistId) {
+                if (!pl.trackIds.contains(track.id)) {
+                    pl.copy(trackIds = pl.trackIds + track.id)
+                } else pl
+            } else pl
+        }
+        _uiState.update { it.copy(userPlaylists = currentPlaylists) }
+        saveUserPlaylists(currentPlaylists)
+        saveSingleTrackRecord(track)
+    }
+
+    fun removeTrackFromUserPlaylist(playlistId: String, trackId: String) {
+        soundAndHaptics.vibrateClick()
+        val currentPlaylists = _uiState.value.userPlaylists.map { pl ->
+            if (pl.id == playlistId) {
+                pl.copy(trackIds = pl.trackIds.filter { it != trackId })
+            } else pl
+        }
+        _uiState.update { it.copy(userPlaylists = currentPlaylists) }
+        saveUserPlaylists(currentPlaylists)
+    }
+
+    fun toggleFavoriteTrack(track: com.example.model.BgmTrack) {
+        soundAndHaptics.vibrateClick()
+        val isNowFav = profilePreferences.toggleSongFavorite(track.id)
+        val currentFavIds = profilePreferences.getFavoriteSongIds()
+        val currentFavTracks = _uiState.value.favoriteTracks.toMutableList()
+        if (isNowFav) {
+            if (!currentFavTracks.any { it.id == track.id }) {
+                currentFavTracks.add(0, track)
+            }
+        } else {
+            currentFavTracks.removeAll { it.id == track.id }
+        }
+        _uiState.update {
+            it.copy(
+                favoriteSongIds = currentFavIds,
+                favoriteTracks = currentFavTracks
+            )
+        }
+        saveFavoriteTracksList(currentFavTracks)
+    }
+
+    /**
+     * Restores default royal and Indian tracks into active playback.
+     */
+    fun restoreDefaultPlaylist() {
+        soundAndHaptics.vibrateClick()
+        soundAndHaptics.soundManager.setBgmEnabled(true)
+        if (com.example.model.BGM_PLAYLIST.isNotEmpty()) {
+            soundAndHaptics.playTrack(com.example.model.BGM_PLAYLIST[0], com.example.model.BGM_PLAYLIST)
+            recordTrackPlayed(com.example.model.BGM_PLAYLIST[0])
+        }
+    }
+
+    private fun recordTrackPlayed(track: com.example.model.BgmTrack) {
+        val currentRecent = _uiState.value.recentlyPlayedTracks.toMutableList()
+        currentRecent.removeAll { it.id == track.id }
+        currentRecent.add(0, track)
+        val trimmed = currentRecent.take(30)
+        _uiState.update { it.copy(recentlyPlayedTracks = trimmed) }
+        saveRecentlyPlayedList(trimmed)
+    }
+
+    private fun loadSavedMusicData() {
+        try {
+            // Load custom playlists
+            val plRaw = profilePreferences.getCustomPlaylistsRaw()
+            if (plRaw.isNotEmpty()) {
+                val array = org.json.JSONArray(plRaw)
+                val list = mutableListOf<com.example.model.UserPlaylist>()
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val id = obj.optString("id")
+                    val name = obj.optString("name")
+                    val emoji = obj.optString("emoji", "🎵")
+                    val idsArr = obj.optJSONArray("trackIds") ?: org.json.JSONArray()
+                    val tIds = mutableListOf<String>()
+                    for (j in 0 until idsArr.length()) {
+                        tIds.add(idsArr.getString(j))
+                    }
+                    list.add(com.example.model.UserPlaylist(id = id, name = name, trackIds = tIds, iconEmoji = emoji))
+                }
+                _uiState.update { it.copy(userPlaylists = list) }
+            }
+
+            // Load recently played
+            val recentRaw = profilePreferences.getRecentlyPlayedRaw()
+            if (recentRaw.isNotEmpty()) {
+                val array = org.json.JSONArray(recentRaw)
+                val list = mutableListOf<com.example.model.BgmTrack>()
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val t = parseTrackFromJson(obj)
+                    if (t != null) list.add(t)
+                }
+                _uiState.update { it.copy(recentlyPlayedTracks = list) }
+            }
+
+            // Load favorite tracks
+            val favRaw = profilePreferences.getSavedFavoriteTracksRaw()
+            if (favRaw.isNotEmpty()) {
+                val array = org.json.JSONArray(favRaw)
+                val list = mutableListOf<com.example.model.BgmTrack>()
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val t = parseTrackFromJson(obj)
+                    if (t != null) list.add(t)
+                }
+                _uiState.update { it.copy(favoriteTracks = list) }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("LudoViewModel", "Error loading saved music data: ${e.message}")
+        }
+    }
+
+    private fun saveUserPlaylists(list: List<com.example.model.UserPlaylist>) {
+        try {
+            val array = org.json.JSONArray()
+            for (pl in list) {
+                val obj = org.json.JSONObject()
+                obj.put("id", pl.id)
+                obj.put("name", pl.name)
+                obj.put("emoji", pl.iconEmoji)
+                val idsArr = org.json.JSONArray()
+                for (id in pl.trackIds) {
+                    idsArr.put(id)
+                }
+                obj.put("trackIds", idsArr)
+                array.put(obj)
+            }
+            profilePreferences.setCustomPlaylistsRaw(array.toString())
+        } catch (_: Exception) {}
+    }
+
+    private fun saveRecentlyPlayedList(list: List<com.example.model.BgmTrack>) {
+        try {
+            val array = org.json.JSONArray()
+            for (t in list) {
+                array.put(trackToJson(t))
+            }
+            profilePreferences.setRecentlyPlayedRaw(array.toString())
+        } catch (_: Exception) {}
+    }
+
+    private fun saveFavoriteTracksList(list: List<com.example.model.BgmTrack>) {
+        try {
+            val array = org.json.JSONArray()
+            for (t in list) {
+                array.put(trackToJson(t))
+            }
+            profilePreferences.setSavedFavoriteTracksRaw(array.toString())
+        } catch (_: Exception) {}
+    }
+
+    private fun saveSingleTrackRecord(track: com.example.model.BgmTrack) {
+        val currentFav = _uiState.value.favoriteTracks
+        if (!currentFav.any { it.id == track.id }) {
+            val updated = currentFav + track
+            _uiState.update { it.copy(favoriteTracks = updated) }
+            saveFavoriteTracksList(updated)
+        }
+    }
+
+    private fun trackToJson(track: com.example.model.BgmTrack): org.json.JSONObject {
+        val obj = org.json.JSONObject()
+        obj.put("id", track.id)
+        obj.put("title", track.title)
+        obj.put("singer", track.singer)
+        obj.put("albumName", track.albumName)
+        obj.put("year", track.year)
+        obj.put("durationLabel", track.durationLabel)
+        obj.put("durationSeconds", track.durationSeconds)
+        obj.put("albumArtUrl", track.albumArtUrl ?: "")
+        obj.put("streamUrl", track.streamUrl ?: "")
+        obj.put("category", track.category.name)
+        obj.put("iconEmoji", track.iconEmoji)
+        return obj
+    }
+
+    private fun parseTrackFromJson(obj: org.json.JSONObject): com.example.model.BgmTrack? {
+        return try {
+            val id = obj.optString("id")
+            val title = obj.optString("title")
+            val singer = obj.optString("singer")
+            val albumName = obj.optString("albumName")
+            val year = obj.optString("year")
+            val durationLabel = obj.optString("durationLabel", "3:30")
+            val durationSeconds = obj.optInt("durationSeconds", 210)
+            val albumArtUrl = obj.optString("albumArtUrl").ifEmpty { null }
+            val streamUrl = obj.optString("streamUrl").ifEmpty { null }
+            val catName = obj.optString("category", "TRENDING")
+            val cat = try { com.example.model.MusicCategory.valueOf(catName) } catch (_: Exception) { com.example.model.MusicCategory.TRENDING }
+            val emoji = obj.optString("iconEmoji", "🎵")
+            com.example.model.BgmTrack(
+                id = id,
+                title = title,
+                singer = singer,
+                albumName = albumName,
+                year = year,
+                durationLabel = durationLabel,
+                durationSeconds = durationSeconds,
+                albumArtUrl = albumArtUrl,
+                streamUrl = streamUrl,
+                category = cat,
+                iconEmoji = emoji
+            )
+        } catch (_: Exception) { null }
     }
 
     fun setBgmVolume(volume: Float) {

@@ -36,6 +36,10 @@ class ProfilePreferences(private val context: Context) {
         private const val KEY_MUSIC_SHUFFLE_ENABLED = "pref_music_shuffle_enabled"
         private const val KEY_FAVORITE_SONG_IDS = "pref_favorite_song_ids"
 
+        private const val KEY_CUSTOM_PLAYLISTS = "pref_custom_playlists"
+        private const val KEY_RECENTLY_PLAYED = "pref_recently_played_songs"
+        private const val KEY_SAVED_FAVORITE_TRACKS = "pref_saved_favorite_tracks"
+
         const val DEFAULT_NICKNAME = "Ishu"
         const val DEFAULT_CROWN_AVATAR = "crown_imperial_gold"
         const val DEFAULT_ROYAL_TITLE = "Maharaja"
@@ -56,7 +60,7 @@ class ProfilePreferences(private val context: Context) {
         const val DEFAULT_REPEAT_MODE = "ALL"
     }
 
-    fun isBgmEnabled(): Boolean = if (com.example.model.BGM_PLAYLIST.isEmpty()) false else prefs.getBoolean(KEY_BGM_ENABLED, DEFAULT_BGM_ENABLED)
+    fun isBgmEnabled(): Boolean = prefs.getBoolean(KEY_BGM_ENABLED, DEFAULT_BGM_ENABLED)
     fun setBgmEnabled(enabled: Boolean) = prefs.edit().putBoolean(KEY_BGM_ENABLED, enabled).apply()
 
     fun isSfxEnabled(): Boolean = prefs.getBoolean(KEY_SFX_ENABLED, DEFAULT_SFX_ENABLED)
@@ -97,6 +101,15 @@ class ProfilePreferences(private val context: Context) {
         setFavoriteSongIds(current)
         return isNowFav
     }
+
+    fun getCustomPlaylistsRaw(): String = prefs.getString(KEY_CUSTOM_PLAYLISTS, "") ?: ""
+    fun setCustomPlaylistsRaw(json: String) = prefs.edit().putString(KEY_CUSTOM_PLAYLISTS, json).apply()
+
+    fun getRecentlyPlayedRaw(): String = prefs.getString(KEY_RECENTLY_PLAYED, "") ?: ""
+    fun setRecentlyPlayedRaw(json: String) = prefs.edit().putString(KEY_RECENTLY_PLAYED, json).apply()
+
+    fun getSavedFavoriteTracksRaw(): String = prefs.getString(KEY_SAVED_FAVORITE_TRACKS, "") ?: ""
+    fun setSavedFavoriteTracksRaw(json: String) = prefs.edit().putString(KEY_SAVED_FAVORITE_TRACKS, json).apply()
 
     fun getNickname(): String {
         return prefs.getString(KEY_NICKNAME, DEFAULT_NICKNAME) ?: DEFAULT_NICKNAME

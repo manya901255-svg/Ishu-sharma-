@@ -497,21 +497,43 @@ fun HomeScreen(
             )
         }
 
-        // Royal Music Player & Jukebox Dialog (44 Songs & Tracks)
+        // Royal Indian Music Player & Online Streaming Dialog
         if (uiState.showMusicPlayerDialog) {
             LudoMusicPlayerDialog(
                 currentTrack = uiState.currentBgmTrack,
                 isPlaying = uiState.isMusicPlaying,
                 repeatMode = uiState.musicRepeatMode,
+                isShuffleEnabled = uiState.isMusicShuffleEnabled,
                 volume = uiState.bgmVolume,
                 favoriteSongIds = uiState.favoriteSongIds,
+                isBuffering = uiState.isMusicBuffering,
+                playbackPositionMs = uiState.playbackPositionMs,
+                playbackDurationMs = uiState.playbackDurationMs,
+                selectedCategory = uiState.selectedMusicCategory,
+                categoryTracks = uiState.categoryTracks,
+                isLoadingCategory = uiState.isLoadingCategoryMusic,
+                searchResults = uiState.onlineSearchResults,
+                isSearching = uiState.isSearchingMusic,
+                searchQuery = uiState.onlineSearchQuery,
+                recentlyPlayed = uiState.recentlyPlayedTracks,
+                userPlaylists = uiState.userPlaylists,
+                favoriteTracks = uiState.favoriteTracks,
                 onPlayPauseToggle = { viewModel.toggleMusicPlayPause() },
                 onNextTrack = { viewModel.playNextBgmTrack() },
                 onPreviousTrack = { viewModel.playPreviousBgmTrack() },
                 onSelectTrack = { viewModel.selectBgmTrack(it) },
+                onPlayTrackDirect = { track, list -> viewModel.playTrackDirect(track, list) },
+                onSeekPosition = { viewModel.seekMusicPosition(it) },
+                onSearchQueryChange = { viewModel.searchOnlineMusic(it) },
+                onSelectCategory = { viewModel.selectMusicCategory(it) },
+                onCreatePlaylist = { viewModel.createUserPlaylist(it) },
+                onAddTrackToPlaylist = { plId, track -> viewModel.addTrackToUserPlaylist(plId, track) },
+                onRemoveTrackFromPlaylist = { plId, trackId -> viewModel.removeTrackFromUserPlaylist(plId, trackId) },
                 onRepeatModeCycle = { viewModel.cycleMusicRepeatMode() },
+                onToggleShuffle = { viewModel.toggleMusicShuffle() },
                 onVolumeChange = { viewModel.setBgmVolume(it) },
                 onToggleFavorite = { viewModel.toggleFavoriteSong(it) },
+                onToggleFavoriteTrack = { viewModel.toggleFavoriteTrack(it) },
                 onDismiss = { viewModel.toggleMusicPlayerDialog(false) }
             )
         }

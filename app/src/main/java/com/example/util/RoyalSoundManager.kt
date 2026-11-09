@@ -51,20 +51,47 @@ class RoyalSoundManager(private val context: Context) {
     // MediaPlayer for sequential Royal Kingdom background music playlist
     private var bgmPlayer: MediaPlayer? = null
     private var isBgmPrepared = false
+    var isBuffering = false
+        private set
 
-    // Current playing track index in BGM_PLAYLIST
+    private var dynamicPlaylist: MutableList<BgmTrack> = mutableListOf()
+    private var currentPlayingTrack: BgmTrack? = null
+
+    // Current playing track index
     var currentTrackIndex: Int = -1
         private set
 
-    val playlist: List<BgmTrack> get() = BGM_PLAYLIST
+    val playlist: List<BgmTrack> get() = if (dynamicPlaylist.isNotEmpty()) dynamicPlaylist else BGM_PLAYLIST
 
-    fun getCurrentTrack(): BgmTrack? = BGM_PLAYLIST.getOrNull(currentTrackIndex)
+    fun getCurrentTrack(): BgmTrack? = currentPlayingTrack ?: playlist.getOrNull(currentTrackIndex)
 
     private var onTrackChangeListener: ((BgmTrack?, Int) -> Unit)? = null
+    private var onBufferingListener: ((Boolean) -> Unit)? = null
 
     fun setOnTrackChangeListener(listener: (BgmTrack?, Int) -> Unit) {
         onTrackChangeListener = listener
         listener(getCurrentTrack(), currentTrackIndex)
+    }
+
+    fun setOnBufferingListener(listener: (Boolean) -> Unit) {
+        onBufferingListener = listener
+    }
+
+    fun seekTo(positionMs: Int) {
+        try {
+            bgmPlayer?.seekTo(positionMs)
+        } catch (_: Exception) {}
+    }
+
+    fun getCurrentPosition(): Int = try {
+        bgmPlayer?.currentPosition ?: 0
+    } catch (_: Exception) { 0 }
+
+    fun getDuration(): Int = try {
+        val d = bgmPlayer?.duration ?: 0
+        if (d > 0) d else (currentPlayingTrack?.durationSeconds ?: 0) * 1000
+    } catch (_: Exception) {
+        (currentPlayingTrack?.durationSeconds ?: 0) * 1000
     }
 
     // Vibrator for tactile haptic feedback
@@ -234,18 +261,44 @@ class RoyalSoundManager(private val context: Context) {
     fun isPlaying(): Boolean = bgmPlayer?.isPlaying == true
 
     /**
-     * Initializes and prepares the MediaPlayer for a specific BGM track from assets.
+     * Plays a specific BgmTrack directly (supporting online streaming URLs and local assets),
+     * optionally setting the active dynamic playlist context.
+     */
+    fun playTrack(track: BgmTrack, newPlaylist: List<BgmTrack> = emptyList()) {
+        if (newPlaylist.isNotEmpty()) {
+            dynamicPlaylist = newPlaylist.toMutableList()
+        } else if (!dynamicPlaylist.any { it.id == track.id }) {
+            dynamicPlaylist.add(0, track)
+        }
+        val targetIndex = dynamicPlaylist.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
+        isBgmEnabled = true
+        profilePreferences.setBgmEnabled(true)
+        if (bgmVolume <= 0.05f) {
+            setBgmVolume(0.80f)
+        }
+        playTrackInternal(track, targetIndex)
+    }
+
+    /**
+     * Initializes and prepares the MediaPlayer for a track at index in active playlist.
      */
     private fun initBgmPlayerForTrack(index: Int) {
-        if (BGM_PLAYLIST.isEmpty()) {
+        val currentList = playlist
+        if (currentList.isEmpty()) {
             currentTrackIndex = -1
+            currentPlayingTrack = null
             onPlaybackStateListener?.invoke(false)
             onTrackChangeListener?.invoke(null, -1)
             return
         }
-        val safeIndex = index.coerceIn(0, BGM_PLAYLIST.lastIndex)
-        val track = BGM_PLAYLIST[safeIndex]
+        val safeIndex = index.coerceIn(0, currentList.lastIndex)
+        val track = currentList[safeIndex]
+        playTrackInternal(track, safeIndex)
+    }
+
+    private fun playTrackInternal(track: BgmTrack, safeIndex: Int) {
         currentTrackIndex = safeIndex
+        currentPlayingTrack = track
 
         try {
             bgmPlayer?.let { player ->
@@ -261,24 +314,59 @@ class RoyalSoundManager(private val context: Context) {
                     }
                     setOnErrorListener { _, what, extra ->
                         Log.e("RoyalSoundManager", "MediaPlayer error: what=$what, extra=$extra")
+                        isBuffering = false
                         isBgmPrepared = false
+                        onBufferingListener?.invoke(false)
                         onPlaybackStateListener?.invoke(false)
                         true
                     }
                 }
             }
 
+            bgmPlayer?.setOnBufferingUpdateListener { _, _ -> }
+            requestAudioFocus()
+            val effectiveVol = if (bgmVolume > 0.05f) bgmVolume else 0.80f
+            bgmVolume = effectiveVol
+            bgmPlayer?.setVolume(effectiveVol, effectiveVol)
+
+            // Case 1: Online Streaming Track (HTTP / HTTPS CDN URL)
+            if (!track.streamUrl.isNullOrEmpty()) {
+                isBuffering = true
+                onBufferingListener?.invoke(true)
+                bgmPlayer?.apply {
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .build()
+                    )
+                    setDataSource(track.streamUrl)
+                    setOnPreparedListener { mp ->
+                        isBuffering = false
+                        isBgmPrepared = true
+                        onBufferingListener?.invoke(false)
+                        if (isBgmEnabled) {
+                            mp.start()
+                            onPlaybackStateListener?.invoke(true)
+                        } else {
+                            onPlaybackStateListener?.invoke(false)
+                        }
+                        onTrackChangeListener?.invoke(track, safeIndex)
+                    }
+                    prepareAsync()
+                }
+                return
+            }
+
+            // Case 2: Bundled local asset audio
             var prepared = false
-            // Strictly check the custom playlist track's exact audio file in assets/bgm
             val assetFileToPlay = if (track.assetFileName.isNotBlank() && availableBgmAssets.contains(track.assetFileName)) {
                 track.assetFileName
             } else {
-                Log.e("RoyalSoundManager", "Audio asset 'bgm/${track.assetFileName}' not found for song '${track.title}'. Refusing to substitute other audio.")
                 null
             }
 
             if (!assetFileToPlay.isNullOrBlank()) {
-                // Strategy 1: Direct AssetFileDescriptor
                 try {
                     val afd = context.assets.openFd("bgm/$assetFileToPlay")
                     bgmPlayer?.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
@@ -289,7 +377,6 @@ class RoyalSoundManager(private val context: Context) {
                     Log.w("RoyalSoundManager", "Direct assetFd failed for $assetFileToPlay: ${e.message}")
                 }
 
-                // Strategy 2: If direct fd failed, stream asset into cache file and play
                 if (!prepared) {
                     try {
                         bgmPlayer?.reset()
@@ -307,7 +394,7 @@ class RoyalSoundManager(private val context: Context) {
                             prepared = true
                         }
                     } catch (e2: Exception) {
-                        Log.e("RoyalSoundManager", "Cached file playback fallback notice for $assetFileToPlay: ${e2.message}")
+                        Log.e("RoyalSoundManager", "Cached file playback fallback notice: ${e2.message}")
                     }
                 }
             }
@@ -327,12 +414,7 @@ class RoyalSoundManager(private val context: Context) {
 
             if (prepared) {
                 isBgmPrepared = true
-                val effectiveVol = if (bgmVolume > 0.05f) bgmVolume else 0.80f
-                bgmVolume = effectiveVol
-                bgmPlayer?.setVolume(effectiveVol, effectiveVol)
-
                 if (isBgmEnabled) {
-                    requestAudioFocus()
                     bgmPlayer?.start()
                     onPlaybackStateListener?.invoke(true)
                 } else {
@@ -345,14 +427,17 @@ class RoyalSoundManager(private val context: Context) {
             onTrackChangeListener?.invoke(track, safeIndex)
         } catch (e: Exception) {
             Log.e("RoyalSoundManager", "Error initializing track $safeIndex: ${track.title}", e)
+            isBuffering = false
             isBgmPrepared = false
+            onBufferingListener?.invoke(false)
             onPlaybackStateListener?.invoke(false)
             onTrackChangeListener?.invoke(track, safeIndex)
         }
     }
 
     private fun handleTrackCompletion() {
-        if (BGM_PLAYLIST.isEmpty()) return
+        val currentList = playlist
+        if (currentList.isEmpty()) return
         when (repeatMode) {
             com.example.model.MusicRepeatMode.ONE -> {
                 try {
@@ -375,35 +460,38 @@ class RoyalSoundManager(private val context: Context) {
     // --- Sequential & Shuffle Ambient Background Music Control ---
 
     fun playNextTrack() {
-        if (BGM_PLAYLIST.isEmpty()) return
-        val nextIdx = if (isShuffleEnabled && BGM_PLAYLIST.size > 1) {
+        val currentList = playlist
+        if (currentList.isEmpty()) return
+        val nextIdx = if (isShuffleEnabled && currentList.size > 1) {
             var candidate: Int
             do {
-                candidate = kotlin.random.Random.nextInt(BGM_PLAYLIST.size)
+                candidate = kotlin.random.Random.nextInt(currentList.size)
             } while (candidate == currentTrackIndex)
             candidate
         } else {
-            (currentTrackIndex + 1) % BGM_PLAYLIST.size
+            (currentTrackIndex + 1) % currentList.size
         }
         initBgmPlayerForTrack(nextIdx)
     }
 
     fun playPreviousTrack() {
-        if (BGM_PLAYLIST.isEmpty()) return
-        val prevIdx = if (isShuffleEnabled && BGM_PLAYLIST.size > 1) {
+        val currentList = playlist
+        if (currentList.isEmpty()) return
+        val prevIdx = if (isShuffleEnabled && currentList.size > 1) {
             var candidate: Int
             do {
-                candidate = kotlin.random.Random.nextInt(BGM_PLAYLIST.size)
+                candidate = kotlin.random.Random.nextInt(currentList.size)
             } while (candidate == currentTrackIndex)
             candidate
         } else {
-            if (currentTrackIndex - 1 < 0) BGM_PLAYLIST.lastIndex else currentTrackIndex - 1
+            if (currentTrackIndex - 1 < 0) currentList.lastIndex else currentTrackIndex - 1
         }
         initBgmPlayerForTrack(prevIdx)
     }
 
     fun selectTrack(index: Int) {
-        if (index in BGM_PLAYLIST.indices) {
+        val currentList = playlist
+        if (index in currentList.indices) {
             isBgmEnabled = true
             profilePreferences.setBgmEnabled(true)
             if (bgmVolume <= 0.05f) {
@@ -414,7 +502,7 @@ class RoyalSoundManager(private val context: Context) {
     }
 
     fun togglePlayPause(): Boolean {
-        if (BGM_PLAYLIST.isEmpty()) {
+        if (playlist.isEmpty()) {
             stopAmbientBgm()
             return false
         }
@@ -433,7 +521,8 @@ class RoyalSoundManager(private val context: Context) {
     }
 
     fun startAmbientBgm() {
-        if (BGM_PLAYLIST.isEmpty()) {
+        val currentList = playlist
+        if (currentList.isEmpty()) {
             stopAmbientBgm()
             return
         }
