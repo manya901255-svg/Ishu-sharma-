@@ -53,6 +53,7 @@ fun Realistic3DDice(
     isTurnActive: Boolean,
     modifier: Modifier = Modifier,
     diceSize: Dp = 68.dp,
+    diceSkinId: String = "dice_imperial_gold",
     onRollClick: () -> Unit
 ) {
     val density = LocalDensity.current.density
@@ -196,11 +197,14 @@ fun Realistic3DDice(
                 .clip(RoundedCornerShape(16.dp))
                 .background(
                     brush = Brush.radialGradient(
-                        colors = listOf(
-                            RoyalMarbleBase,
-                            RoyalMarbleTile,
-                            RoyalMarbleShadow
-                        ),
+                        colors = when (diceSkinId) {
+                            "dice_maharaja_ruby" -> listOf(Color(0xFFFF5252), Color(0xFFD50000), Color(0xFF880E4F))
+                            "dice_emerald_empire" -> listOf(Color(0xFF69F0AE), Color(0xFF00C853), Color(0xFF1B5E20))
+                            "dice_cyber_neon" -> listOf(Color(0xFF18FFFF), Color(0xFF00B0FF), Color(0xFF651FFF))
+                            "dice_royal_platinum" -> listOf(Color(0xFFFFFFFF), Color(0xFFCFD8DC), Color(0xFF78909C))
+                            "dice_classic_ivory" -> listOf(Color(0xFFFFF9C4), Color(0xFFFFF176), Color(0xFFFFD54F))
+                            else -> listOf(RoyalMarbleBase, RoyalMarbleTile, RoyalMarbleShadow)
+                        },
                         radius = 160f,
                         center = Offset(
                             x = if (isRolling) (diceSize.value * (0.3f + 0.4f * sin(progress * 6.28f))) else diceSize.value * 0.35f,
@@ -211,12 +215,14 @@ fun Realistic3DDice(
                 .border(
                     width = 2.5.dp,
                     brush = Brush.linearGradient(
-                        colors = listOf(
-                            RoyalGoldLight,
-                            RoyalGold,
-                            RoyalGoldDark,
-                            RoyalAmber
-                        )
+                        colors = when (diceSkinId) {
+                            "dice_maharaja_ruby" -> listOf(Color(0xFFFFD700), Color(0xFFFF5252), Color(0xFFFFD700))
+                            "dice_emerald_empire" -> listOf(Color(0xFFB9F6CA), Color(0xFFFFD700), Color(0xFF00E676))
+                            "dice_cyber_neon" -> listOf(Color(0xFF00E5FF), Color(0xFFE040FB), Color(0xFF00E5FF))
+                            "dice_royal_platinum" -> listOf(Color(0xFFFFFFFF), Color(0xFF80D8FF), Color(0xFFFFFFFF))
+                            "dice_classic_ivory" -> listOf(Color(0xFFFFE082), Color(0xFFFFB300), Color(0xFFFFE082))
+                            else -> listOf(RoyalGoldLight, RoyalGold, RoyalGoldDark, RoyalAmber)
+                        }
                     ),
                     shape = RoundedCornerShape(16.dp)
                 )

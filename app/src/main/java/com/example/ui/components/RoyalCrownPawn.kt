@@ -44,6 +44,7 @@ fun RoyalCrownPawn(
     modifier: Modifier = Modifier,
     size: Dp = 26.dp,
     crownEmoji: String? = null,
+    pawnSkin: String = "crown_maharaja",
     onClick: (() -> Unit)? = null
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pawnGlow")
@@ -187,16 +188,21 @@ fun RoyalCrownPawn(
             )
         }
 
-        // 8. Custom Crown Avatar Topper (when equipped)
-        if (crownEmoji != null) {
-            Text(
-                text = crownEmoji,
-                fontSize = (size.value * 0.38f).sp,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = (-size * 0.14f) + (bounceOffset.dp * 0.5f))
-            )
+        // 8. Custom Crown Avatar / Token Crest Topper (when equipped)
+        val activeCrest = crownEmoji ?: when (pawnSkin) {
+            "token_lion_shield" -> "🛡️"
+            "token_lotus_gem" -> "🪷"
+            "token_dragon_crest" -> "🐉"
+            "token_star_emperor" -> "⭐"
+            else -> "👑"
         }
+        Text(
+            text = activeCrest,
+            fontSize = (size.value * 0.38f).sp,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = (-size * 0.14f) + (bounceOffset.dp * 0.5f))
+        )
 
         // 9. Floating 'X Left' Step Counter Badge (Authentic Ludo Club feature shown in video)
         if (pawn.isMovable && (pawn.state == com.example.model.PawnState.ON_BOARD || pawn.state == com.example.model.PawnState.IN_HOME_STRETCH)) {

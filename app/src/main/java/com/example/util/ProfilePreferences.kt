@@ -39,6 +39,8 @@ class ProfilePreferences(private val context: Context) {
         private const val KEY_CUSTOM_PLAYLISTS = "pref_custom_playlists"
         private const val KEY_RECENTLY_PLAYED = "pref_recently_played_songs"
         private const val KEY_SAVED_FAVORITE_TRACKS = "pref_saved_favorite_tracks"
+        private const val KEY_DICE_SKIN = "pref_equipped_dice_skin"
+        private const val KEY_TOKEN_SKIN = "pref_equipped_token_skin"
 
         const val DEFAULT_NICKNAME = "Ishu"
         const val DEFAULT_CROWN_AVATAR = "crown_imperial_gold"
@@ -50,6 +52,8 @@ class ProfilePreferences(private val context: Context) {
         const val DEFAULT_WIN_STREAK = 4
         const val DEFAULT_TOTAL_CAPTURES = 89
         const val DEFAULT_PAWN_CROWN_AVATAR = "crown_imperial_gold"
+        const val DEFAULT_DICE_SKIN = "dice_imperial_gold"
+        const val DEFAULT_TOKEN_SKIN = "crown_maharaja"
         const val DEFAULT_BOARD_THEME = "imperial_navy"
         const val DEFAULT_SFX_PRESET = "royal_court"
         const val DEFAULT_BGM_ENABLED = true
@@ -59,6 +63,12 @@ class ProfilePreferences(private val context: Context) {
         const val DEFAULT_SFX_VOLUME = 0.85f
         const val DEFAULT_REPEAT_MODE = "ALL"
     }
+
+    fun getEquippedDiceSkin(): String = prefs.getString(KEY_DICE_SKIN, DEFAULT_DICE_SKIN) ?: DEFAULT_DICE_SKIN
+    fun setEquippedDiceSkin(skinId: String) = prefs.edit().putString(KEY_DICE_SKIN, skinId).apply()
+
+    fun getEquippedTokenSkin(): String = prefs.getString(KEY_TOKEN_SKIN, DEFAULT_TOKEN_SKIN) ?: DEFAULT_TOKEN_SKIN
+    fun setEquippedTokenSkin(skinId: String) = prefs.edit().putString(KEY_TOKEN_SKIN, skinId).apply()
 
     fun isBgmEnabled(): Boolean = prefs.getBoolean(KEY_BGM_ENABLED, DEFAULT_BGM_ENABLED)
     fun setBgmEnabled(enabled: Boolean) = prefs.edit().putBoolean(KEY_BGM_ENABLED, enabled).apply()

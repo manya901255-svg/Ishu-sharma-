@@ -53,7 +53,8 @@ fun PlayerCornerSlotPanel(
     onLightningClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     floatingEmoji: String? = null,
-    alignRight: Boolean = false
+    alignRight: Boolean = false,
+    diceSkinId: String = "dice_imperial_gold"
 ) {
     if (player == null) return
 
@@ -106,6 +107,7 @@ fun PlayerCornerSlotPanel(
                 canRoll = canRoll && isHuman,
                 consecutiveSixes = consecutiveSixes,
                 timeRemainingSec = timeRemainingSec,
+                diceSkinId = diceSkinId,
                 onRollClick = onRollClick
             )
 
@@ -129,6 +131,7 @@ fun PlayerCornerSlotPanel(
                 canRoll = canRoll && isHuman,
                 consecutiveSixes = consecutiveSixes,
                 timeRemainingSec = timeRemainingSec,
+                diceSkinId = diceSkinId,
                 onRollClick = onRollClick
             )
 
@@ -402,6 +405,7 @@ private fun CornerDiceWidget(
     canRoll: Boolean,
     consecutiveSixes: Int,
     timeRemainingSec: Int,
+    diceSkinId: String = "dice_imperial_gold",
     onRollClick: () -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "dicePulse")
@@ -456,6 +460,7 @@ private fun CornerDiceWidget(
                 playerColor = playerColor,
                 isTurnActive = isActiveTurn,
                 diceSize = 34.dp,
+                diceSkinId = diceSkinId,
                 onRollClick = {
                     if (canRoll) {
                         onRollClick()

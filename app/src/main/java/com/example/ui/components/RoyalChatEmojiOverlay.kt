@@ -94,6 +94,7 @@ fun RoyalChatEmojiDialog(
     onSendEmoji: (String) -> Unit,
     currentSenderName: String = "You",
     currentSenderColor: LudoColor = LudoColor.RED,
+    onReportPlayerClick: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     var selectedCategory by remember { mutableStateOf(0) } // 0: Chat Room, 1: Royal Decrees, 2: Emojis
@@ -185,20 +186,40 @@ fun RoyalChatEmojiDialog(
                         }
                     }
 
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.1f))
-                            .testTag("chat_close_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (onReportPlayerClick != null) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFFFF5252).copy(alpha = 0.2f))
+                                    .border(1.dp, Color(0xFFFF5252), RoundedCornerShape(8.dp))
+                                    .clickable { onReportPlayerClick() }
+                                    .padding(horizontal = 7.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🛡️", fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text("Report", color = Color(0xFFFF8A80), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.1f))
+                                .testTag("chat_close_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
 

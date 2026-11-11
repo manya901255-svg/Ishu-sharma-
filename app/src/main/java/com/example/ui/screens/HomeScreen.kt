@@ -220,21 +220,32 @@ fun HomeScreen(
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        // Card 1: Authentic Play Online Card (Screenshot 2)
+                        // Card 1: Authentic Play Online Card
                         LudoClubImageCard(
                             imageRes = R.drawable.card_play_online,
                             title = "Play Online",
                             onClick = { selectedModeForSetup = GameMode.ONLINE_MULTIPLAYER }
                         )
 
-                        // Card 2: 2 vs 2 Battle Card (Screenshot 2)
+                        // Card 2: Classic Ludo (4-Pawn Traditional)
+                        LudoClubProceduralCard(
+                            title = "Classic Mode",
+                            subtitle = "Home 4 Pawns to Win!",
+                            bgGradient = listOf(Color(0xFF0D47A1), Color(0xFF1976D2)),
+                            icon = "👑",
+                            decorEmoji = "🏛️",
+                            badge = "TRADITIONAL",
+                            onClick = { selectedModeForSetup = GameMode.CLASSIC }
+                        )
+
+                        // Card 3: 2 vs 2 Team Battle Card (Authentic Co-op!)
                         LudoClubImageCard(
                             imageRes = R.drawable.card_two_vs_two,
                             title = "2 vs 2 Battle",
-                            onClick = { selectedModeForSetup = GameMode.PASS_AND_PLAY }
+                            onClick = { selectedModeForSetup = GameMode.TEAM_2VS2 }
                         )
 
-                        // Card 3: Quick Rush Blitz Card (Screenshot 3)
+                        // Card 4: Quick Rush Blitz Card
                         LudoClubProceduralCard(
                             title = "Quick Rush",
                             subtitle = "1 Pawn Home to Win!",
@@ -245,10 +256,10 @@ fun HomeScreen(
                             onClick = { selectedModeForSetup = GameMode.QUICK_RUSH }
                         )
 
-                        // Card 4: vs AI Match (Screenshot 3)
+                        // Card 5: vs AI Match
                         LudoClubProceduralCard(
                             title = "vs AI Mode",
-                            subtitle = "Offline Royal",
+                            subtitle = "Offline Royal Bots",
                             bgGradient = listOf(Color(0xFF7E57C2), Color(0xFF512DA8)),
                             icon = "🤖",
                             decorEmoji = "👑",
@@ -256,7 +267,44 @@ fun HomeScreen(
                             onClick = { selectedModeForSetup = GameMode.VS_AI }
                         )
 
-                        // Card 5: Private Room (Screenshot 1)
+                        // Card 6: Local Pass & Play Card
+                        LudoClubProceduralCard(
+                            title = "Pass & Play",
+                            subtitle = "Local Court 2-4 Players",
+                            bgGradient = listOf(Color(0xFF2E7D32), Color(0xFF1B5E20)),
+                            icon = "👥",
+                            decorEmoji = "🎲",
+                            badge = "LOCAL",
+                            onClick = { selectedModeForSetup = GameMode.PASS_AND_PLAY }
+                        )
+
+                        // Card 7: Friends Challenge Duel
+                        LudoClubProceduralCard(
+                            title = "Friends Duel",
+                            subtitle = "1-on-1 Royal Duel",
+                            bgGradient = listOf(Color(0xFF00B0FF), Color(0xFF0091EA)),
+                            icon = "⚔️",
+                            decorEmoji = "🛡️",
+                            badge = "CHALLENGE",
+                            onClick = {
+                                viewModel.startNewGame(GameMode.FRIENDS_CHALLENGE, 2, wager = 1500L)
+                            }
+                        )
+
+                        // Card 8: Practice Mode
+                        LudoClubProceduralCard(
+                            title = "Practice Mode",
+                            subtitle = "Hints & Undo Moves",
+                            bgGradient = listOf(Color(0xFF00BFA5), Color(0xFF00796B)),
+                            icon = "🎓",
+                            decorEmoji = "💡",
+                            badge = "ACADEMY",
+                            onClick = {
+                                viewModel.startNewGame(GameMode.PRACTICE, 2, wager = 0L)
+                            }
+                        )
+
+                        // Card 9: Private Room
                         LudoClubProceduralCard(
                             title = "Private Room",
                             subtitle = "Play with Friends",
@@ -269,13 +317,40 @@ fun HomeScreen(
                     }
                 }
 
-                // Right Column Action Badges (Daily, History, Tasks, Mail, Blueprint)
+                // Right Column Action Badges (Daily, History, Tasks, Guide, Armory, Admin, Mail, Blueprint)
                 Column(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 2.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    LudoClubActionBadge(
+                        icon = "📖",
+                        label = "Guide",
+                        badge = "RULES",
+                        badgeColor = Color(0xFF00E5FF)
+                    ) {
+                        viewModel.toggleTutorialDialog(true)
+                    }
+
+                    LudoClubActionBadge(
+                        icon = "⚔️",
+                        label = "Armory",
+                        badge = "SKINS",
+                        badgeColor = Color(0xFFFFD600)
+                    ) {
+                        viewModel.toggleCustomizerShop(true)
+                    }
+
+                    LudoClubActionBadge(
+                        icon = "🛡️",
+                        label = "Admin",
+                        badge = "PIN",
+                        badgeColor = Color(0xFFFF5252)
+                    ) {
+                        viewModel.toggleAdminDashboard(true)
+                    }
+
                     LudoClubActionBadge(
                         icon = "🎁",
                         label = "Daily",
@@ -607,15 +682,68 @@ fun HomeScreen(
             )
         }
 
+        // Interactive Tutorial Dialog (Royal Academy)
+        if (uiState.showTutorialDialog) {
+            InteractiveTutorialDialog(
+                onDismiss = { viewModel.toggleTutorialDialog(false) }
+            )
+        }
+
+        // Royal Admin Dashboard Dialog
+        if (uiState.showAdminDashboard) {
+            RoyalAdminDashboardDialog(
+                isPinVerified = uiState.adminPinVerified,
+                onVerifyPin = { pin -> viewModel.verifyAdminPin(pin) },
+                playerReports = uiState.playerReports,
+                userCoins = uiState.userCoins,
+                userGems = uiState.userGems,
+                onGrantCoins = { amount -> viewModel.adminGrantCoins(amount) },
+                onGrantGems = { amount -> viewModel.adminGrantGems(amount) },
+                onResetDailyRewards = { viewModel.adminResetDailyRewards() },
+                onResetDailyMissions = { viewModel.adminResetDailyMissions() },
+                onClearReports = { viewModel.adminClearReports() },
+                onDismiss = { viewModel.toggleAdminDashboard(false) }
+            )
+        }
+
+        // Player Report Dialog
+        if (uiState.showReportDialog && uiState.reportedTargetPlayer != null) {
+            PlayerReportDialog(
+                targetPlayer = uiState.reportedTargetPlayer!!,
+                onReportSubmitted = { reason, isBlocked ->
+                    viewModel.submitPlayerReport(reason, isBlocked)
+                },
+                onDismiss = { viewModel.dismissReportPlayerDialog() }
+            )
+        }
+
+        // Armory & Customizer Shop Dialog
+        if (uiState.showCustomizerShopDialog) {
+            DiceAndTokenShopDialog(
+                equippedDiceSkinId = uiState.equippedDiceSkin,
+                equippedTokenSkinId = uiState.equippedPawnSkin,
+                equippedSoundTheme = uiState.sfxPreset,
+                userCoins = uiState.userCoins,
+                onEquipDiceSkin = { skinId -> viewModel.equipDiceSkin(skinId) },
+                onEquipTokenSkin = { skinId -> viewModel.equipTokenSkin(skinId) },
+                onEquipSoundTheme = { themeId -> viewModel.equipSoundTheme(themeId) },
+                onDismiss = { viewModel.toggleCustomizerShop(false) }
+            )
+        }
+
         // 3D Entry Theme Dialog for all Selected Game Modes
         if (selectedModeForSetup != null) {
             val mode = selectedModeForSetup!!
             val modeTitle = when (mode) {
                 GameMode.ONLINE_MULTIPLAYER -> "Online"
+                GameMode.CLASSIC -> "Classic"
+                GameMode.TEAM_2VS2 -> "Team 2vs2"
                 GameMode.VS_AI -> "Play AI"
                 GameMode.PASS_AND_PLAY -> "Pass & Play"
                 GameMode.QUICK_RUSH -> "Rush"
                 GameMode.PRIVATE_ROOM -> "Room"
+                GameMode.FRIENDS_CHALLENGE -> "Challenge"
+                GameMode.PRACTICE -> "Practice"
                 else -> "Online"
             }
             OnlineModeLobbyDialog(

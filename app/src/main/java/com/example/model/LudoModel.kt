@@ -102,6 +102,9 @@ enum class GameMode(val title: String, val subtitle: String, val defaultWager: L
     ONLINE_MULTIPLAYER("Online Match", "Real-time match with players across kingdoms", 1500),
     PRIVATE_ROOM("Private Royal Room", "Create or join a room with royal invitation code", 1500),
     QUICK_RUSH("Quick Rush Mode", "Blitz mode: First pawn to palace wins!", 1500),
+    TEAM_2VS2("Team Ludo (2 vs 2)", "Team up with a partner! Protect partner tokens & win together!", 2000),
+    FRIENDS_CHALLENGE("Friends Challenge", "1-on-1 direct duel with royal friends", 1500),
+    PRACTICE("Practice Mode", "Solo training ground with tactical hints & undo moves", 0),
     TOURNAMENT("Royal Tournament", "Championship bracket for massive jackpot", 5000)
 }
 
@@ -149,4 +152,52 @@ data class LeaderboardUser(
     val trophies: Int,
     val winRate: String,
     val totalEarnings: Long
+)
+
+data class DiceSkin(
+    val id: String,
+    val name: String,
+    val description: String,
+    val primaryColor: Color,
+    val accentColor: Color,
+    val pipColor: Color,
+    val iconEmoji: String = "🎲",
+    val priceCoins: Long = 0L,
+    val isDefault: Boolean = false
+)
+
+val BUILT_IN_DICE_SKINS = listOf(
+    DiceSkin("dice_imperial_gold", "Imperial Gold", "Pure Jaipur bullion dice with ruby pips", Color(0xFFFFD700), Color(0xFFFFA000), Color(0xFFC62828), "👑", 0L, true),
+    DiceSkin("dice_maharaja_ruby", "Maharaja Ruby", "Faceted royal crimson gem with gold pips", Color(0xFFD50000), Color(0xFF880E4F), Color(0xFFFFD700), "💎", 2500L),
+    DiceSkin("dice_emerald_empire", "Emerald Empire", "Royal Mughal emerald with diamond pips", Color(0xFF00C853), Color(0xFF1B5E20), Color(0xFFE0F7FA), "🟢", 3000L),
+    DiceSkin("dice_cyber_neon", "Cyber Neon", "Electrified arcade synth neon dice", Color(0xFF00E5FF), Color(0xFFD500F9), Color(0xFFFFFFFF), "⚡", 4000L),
+    DiceSkin("dice_royal_platinum", "Royal Platinum", "Mirror-polished white platinum with sapphire pips", Color(0xFFECEFF1), Color(0xFF90A4AE), Color(0xFF0277BD), "✨", 5000L),
+    DiceSkin("dice_classic_ivory", "Classic Ivory", "Hand-carved vintage ivory bone dice", Color(0xFFFFF8E1), Color(0xFFFFE082), Color(0xFF212121), "🎲", 0L)
+)
+
+data class TokenSkin(
+    val id: String,
+    val name: String,
+    val description: String,
+    val symbolEmoji: String,
+    val badgeTitle: String,
+    val priceCoins: Long = 0L,
+    val isDefault: Boolean = false
+)
+
+val BUILT_IN_TOKEN_SKINS = listOf(
+    TokenSkin("crown_maharaja", "Maharaja Crown", "Imperial royal crown token", "👑", "IMPERIAL", 0L, true),
+    TokenSkin("token_lion_shield", "Lion Shield", "Bravery emblem of royal warriors", "🛡️", "DEFENDER", 2500L),
+    TokenSkin("token_lotus_gem", "Lotus Gem", "Sacred blooming lotus of prosperity", "🪷", "MYSTIC", 3000L),
+    TokenSkin("token_dragon_crest", "Dragon Crest", "Fierce mythic dragon insignia", "🐉", "VALIANT", 4000L),
+    TokenSkin("token_star_emperor", "Star Emperor", "Radiant galactic crown star", "⭐", "CHAMPION", 5000L)
+)
+
+data class PlayerReport(
+    val id: String,
+    val reportedPlayerName: String,
+    val reason: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val isBlocked: Boolean = true,
+    val status: String = "UNDER_REVIEW"
 )

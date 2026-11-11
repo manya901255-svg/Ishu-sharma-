@@ -92,12 +92,25 @@ object LudoEngine {
     }
 
     /**
+     * Checks if two colors belong to the same team in 2vs2 mode:
+     * Team Sun: Yellow & Green
+     * Team Moon: Red & Blue
+     */
+    fun areTeammates(color1: LudoColor, color2: LudoColor): Boolean {
+        val teamSun = setOf(LudoColor.YELLOW, LudoColor.GREEN)
+        val teamMoon = setOf(LudoColor.RED, LudoColor.BLUE)
+        return (color1 in teamSun && color2 in teamSun) || (color1 in teamMoon && color2 in teamMoon)
+    }
+
+    /**
      * Checks if moving this pawn would capture any opponent pawn(s).
      * Returns the captured pawns if any. Safe squares prevent capture.
+     * In TEAM_2VS2 mode, teammates do not capture each other.
      */
     fun checkForCaptures(
         movingPawn: Pawn,
-        allPlayers: List<Player>
+        allPlayers: List<Player>,
+        mode: GameMode = GameMode.CLASSIC
     ): List<Pair<Player, Pawn>> {
         if (movingPawn.state != PawnState.ON_BOARD) return emptyList()
         val targetPos = movingPawn.trackPosition
@@ -106,6 +119,7 @@ object LudoEngine {
         val captured = mutableListOf<Pair<Player, Pawn>>()
         for (player in allPlayers) {
             if (player.color == movingPawn.color) continue
+            if (mode == GameMode.TEAM_2VS2 && areTeammates(player.color, movingPawn.color)) continue
             for (enemyPawn in player.pawns) {
                 if (enemyPawn.state == PawnState.ON_BOARD && enemyPawn.trackPosition == targetPos) {
                     captured.add(player to enemyPawn)
@@ -122,7 +136,8 @@ object LudoEngine {
         player: Player,
         movablePawns: List<Pawn>,
         dice: Int,
-        allPlayers: List<Player>
+        allPlayers: List<Player>,
+        mode: GameMode = GameMode.CLASSIC
     ): Pawn? {
         if (movablePawns.isEmpty()) return null
         if (movablePawns.size == 1) return movablePawns.first()
@@ -130,7 +145,7 @@ object LudoEngine {
         // 1. Priority: Can capture an enemy pawn?
         for (pawn in movablePawns) {
             val simulated = calculateMoveResult(pawn, dice)
-            val captures = checkForCaptures(simulated, allPlayers)
+            val captures = checkForCaptures(simulated, allPlayers, mode)
             if (captures.isNotEmpty()) return pawn
         }
 
@@ -168,16 +183,23 @@ object LudoEngine {
     /**
      * Checks if a player has met the winning condition based on the active GameMode:
      * - DASH: First player with 1 pawn home wins!
-     * - RUSH / QUICK_RUSH: First player with 2 pawns home wins!
+     * - RUSH / QUICK_RUSH / FRIENDS_CHALLENGE: First player with 2 pawns home wins!
      * - BOLT: First player with 3 pawns home wins!
+     * - TEAM_2VS2: First team with 4 total pawns home wins together!
      * - CLASSIC / Others: All 4 pawns home to win!
      */
-    fun hasPlayerWon(player: Player, mode: GameMode): Boolean {
+    fun hasPlayerWon(player: Player, mode: GameMode, allPlayers: List<Player> = emptyList()): Boolean {
         val finishedCount = player.pawns.count { it.state == PawnState.FINISHED }
         return when (mode) {
             GameMode.DASH -> finishedCount >= 1
-            GameMode.RUSH, GameMode.QUICK_RUSH -> finishedCount >= 2
+            GameMode.RUSH, GameMode.QUICK_RUSH, GameMode.FRIENDS_CHALLENGE -> finishedCount >= 2
             GameMode.BOLT -> finishedCount >= 3
+            GameMode.TEAM_2VS2 -> {
+                val teamMembers = allPlayers.filter { areTeammates(it.color, player.color) }
+                val totalTeamFinished = (if (teamMembers.isNotEmpty()) teamMembers else listOf(player))
+                    .sumOf { p -> p.pawns.count { it.state == PawnState.FINISHED } }
+                totalTeamFinished >= 4
+            }
             else -> finishedCount == player.pawns.size
         }
     }

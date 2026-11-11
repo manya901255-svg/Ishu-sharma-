@@ -149,7 +149,17 @@ data class LudoUiState(
     val activeWallpapers: Map<String, String> = emptyMap(),
     val customUploadedWallpapers: List<String> = emptyList(),
     val favoriteWallpaperIds: Set<String> = emptySet(),
-    val recentWallpaperIds: List<String> = emptyList()
+    val recentWallpaperIds: List<String> = emptyList(),
+    // MG Ludo Upgraded Admin, Tutorial, Moderation & Customization State
+    val showAdminDashboard: Boolean = false,
+    val adminPinVerified: Boolean = false,
+    val showTutorialDialog: Boolean = false,
+    val showReportDialog: Boolean = false,
+    val showCustomizerShopDialog: Boolean = false,
+    val reportedTargetPlayer: Player? = null,
+    val playerReports: List<PlayerReport> = emptyList(),
+    val practiceHint: String? = null,
+    val canUndoPracticeMove: Boolean = false
 )
 
 class LudoViewModel(application: Application) : AndroidViewModel(application) {
@@ -188,6 +198,8 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         val sfxVol = profilePreferences.getSfxVolume()
         val savedSfxPreset = profilePreferences.getSfxPreset()
         val savedBoardTheme = profilePreferences.getBoardTheme()
+        val savedDiceSkin = profilePreferences.getEquippedDiceSkin()
+        val savedTokenSkin = profilePreferences.getEquippedTokenSkin()
         val savedCoins = profilePreferences.getUserCoins()
         val savedGems = profilePreferences.getUserGems()
         val savedPhotoUri = profilePreferences.getCustomPhotoUri()
@@ -214,6 +226,8 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 winStreak = streak,
                 totalCaptures = captures,
                 equippedPawnCrownAvatar = pawnCrown,
+                equippedPawnSkin = savedTokenSkin,
+                equippedDiceSkin = savedDiceSkin,
                 equippedBoardTheme = savedBoardTheme,
                 isBgmEnabled = bgmOn,
                 isSfxEnabled = sfxOn,
@@ -1050,7 +1064,15 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         aiTurnJob?.cancel()
         turnTimerJob?.cancel()
 
-        val colors = if (playerCount == 2) {
+        val effectiveCount = when (mode) {
+            GameMode.TEAM_2VS2 -> 4
+            GameMode.PRACTICE, GameMode.FRIENDS_CHALLENGE -> 2
+            else -> playerCount
+        }
+
+        val colors = if (mode == GameMode.TEAM_2VS2) {
+            listOf(LudoColor.YELLOW, LudoColor.RED, LudoColor.GREEN, LudoColor.BLUE)
+        } else if (effectiveCount == 2) {
             val opposite = when (chosenColor) {
                 LudoColor.RED -> LudoColor.BLUE
                 LudoColor.GREEN -> LudoColor.YELLOW
@@ -1060,7 +1082,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             listOf(chosenColor, opposite)
         } else {
             val remaining = listOf(LudoColor.RED, LudoColor.GREEN, LudoColor.YELLOW, LudoColor.BLUE).filter { it != chosenColor }
-            listOf(chosenColor) + remaining.take(playerCount - 1)
+            listOf(chosenColor) + remaining.take(effectiveCount - 1)
         }
 
         val players = colors.mapIndexed { index, color ->
@@ -1071,6 +1093,11 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             val name = when {
                 index == 0 -> if (_uiState.value.playerNickname.isNotBlank() && _uiState.value.playerNickname != "You") "You (${_uiState.value.playerNickname})" else "You"
                 mode == GameMode.PASS_AND_PLAY -> "Player ${index + 1}"
+                mode == GameMode.TEAM_2VS2 && index == 2 -> "Prince Aryan 🟢 (Partner)"
+                mode == GameMode.TEAM_2VS2 && index == 1 -> "Abdul 🔴 (Rival)"
+                mode == GameMode.TEAM_2VS2 && index == 3 -> "Flora 🔵 (Rival)"
+                mode == GameMode.PRACTICE -> "Training Sensei (Bot)"
+                mode == GameMode.FRIENDS_CHALLENGE -> "Prince Aryan 🟢✓"
                 mode == GameMode.VS_AI -> "Computer ${index + 1}"
                 index == 1 -> "Computer 2 (Abdul)"
                 index == 2 -> "Computer 3 (Sisiliya)"
@@ -1113,13 +1140,20 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 color = color,
                 isAi = !isHuman,
                 countryFlag = flag,
-                isOnline = mode == GameMode.ONLINE_MULTIPLAYER || mode == GameMode.PRIVATE_ROOM,
+                isOnline = mode == GameMode.ONLINE_MULTIPLAYER || mode == GameMode.PRIVATE_ROOM || mode == GameMode.FRIENDS_CHALLENGE,
                 avatar = avatar,
                 customPhotoUri = if (index == 0) _uiState.value.customProfilePhotoUri else null,
                 level = playerLevel,
                 pawns = initialPawns,
                 coins = if (index == 0) _uiState.value.userCoins else 15000L + Random.nextInt(5000)
             )
+        }
+
+        val modeBanner = when (mode) {
+            GameMode.TEAM_2VS2 -> "🤝 Team Ludo 2 vs 2! Team Sun (Yellow & Green) vs Team Moon (Red & Blue)! Protect your partner!"
+            GameMode.PRACTICE -> "🎓 Royal Practice Academy! Strategy hints & Undo Move enabled!"
+            GameMode.FRIENDS_CHALLENGE -> "⚔️ Royal Duel! You vs Prince Aryan in a direct 1-on-1 battle!"
+            else -> "Royal ${mode.title} begins! Wager: 🪙 ${com.example.ui.components.formatCompactCoins(wager)} • 2X Double Prize Active!"
         }
 
         _uiState.update {
@@ -1138,14 +1172,16 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 winner = null,
                 rankings = emptyList(),
                 roomCode = roomCode,
+                practiceHint = null,
+                canUndoPracticeMove = false,
                 currentMatchReplayMoves = emptyList(),
-                bannerNotice = "Royal ${mode.title} begins! Wager: 🪙 ${com.example.ui.components.formatCompactCoins(wager)} • 2X Double Prize Active!",
+                bannerNotice = modeBanner,
                 chatMessages = listOf(
                     ChatMessage(
                         id = UUID.randomUUID().toString(),
                         senderName = "Royal Court",
                         senderColor = LudoColor.YELLOW,
-                        text = "Match started! 2X Double Prize active: Winner claims double coins and a Mystery Chest Box!"
+                        text = if (mode == GameMode.TEAM_2VS2) "Team Ludo active! Work with partner to home 4 total pawns!" else "Match started! 2X Double Prize active: Winner claims double coins and a Mystery Chest Box!"
                     )
                 )
             )
@@ -1312,6 +1348,11 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         val currentPlayer = state.players[state.currentPlayerIndex]
         if (pawn.color != currentPlayer.color || !pawn.isMovable) return
 
+        if (state.gameMode == GameMode.PRACTICE && !currentPlayer.isAi) {
+            practiceLastState = state.players
+            _uiState.update { it.copy(canUndoPracticeMove = true) }
+        }
+
         viewModelScope.launch {
             _uiState.update { it.copy(turnPhase = TurnPhase.ANIMATING_MOVE) }
 
@@ -1328,8 +1369,8 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             var gaveExtraTurn = false
             var bannerMsg: String? = null
 
-            // Check if captured enemy pawn(s)
-            val captures = LudoEngine.checkForCaptures(movedPawn, state.players)
+            // Check if captured enemy pawn(s) (respecting Team 2vs2 co-op protection)
+            val captures = LudoEngine.checkForCaptures(movedPawn, state.players, state.gameMode)
             val updatedPlayers = state.players.map { player ->
                 if (player.color == currentPlayer.color) {
                     val newPawns = player.pawns.map { if (it.id == pawn.id) movedPawn else it.copy(isMovable = false) }
@@ -1398,9 +1439,9 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 bannerMsg = bannerMsg ?: "Rolled 6! ${currentPlayer.name} earns an extra roll!"
             }
 
-            // Check Win Condition based on active game mode (Classic, Rush, Bolt, Dash)
+            // Check Win Condition based on active game mode (Classic, Rush, Bolt, Dash, Team 2vs2)
             val updatedCurrentPlayer = updatedPlayers[state.currentPlayerIndex]
-            val isWinner = com.example.engine.LudoEngine.hasPlayerWon(updatedCurrentPlayer, state.gameMode)
+            val isWinner = com.example.engine.LudoEngine.hasPlayerWon(updatedCurrentPlayer, state.gameMode, updatedPlayers)
 
             if (isWinner) {
                 soundAndHaptics.vibrateVictory()
@@ -2392,6 +2433,132 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 consecutiveSixes = 0,
                 bannerNotice = "You left the match. Entry fee of 🪙 ${com.example.ui.components.formatCompactCoins(wager)} was forfeited."
             )
+        }
+    }
+
+    // Administration & Royal Chamber
+    fun toggleAdminDashboard(show: Boolean) {
+        _uiState.update { it.copy(showAdminDashboard = show) }
+    }
+
+    fun verifyAdminPin(pin: String): Boolean {
+        val isValid = pin == "1234"
+        if (isValid) {
+            _uiState.update { it.copy(adminPinVerified = true) }
+            soundAndHaptics.playCoinReward()
+        } else {
+            soundAndHaptics.playButtonClick()
+        }
+        return isValid
+    }
+
+    fun adminGrantCoins(amount: Long) {
+        val newCoins = _uiState.value.userCoins + amount
+        profilePreferences.setUserCoins(newCoins)
+        _uiState.update { it.copy(userCoins = newCoins, bannerNotice = "Granted +$amount Coins!") }
+        soundAndHaptics.playCoinReward()
+    }
+
+    fun adminGrantGems(amount: Int) {
+        val newGems = _uiState.value.userGems + amount
+        profilePreferences.setUserGems(newGems)
+        _uiState.update { it.copy(userGems = newGems, bannerNotice = "Granted +$amount Gems!") }
+        soundAndHaptics.playCoinReward()
+    }
+
+    fun adminResetDailyRewards() {
+        _uiState.update { it.copy(lastSpinTimestampMillis = 0L, bannerNotice = "Daily Login & Spin Timers Reset!") }
+        soundAndHaptics.playSafeTile()
+    }
+
+    fun adminResetDailyMissions() {
+        _uiState.update { it.copy(dailyMissions = com.example.model.DEFAULT_DAILY_MISSIONS, bannerNotice = "Daily Missions Refreshed!") }
+        soundAndHaptics.playSafeTile()
+    }
+
+    fun adminClearReports() {
+        _uiState.update { it.copy(playerReports = emptyList(), bannerNotice = "All reports cleared!") }
+    }
+
+    // Interactive Tutorial
+    fun toggleTutorialDialog(show: Boolean) {
+        _uiState.update { it.copy(showTutorialDialog = show) }
+    }
+
+    // Player Moderation & Reports
+    fun openReportPlayerDialog(targetPlayer: Player) {
+        _uiState.update { it.copy(showReportDialog = true, reportedTargetPlayer = targetPlayer) }
+    }
+
+    fun dismissReportPlayerDialog() {
+        _uiState.update { it.copy(showReportDialog = false, reportedTargetPlayer = null) }
+    }
+
+    fun submitPlayerReport(reason: String, isBlocked: Boolean) {
+        val target = _uiState.value.reportedTargetPlayer
+        val targetName = target?.name ?: "Opponent"
+        val report = PlayerReport(
+            id = UUID.randomUUID().toString(),
+            reportedPlayerName = targetName,
+            reason = reason,
+            isBlocked = isBlocked
+        )
+        _uiState.update { s ->
+            s.copy(
+                playerReports = s.playerReports + report,
+                showReportDialog = false,
+                reportedTargetPlayer = null,
+                bannerNotice = "Report submitted against $targetName. Ticket logged."
+            )
+        }
+        showPopUpNotice(
+            title = "🛡️ Report Submitted",
+            message = "Thank you for keeping MG Ludo safe. Your report against $targetName for '$reason' has been logged. ${if (isBlocked) "Player blocked from future matches." else ""}",
+            icon = "🛡️",
+            type = "SUCCESS"
+        )
+    }
+
+    // Armory & Customizer (Dice, Tokens, Sound)
+    fun toggleCustomizerShop(show: Boolean) {
+        _uiState.update { it.copy(showCustomizerShopDialog = show) }
+    }
+
+    fun equipDiceSkin(skinId: String) {
+        profilePreferences.setEquippedDiceSkin(skinId)
+        val skinName = BUILT_IN_DICE_SKINS.firstOrNull { it.id == skinId }?.name ?: skinId
+        _uiState.update { it.copy(equippedDiceSkin = skinId, bannerNotice = "Equipped $skinName Dice!") }
+        soundAndHaptics.playButtonClick()
+    }
+
+    fun equipTokenSkin(skinId: String) {
+        profilePreferences.setEquippedTokenSkin(skinId)
+        val skinName = BUILT_IN_TOKEN_SKINS.firstOrNull { it.id == skinId }?.name ?: skinId
+        _uiState.update { it.copy(equippedPawnSkin = skinId, bannerNotice = "Equipped $skinName Token!") }
+        soundAndHaptics.playButtonClick()
+    }
+
+    fun equipSoundTheme(themeId: String) {
+        profilePreferences.setSfxPreset(themeId)
+        _uiState.update { it.copy(sfxPreset = themeId, bannerNotice = "Selected $themeId sound theme!") }
+        soundAndHaptics.playButtonClick()
+    }
+
+    // Practice Mode Undo
+    private var practiceLastState: List<Player>? = null
+
+    fun undoLastPracticeMove() {
+        val last = practiceLastState
+        if (_uiState.value.gameMode == GameMode.PRACTICE && last != null) {
+            _uiState.update {
+                it.copy(
+                    players = last,
+                    turnPhase = TurnPhase.ROLL_DICE,
+                    canUndoPracticeMove = false,
+                    bannerNotice = "↩️ Last move undone! Roll again."
+                )
+            }
+            soundAndHaptics.playButtonClick()
         }
     }
 

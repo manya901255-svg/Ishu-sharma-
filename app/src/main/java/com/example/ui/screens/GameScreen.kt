@@ -28,8 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.model.LudoColor
-import com.example.model.TurnPhase
+import com.example.model.*
 import com.example.ui.components.*
 import com.example.ui.theme.*
 import com.example.viewmodel.AppScreen
@@ -194,13 +193,13 @@ fun GameScreen(
                     )
                 }
 
-                // 6. Light Blue Help Button [?]
+                // 6. Light Blue Help Button [?] -> Opens Royal Ludo Academy & Rules
                 Box(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color(0xFF00B0FF))
-                        .clickable { viewModel.toggleFairProof(true) },
+                        .clickable { viewModel.toggleTutorialDialog(true) },
                     contentAlignment = Alignment.Center
                 ) {
                     Text("?", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
@@ -334,7 +333,8 @@ fun GameScreen(
                             onRollClick = {},
                             onProfileClick = {},
                             floatingEmoji = if (uiState.activeFloatingEmoji?.first == topOpponent.name) uiState.activeFloatingEmoji?.second else null,
-                            alignRight = false
+                            alignRight = false,
+                            diceSkinId = uiState.equippedDiceSkin
                         )
                     } else if (!isTwoPlayer && redPlayer != null) {
                         // 4-Player Top-Left: Red Player with individual dice
@@ -351,7 +351,8 @@ fun GameScreen(
                             onRollClick = if (isRedHuman) { { viewModel.rollDice() } } else { {} },
                             onProfileClick = if (isRedHuman) { { viewModel.navigateTo(AppScreen.PROFILE) } } else { {} },
                             floatingEmoji = if (uiState.activeFloatingEmoji?.first == redPlayer.name) uiState.activeFloatingEmoji?.second else null,
-                            alignRight = false
+                            alignRight = false,
+                            diceSkinId = uiState.equippedDiceSkin
                         )
                     } else {
                         Spacer(modifier = Modifier.width(40.dp))
@@ -372,8 +373,67 @@ fun GameScreen(
                             onRollClick = if (isGreenHuman) { { viewModel.rollDice() } } else { {} },
                             onProfileClick = if (isGreenHuman) { { viewModel.navigateTo(AppScreen.PROFILE) } } else { {} },
                             floatingEmoji = if (uiState.activeFloatingEmoji?.first == greenPlayer.name) uiState.activeFloatingEmoji?.second else null,
-                            alignRight = true
+                            alignRight = true,
+                            diceSkinId = uiState.equippedDiceSkin
                         )
+                    }
+                }
+
+                // Team 2vs2 Co-op Scoreboard Banner
+                if (uiState.gameMode == GameMode.TEAM_2VS2) {
+                    val sunFinished = uiState.players.filter { com.example.engine.LudoEngine.areTeammates(it.color, LudoColor.YELLOW) }.sumOf { it.finishedPawnsCount }
+                    val moonFinished = uiState.players.filter { com.example.engine.LudoEngine.areTeammates(it.color, LudoColor.RED) }.sumOf { it.finishedPawnsCount }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF0F2652))
+                            .border(1.dp, Color(0xFF2979FF), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("☀️ Team Sun (Yellow & Green): $sunFinished/4 👑", color = Color(0xFFFFD54F), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                        Text("🌙 Team Moon (Red & Blue): $moonFinished/4", color = Color(0xFFFF8A80), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // Practice Mode Tactical Hint & Undo Banner
+                if (uiState.gameMode == GameMode.PRACTICE) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF00363A))
+                            .border(1.dp, Color(0xFF00BFA5), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val hint = uiState.practiceHint ?: "🎓 Practice Academy: Roll the dice! Strategy hints appear here."
+                        Text(
+                            text = hint,
+                            color = Color(0xFF80D8FF),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (uiState.canUndoPracticeMove) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFFF9100))
+                                    .clickable { viewModel.undoLastPracticeMove() }
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text("↩️ Undo", color = Color.Black, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
 
@@ -385,10 +445,12 @@ fun GameScreen(
                         .padding(vertical = 2.dp),
                     contentAlignment = Alignment.Center
                 ) {
+                    val equippedTokenSkin = BUILT_IN_TOKEN_SKINS.firstOrNull { it.id == uiState.equippedPawnSkin }
+                    val activeEmblem = equippedTokenSkin?.symbolEmoji ?: com.example.model.getPawnCrownEmoji(uiState.equippedPawnCrownAvatar)
                     RoyalBoardView(
                         players = uiState.players,
                         onPawnClick = { pawn -> viewModel.onPawnClicked(pawn) },
-                        pawnCrownEmoji = com.example.model.getPawnCrownEmoji(uiState.equippedPawnCrownAvatar),
+                        pawnCrownEmoji = activeEmblem,
                         boardTheme = com.example.model.getBoardTheme(uiState.equippedBoardTheme),
                         modifier = Modifier
                             .fillMaxWidth(0.99f)
@@ -423,7 +485,8 @@ fun GameScreen(
                             onProfileClick = if (isBottomHuman) { { viewModel.navigateTo(AppScreen.PROFILE) } } else { {} },
                             onLightningClick = { viewModel.activatePowerUp("LIGHTNING") },
                             floatingEmoji = if (uiState.activeFloatingEmoji?.first == bottomUserPlayer.name) uiState.activeFloatingEmoji?.second else null,
-                            alignRight = false
+                            alignRight = false,
+                            diceSkinId = uiState.equippedDiceSkin
                         )
                     }
 
@@ -442,7 +505,8 @@ fun GameScreen(
                             onRollClick = if (isBlueHuman) { { viewModel.rollDice() } } else { {} },
                             onProfileClick = if (isBlueHuman) { { viewModel.navigateTo(AppScreen.PROFILE) } } else { {} },
                             floatingEmoji = if (uiState.activeFloatingEmoji?.first == bluePlayer.name) uiState.activeFloatingEmoji?.second else null,
-                            alignRight = true
+                            alignRight = true,
+                            diceSkinId = uiState.equippedDiceSkin
                         )
                     } else {
                         Spacer(modifier = Modifier.width(40.dp))
@@ -792,7 +856,45 @@ fun GameScreen(
                 onSendEmoji = { viewModel.sendRoyalEmoji(it) },
                 currentSenderName = currentSender?.name ?: "You",
                 currentSenderColor = currentSender?.color ?: com.example.model.LudoColor.RED,
+                onReportPlayerClick = {
+                    val opponent = uiState.players.firstOrNull { it.id != humanPlayer?.id }
+                    if (opponent != null) {
+                        viewModel.openReportPlayerDialog(opponent)
+                    }
+                },
                 onDismiss = { viewModel.toggleChatDialog(false) }
+            )
+        }
+
+        // Interactive Tutorial Dialog (Royal Academy)
+        if (uiState.showTutorialDialog) {
+            InteractiveTutorialDialog(
+                onDismiss = { viewModel.toggleTutorialDialog(false) }
+            )
+        }
+
+        // Player Report Dialog
+        if (uiState.showReportDialog && uiState.reportedTargetPlayer != null) {
+            PlayerReportDialog(
+                targetPlayer = uiState.reportedTargetPlayer!!,
+                onReportSubmitted = { reason, isBlocked ->
+                    viewModel.submitPlayerReport(reason, isBlocked)
+                },
+                onDismiss = { viewModel.dismissReportPlayerDialog() }
+            )
+        }
+
+        // Armory & Customizer Shop Dialog
+        if (uiState.showCustomizerShopDialog) {
+            DiceAndTokenShopDialog(
+                equippedDiceSkinId = uiState.equippedDiceSkin,
+                equippedTokenSkinId = uiState.equippedPawnSkin,
+                equippedSoundTheme = uiState.sfxPreset,
+                userCoins = uiState.userCoins,
+                onEquipDiceSkin = { skinId -> viewModel.equipDiceSkin(skinId) },
+                onEquipTokenSkin = { skinId -> viewModel.equipTokenSkin(skinId) },
+                onEquipSoundTheme = { themeId -> viewModel.equipSoundTheme(themeId) },
+                onDismiss = { viewModel.toggleCustomizerShop(false) }
             )
         }
 
