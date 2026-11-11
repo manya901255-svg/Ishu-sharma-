@@ -145,18 +145,18 @@ fun GameScreen(
                     }
                 }
 
-                // 4. Green 3D Toggle Button [3D]
+                // 4. Classic 2D Board Indicator [2D]
                 Box(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (uiState.is3DBoardEnabled) Color(0xFF00E676) else Color(0xFF1E3A70))
-                        .clickable { viewModel.toggle3DBoard(!uiState.is3DBoardEnabled) },
+                        .background(Color(0xFF1E3A70))
+                        .border(1.dp, Color(0xFF4FC3F7).copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (uiState.is3DBoardEnabled) "3D" else "2D",
-                        color = if (uiState.is3DBoardEnabled) Color(0xFF003300) else Color.White,
+                        text = "2D",
+                        color = Color(0xFF81D4FA),
                         fontWeight = FontWeight.Black,
                         fontSize = 12.sp
                     )
@@ -226,19 +226,13 @@ fun GameScreen(
         },
         containerColor = Color(0xFF071228)
     ) { padding ->
-        Box(
+        WallpaperBackgroundView(
+            wallpaperIdOrPath = uiState.activeWallpapers[com.example.model.WallpaperTarget.BOARD.id],
+            target = com.example.model.WallpaperTarget.BOARD,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF0B1938),
-                            Color(0xFF071228),
-                            Color(0xFF040A18)
-                        )
-                    )
-                )
+                .padding(padding),
+            dimOverlayAlpha = 0.15f
         ) {
 
             Column(
@@ -383,7 +377,7 @@ fun GameScreen(
                     }
                 }
 
-                // 3. Center Board
+                // 3. Center Board: Traditional Flat 2D Ludo Board (No 3D Tilt or Rotation)
                 Box(
                     modifier = Modifier
                         .weight(1f, fill = false)
@@ -391,26 +385,15 @@ fun GameScreen(
                         .padding(vertical = 2.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (uiState.is3DBoardEnabled) {
-                        LudoBoard3DView(
-                            players = uiState.players,
-                            onPawnClick = { pawn -> viewModel.onPawnClicked(pawn) },
-                            pawnCrownEmoji = com.example.model.getPawnCrownEmoji(uiState.equippedPawnCrownAvatar),
-                            boardTheme = com.example.model.getBoardTheme(uiState.equippedBoardTheme),
-                            is3DMode = true,
-                            tiltAngle = uiState.board3DAngle,
-                            onCycleAngle = { viewModel.cycle3DAngle() },
-                            modifier = Modifier.fillMaxWidth(0.99f)
-                        )
-                    } else {
-                        RoyalBoardView(
-                            players = uiState.players,
-                            onPawnClick = { pawn -> viewModel.onPawnClicked(pawn) },
-                            pawnCrownEmoji = com.example.model.getPawnCrownEmoji(uiState.equippedPawnCrownAvatar),
-                            boardTheme = com.example.model.getBoardTheme(uiState.equippedBoardTheme),
-                            modifier = Modifier.fillMaxWidth(0.99f)
-                        )
-                    }
+                    RoyalBoardView(
+                        players = uiState.players,
+                        onPawnClick = { pawn -> viewModel.onPawnClicked(pawn) },
+                        pawnCrownEmoji = com.example.model.getPawnCrownEmoji(uiState.equippedPawnCrownAvatar),
+                        boardTheme = com.example.model.getBoardTheme(uiState.equippedBoardTheme),
+                        modifier = Modifier
+                            .fillMaxWidth(0.99f)
+                            .aspectRatio(1f)
+                    )
                 }
 
                 // 4. Bottom Player Slots with Individual Dice Per Player
@@ -855,7 +838,40 @@ fun GameScreen(
                 onTestStarSafe = { viewModel.soundAndHaptics.playStarSafe() },
                 onTestSixRolled = { viewModel.soundAndHaptics.playSixRolled() },
                 onOpenMusicPlayer = { viewModel.toggleMusicPlayerDialog(true) },
+                onOpenWallpaperCustomizer = { viewModel.toggleWallpaperCustomizer(true, com.example.model.WallpaperTarget.BOARD) },
                 onDismiss = { viewModel.toggleSoundSettings(false) }
+            )
+        }
+
+        // MG Ludo Custom Wallpaper Studio Dialog
+        if (uiState.showWallpaperCustomizerDialog) {
+            CustomWallpaperDialog(
+                initialTarget = uiState.activeWallpaperTarget,
+                wallpapersPerTarget = uiState.activeWallpapers,
+                customUploadedWallpapers = uiState.customUploadedWallpapers,
+                favoriteWallpaperIds = uiState.favoriteWallpaperIds,
+                recentWallpaperIds = uiState.recentWallpaperIds,
+                onApplyWallpaper = { target, idOrPath ->
+                    viewModel.applyWallpaper(target, idOrPath)
+                },
+                onUploadImageUri = { uri, target ->
+                    viewModel.uploadWallpaperFromUri(uri, target)
+                },
+                onDeleteUploadedWallpaper = { path ->
+                    viewModel.deleteCustomWallpaper(path)
+                },
+                onToggleFavorite = { idOrPath ->
+                    viewModel.toggleWallpaperFavorite(idOrPath)
+                },
+                onResetTarget = { target ->
+                    viewModel.resetWallpaperForTarget(target)
+                },
+                onResetAll = {
+                    viewModel.resetAllWallpapers()
+                },
+                onDismiss = {
+                    viewModel.toggleWallpaperCustomizer(false)
+                }
             )
         }
 

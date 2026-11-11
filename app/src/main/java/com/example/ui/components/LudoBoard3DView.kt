@@ -83,22 +83,15 @@ fun LudoBoard3DView(
     onPawnClick: (Pawn) -> Unit,
     pawnCrownEmoji: String? = null,
     boardTheme: RegalBoardTheme = getBoardTheme("imperial_navy"),
-    is3DMode: Boolean = true,
-    tiltAngle: Float = 28f,
+    is3DMode: Boolean = false,
+    tiltAngle: Float = 0f,
     onCycleAngle: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current.density
 
-    // Smooth transition between 2D (0f) and 3D (tiltAngle)
-    val animatedTilt by animateFloatAsState(
-        targetValue = if (is3DMode) tiltAngle else 0f,
-        animationSpec = spring(
-            dampingRatio = 0.82f,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "boardTiltAnim"
-    )
+    // Enforce 2D Flat Mode (0f tilt, no 3D perspective)
+    val animatedTilt = 0f
 
     // Pulse animation for active clickable pawns
     val infiniteTransition = rememberInfiniteTransition(label = "pawn_bounce")
@@ -118,35 +111,6 @@ fun LudoBoard3DView(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Floating 3D Camera Mode & Perspective Badge
-        Row(
-            modifier = Modifier
-                .padding(bottom = 2.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(
-                    if (is3DMode) Brush.horizontalGradient(listOf(Color(0xFF00E676), Color(0xFF00B0FF)))
-                    else Brush.horizontalGradient(listOf(Color(0xFF263238), Color(0xFF37474F)))
-                )
-                .border(
-                    width = 1.dp,
-                    color = if (is3DMode) Color.White else Color(0xFF546E7A),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                .clickable { onCycleAngle?.invoke() }
-                .padding(horizontal = 10.dp, vertical = 2.5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = if (is3DMode) "🎮 3D PERSPECTIVE (${animatedTilt.toInt()}°)" else "📐 2D TOP-DOWN",
-                color = if (is3DMode) Color(0xFF002910) else Color.White,
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Black
-            )
-            if (onCycleAngle != null && is3DMode) {
-                Text("⟳", color = Color(0xFF002910), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
-            }
-        }
 
         // 3D Table Stage containing Shadow, Plinth Extrusion, and Tilted Board
         Box(
@@ -225,22 +189,16 @@ fun LudoBoard3DView(
                 modifier = Modifier
                     .fillMaxWidth(0.99f)
                     .aspectRatio(1f)
-                    .graphicsLayer {
-                        rotationX = animatedTilt
-                        cameraDistance = 14f * density
-                        transformOrigin = TransformOrigin(0.5f, 0.72f)
-                        shadowElevation = (animatedTilt * 0.65f).dp.toPx()
-                    }
                     .shadow(
-                        elevation = if (isTilted) 20.dp else 10.dp,
-                        shape = RoundedCornerShape(20.dp),
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(16.dp),
                         spotColor = Color.Black
                     )
-                    .clip(RoundedCornerShape(20.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .background(boardTheme.outerFrameColor)
-                    .border(3.2.dp, boardTheme.borderColor, RoundedCornerShape(20.dp))
+                    .border(2.5.dp, boardTheme.borderColor, RoundedCornerShape(16.dp))
                     .padding(4.dp)
-                    .testTag("ludo_board_3d_view")
+                    .testTag("ludo_board_2d_view")
             ) {
         val boardSize = maxWidth
         val cellSize = boardSize / 15f
@@ -771,7 +729,7 @@ private fun BoxWithConstraintsScope.PawnPlacementItem(
     val xOffset = cellSize * c + (cellSize - pawnSize) / 2f
     val yOffset = cellSize * r + (cellSize - pawnSize) / 2f
 
-    val isTilted = tiltAngle > 2f
+    val isTilted = false
 
     Box(
         modifier = Modifier
@@ -779,18 +737,15 @@ private fun BoxWithConstraintsScope.PawnPlacementItem(
             .size(pawnSize),
         contentAlignment = Alignment.Center
     ) {
-        // 1. Dynamic 3D Cast Shadow on the board surface behind the pawn
+        // 1. Classic flat 2D shadow directly beneath the pawn
         val shadowScale = if (pawn.isMovable) (1f - (bounceOffset / -10f)).coerceIn(0.65f, 1f) else 1f
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .offset(
-                    x = if (isTilted) (tiltAngle * 0.10f).dp else 0.dp,
-                    y = if (isTilted) (3.5f + tiltAngle * 0.16f).dp else 2.dp
-                )
+                .offset(y = 2.dp)
                 .size(
-                    width = pawnSize * 0.78f * shadowScale,
-                    height = pawnSize * (if (isTilted) 0.32f + tiltAngle * 0.005f else 0.28f) * shadowScale
+                    width = pawnSize * 0.75f * shadowScale,
+                    height = pawnSize * 0.28f * shadowScale
                 )
                 .clip(CircleShape)
                 .background(
@@ -800,16 +755,11 @@ private fun BoxWithConstraintsScope.PawnPlacementItem(
                 )
         )
 
-        // 2. Standing 3D Token Pawn (Counter-Tilted so it stands upright perpendicular to the 3D board plane!)
+        // 2. Standing Pawn (Upright on 2D board with no counter-tilt)
         Box(
             modifier = Modifier
                 .graphicsLayer {
-                    if (isTilted) {
-                        rotationX = -tiltAngle * 0.82f
-                        translationY = bounceOffset.dp.toPx()
-                    } else {
-                        translationY = bounceOffset.dp.toPx()
-                    }
+                    translationY = bounceOffset.dp.toPx()
                 }
         ) {
             RoyalCrownPawn(

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Palette
@@ -67,9 +68,10 @@ fun RegalSettingsDialog(
     onTestCapture: () -> Unit = {},
     onTestStarSafe: () -> Unit = {},
     onTestSixRolled: () -> Unit = {},
+    onOpenWallpaperCustomizer: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
-    var activeTab by remember { mutableStateOf(0) } // 0: Sound & Atmosphere, 1: Regal Board Themes
+    var activeTab by remember { mutableStateOf(0) } // 0: Sound & Atmosphere, 1: Regal Board Themes, 2: Wallpapers
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -172,12 +174,34 @@ fun RegalSettingsDialog(
                                 imageVector = Icons.Default.Palette,
                                 contentDescription = null,
                                 tint = if (activeTab == 1) Color.Black else Color.White,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(13.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
                             Text(
-                                text = "Board Themes",
+                                text = "Boards",
                                 color = if (activeTab == 1) Color(0xFF1A1A1A) else Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    // Tab 2: Wallpapers
+                    Box(
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (activeTab == 2) RoyalGold else Color.Transparent)
+                            .clickable { activeTab = 2 }
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("🎨", fontSize = 11.sp)
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "Wallpapers",
+                                color = if (activeTab == 2) Color(0xFF1A1A1A) else Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -546,6 +570,69 @@ fun RegalSettingsDialog(
                                     )
                                 )
                             }
+
+                            // 4. Customize Wallpaper Option (User Request)
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { onOpenWallpaperCustomizer() }
+                                    .border(1.5.dp, RoyalGold, RoundedCornerShape(12.dp)),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(0xFF0F2652)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .clip(CircleShape)
+                                                .background(Brush.linearGradient(listOf(RoyalGold, Color(0xFFFFA000)))),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text("🎨", fontSize = 18.sp)
+                                        }
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = "Customize Wallpaper",
+                                                    color = Color.White,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(Color(0xFF00C853))
+                                                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                                                ) {
+                                                    Text("NEW", color = Color.White, fontSize = 8.5.sp, fontWeight = FontWeight.Black)
+                                                }
+                                            }
+                                            Text(
+                                                text = "Personalize Home, Board, Lobby & Rooms",
+                                                color = RoyalGoldLight,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    }
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                        contentDescription = "Open Customizer",
+                                        tint = RoyalGold,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -576,6 +663,105 @@ fun RegalSettingsDialog(
                                         isSelected = isSelected,
                                         onSelect = { onSelectBoardTheme(theme.id) }
                                     )
+                                }
+                            }
+                        }
+                    }
+
+                    2 -> {
+                        // TAB 2: WALLPAPERS STUDIO OVERVIEW
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 380.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = "CUSTOMIZE GAME BACKGROUNDS",
+                                color = RoyalGoldLight,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+
+                            Text(
+                                text = "Choose from 12 imperial themes or upload custom pictures from your phone gallery for Home, Board, Lobby, Profile, and Private Room.",
+                                color = TextMuted,
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp
+                            )
+
+                            // Quick Action Card
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable { onOpenWallpaperCustomizer() }
+                                    .border(2.dp, Brush.linearGradient(listOf(RoyalGold, Color(0xFF00E5FF))), RoundedCornerShape(14.dp)),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF091C3E))
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text("🖼️", fontSize = 32.sp)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "Open Wallpaper Studio",
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Text(
+                                        text = "Presets • Gallery Upload • Zoom & Crop",
+                                        color = RoyalGoldLight,
+                                        fontSize = 10.5.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Button(
+                                        onClick = onOpenWallpaperCustomizer,
+                                        colors = ButtonDefaults.buttonColors(containerColor = RoyalGold),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Launch Customizer", color = Color(0xFF101C30), fontWeight = FontWeight.Black, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+
+                            // 5 Areas preview chips
+                            Text(
+                                text = "5 INDEPENDENT CUSTOMIZABLE SECTIONS:",
+                                color = Color.White.copy(alpha = 0.8f),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            listOf(
+                                "🏠 Home Screen" to "Main lobby & game mode carousel",
+                                "🎲 Ludo Board" to "In-game battleground board background",
+                                "⚔️ Game Lobby" to "Online wager & room selector",
+                                "👑 Profile" to "Player statistics & identity modal",
+                                "🏰 Private Room" to "Custom room matches with friends"
+                            ).forEach { (title, subtitle) ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFF081836))
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(title, color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                        Text(subtitle, color = TextMuted, fontSize = 9.sp)
+                                    }
+                                    Text("🎨", fontSize = 14.sp)
                                 }
                             }
                         }

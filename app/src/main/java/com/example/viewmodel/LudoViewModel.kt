@@ -112,7 +112,7 @@ data class LudoUiState(
     val showWelcomeOverlay: Boolean = true,
     val showMainMenuOverlay: Boolean = false,
     val is3DBoardEnabled: Boolean = false,
-    val board3DAngle: Float = 28f,
+    val board3DAngle: Float = 0f,
     val showMusicPlayerDialog: Boolean = false,
     val isMusicPlaying: Boolean = false,
     val musicRepeatMode: com.example.model.MusicRepeatMode = com.example.model.MusicRepeatMode.ALL,
@@ -142,7 +142,14 @@ data class LudoUiState(
     val hasNoAds: Boolean = false,
     val hasVoicePass: Boolean = true,
     val voicePassDaysRemaining: Int = 30,
-    val activeInAppProduct: com.example.ui.components.InAppPurchaseProduct? = null
+    val activeInAppProduct: com.example.ui.components.InAppPurchaseProduct? = null,
+    // MG Ludo Custom Wallpaper System State
+    val showWallpaperCustomizerDialog: Boolean = false,
+    val activeWallpaperTarget: com.example.model.WallpaperTarget = com.example.model.WallpaperTarget.HOME,
+    val activeWallpapers: Map<String, String> = emptyMap(),
+    val customUploadedWallpapers: List<String> = emptyList(),
+    val favoriteWallpaperIds: Set<String> = emptySet(),
+    val recentWallpaperIds: List<String> = emptyList()
 )
 
 class LudoViewModel(application: Application) : AndroidViewModel(application) {
@@ -363,7 +370,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         // Live playback progress ticker (updates seek bar position & duration every 500ms)
         viewModelScope.launch {
             while (true) {
-                if (_uiState.value.isMusicPlaying) {
+                if (_uiState.value.isMusicPlaying && !_uiState.value.isMusicBuffering) {
                     val pos = soundAndHaptics.getCurrentPosition()
                     val dur = soundAndHaptics.getDuration()
                     _uiState.update { it.copy(playbackPositionMs = pos, playbackDurationMs = dur) }
@@ -375,6 +382,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         // Load Initial Indian Online Music (Hindi) and Saved Playlists
         loadSavedMusicData()
         selectMusicCategory(com.example.model.MusicCategory.HINDI)
+        loadWallpaperData()
 
         if (bgmOn && com.example.model.BGM_PLAYLIST.isNotEmpty()) {
             soundAndHaptics.soundManager.startAmbientBgm()
@@ -717,27 +725,19 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(showMainMenuOverlay = show) }
     }
 
-    fun toggle3DBoard(enabled: Boolean) {
+    fun toggle3DBoard(enabled: Boolean = false) {
         soundAndHaptics.vibrateClick()
-        _uiState.update { it.copy(is3DBoardEnabled = enabled) }
+        _uiState.update { it.copy(is3DBoardEnabled = false, board3DAngle = 0f) }
     }
 
     fun cycle3DAngle() {
         soundAndHaptics.vibrateClick()
-        _uiState.update { state ->
-            val nextAngle = when (state.board3DAngle) {
-                28f -> 36f
-                36f -> 18f
-                18f -> 28f
-                else -> 28f
-            }
-            state.copy(board3DAngle = nextAngle, is3DBoardEnabled = true)
-        }
+        _uiState.update { it.copy(is3DBoardEnabled = false, board3DAngle = 0f) }
     }
 
     fun set3DAngle(angle: Float) {
         soundAndHaptics.vibrateClick()
-        _uiState.update { it.copy(board3DAngle = angle, is3DBoardEnabled = angle > 0f) }
+        _uiState.update { it.copy(is3DBoardEnabled = false, board3DAngle = 0f) }
     }
 
     fun claimAchievement(achievement: com.example.data.AchievementEntity) {
@@ -2183,6 +2183,80 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleSoundSettings(show: Boolean) {
         soundAndHaptics.vibrateClick()
         _uiState.update { it.copy(showSoundSettingsDialog = show) }
+    }
+
+    // ==========================================
+    // MG LUDO CUSTOM WALLPAPER SYSTEM CONTROLLERS
+    // ==========================================
+
+    fun loadWallpaperData() {
+        val map = mutableMapOf<String, String>()
+        com.example.model.WallpaperTarget.entries.forEach { target ->
+            map[target.id] = profilePreferences.getWallpaperForTarget(target.id, target.defaultWallpaperId)
+        }
+        val uploads = profilePreferences.getCustomUploadedWallpapers()
+        val favorites = profilePreferences.getFavoriteWallpaperIds()
+        val recents = profilePreferences.getRecentlyUsedWallpapers()
+
+        _uiState.update {
+            it.copy(
+                activeWallpapers = map,
+                customUploadedWallpapers = uploads,
+                favoriteWallpaperIds = favorites,
+                recentWallpaperIds = recents
+            )
+        }
+    }
+
+    fun toggleWallpaperCustomizer(
+        show: Boolean,
+        target: com.example.model.WallpaperTarget = com.example.model.WallpaperTarget.HOME
+    ) {
+        soundAndHaptics.vibrateClick()
+        _uiState.update {
+            it.copy(
+                showWallpaperCustomizerDialog = show,
+                activeWallpaperTarget = target,
+                showSoundSettingsDialog = if (show) false else it.showSoundSettingsDialog
+            )
+        }
+    }
+
+    fun applyWallpaper(target: com.example.model.WallpaperTarget, wallpaperIdOrPath: String) {
+        profilePreferences.setWallpaperForTarget(target.id, wallpaperIdOrPath)
+        loadWallpaperData()
+        soundAndHaptics.playButtonClick()
+    }
+
+    fun uploadWallpaperFromUri(sourceUri: android.net.Uri, target: com.example.model.WallpaperTarget) {
+        val savedPath = profilePreferences.saveWallpaperImageLocally(sourceUri)
+        if (savedPath != null) {
+            applyWallpaper(target, savedPath)
+        }
+    }
+
+    fun deleteCustomWallpaper(filePath: String) {
+        profilePreferences.deleteCustomUploadedWallpaper(filePath)
+        loadWallpaperData()
+        soundAndHaptics.vibrateClick()
+    }
+
+    fun toggleWallpaperFavorite(wallpaperIdOrPath: String) {
+        profilePreferences.toggleFavoriteWallpaper(wallpaperIdOrPath)
+        loadWallpaperData()
+        soundAndHaptics.playButtonClick()
+    }
+
+    fun resetWallpaperForTarget(target: com.example.model.WallpaperTarget) {
+        profilePreferences.resetWallpaperForTarget(target.id, target.defaultWallpaperId)
+        loadWallpaperData()
+        soundAndHaptics.playButtonClick()
+    }
+
+    fun resetAllWallpapers() {
+        profilePreferences.resetAllWallpapers()
+        loadWallpaperData()
+        soundAndHaptics.playButtonClick()
     }
 
     fun toggleVoiceChat() {

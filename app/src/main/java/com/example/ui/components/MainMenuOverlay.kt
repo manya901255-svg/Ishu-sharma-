@@ -50,6 +50,7 @@ fun MainMenuOverlay(
     onPlayAi: () -> Unit,
     onPassAndPlay: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenWallpapers: () -> Unit = {},
     onEnterLobby: () -> Unit,
     onOpenBlueprint: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -241,6 +242,18 @@ fun MainMenuOverlay(
                     borderGradient = listOf(Color(0xFFB39DDB), Color(0xFF512DA8)),
                     testTag = "menu_settings_button",
                     onClick = onOpenSettings
+                )
+
+                // 4b. CUSTOM WALLPAPERS BUTTON
+                MainMenuButtonCard(
+                    title = "Customize Wallpapers",
+                    subtitle = "12 Themes • Gallery Upload • 5 Game Areas",
+                    badge = "NEW",
+                    icon = "🎨",
+                    primaryGradient = listOf(Color(0xFF00838F), Color(0xFF006064), Color(0xFF00363A)),
+                    borderGradient = listOf(Color(0xFF4DD0E1), Color(0xFF00ACC1)),
+                    testTag = "menu_wallpapers_button",
+                    onClick = onOpenWallpapers
                 )
 
                 // 5. TECH BLUEPRINT BUTTON

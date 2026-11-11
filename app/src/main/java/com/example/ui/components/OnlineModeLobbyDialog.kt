@@ -43,6 +43,8 @@ fun OnlineModeLobbyDialog(
     initialColor: LudoColor = LudoColor.BLUE,
     initialMode: GameMode = GameMode.ONLINE_MULTIPLAYER,
     titleText: String = "Online",
+    lobbyWallpaper: String? = null,
+    onCustomizeWallpaper: () -> Unit = {},
     onDismiss: () -> Unit,
     onStartGame: (playerCount: Int, wager: Long, chosenColor: LudoColor, mode: GameMode) -> Unit
 ) {
@@ -77,18 +79,11 @@ fun OnlineModeLobbyDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = true)
     ) {
-        Box(
+        WallpaperBackgroundView(
+            wallpaperIdOrPath = lobbyWallpaper,
+            target = com.example.model.WallpaperTarget.LOBBY,
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF5BA7FF),
-                            Color(0xFF82C4FF),
-                            Color(0xFFA5DBFF)
-                        )
-                    )
-                )
                 .systemBarsPadding()
                 .testTag("online_mode_3d_entry_screen")
         ) {
@@ -202,20 +197,39 @@ fun OnlineModeLobbyDialog(
                             }
                         }
 
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .shadow(6.dp, CircleShape)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(Color(0xFFFFD54F), Color(0xFFFFB300), Color(0xFFFF8F00))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .shadow(6.dp, CircleShape)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(Color(0xFF29B6F6), Color(0xFF0288D1))
+                                        )
                                     )
-                                )
-                                .border(2.dp, Color.White, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("🔔", fontSize = 22.sp)
+                                    .border(2.dp, Color.White, CircleShape)
+                                    .clickable { onCustomizeWallpaper() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("🎨", fontSize = 20.sp)
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .shadow(6.dp, CircleShape)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(Color(0xFFFFD54F), Color(0xFFFFB300), Color(0xFFFF8F00))
+                                        )
+                                    )
+                                    .border(2.dp, Color.White, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("🔔", fontSize = 22.sp)
+                            }
                         }
                     }
 

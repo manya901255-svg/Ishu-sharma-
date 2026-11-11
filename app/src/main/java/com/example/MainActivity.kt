@@ -56,6 +56,10 @@ class MainActivity : ComponentActivity() {
                         viewModel.toggleDailySpin(false)
                     }
 
+                    BackHandler(enabled = uiState.showWallpaperCustomizerDialog) {
+                        viewModel.toggleWallpaperCustomizer(false)
+                    }
+
                     BackHandler(enabled = !uiState.showWelcomeOverlay && !uiState.showMainMenuOverlay && uiState.currentScreen != AppScreen.HOME && uiState.currentScreen != AppScreen.GAME) {
                         viewModel.navigateTo(AppScreen.HOME)
                     }
@@ -137,6 +141,10 @@ class MainActivity : ComponentActivity() {
                                     viewModel.toggleMainMenuOverlay(false)
                                     viewModel.toggleSoundSettings(true)
                                 },
+                                onOpenWallpapers = {
+                                    viewModel.toggleMainMenuOverlay(false)
+                                    viewModel.toggleWallpaperCustomizer(true)
+                                },
                                 onEnterLobby = {
                                     viewModel.toggleMainMenuOverlay(false)
                                     viewModel.navigateTo(AppScreen.HOME)
@@ -144,6 +152,37 @@ class MainActivity : ComponentActivity() {
                                 onOpenBlueprint = {
                                     viewModel.toggleMainMenuOverlay(false)
                                     viewModel.navigateTo(AppScreen.TECH_BLUEPRINT)
+                                }
+                            )
+                        }
+                        // Root Custom Wallpaper Studio Dialog (Globally Accessible)
+                        if (uiState.showWallpaperCustomizerDialog) {
+                            com.example.ui.components.CustomWallpaperDialog(
+                                initialTarget = uiState.activeWallpaperTarget,
+                                wallpapersPerTarget = uiState.activeWallpapers,
+                                customUploadedWallpapers = uiState.customUploadedWallpapers,
+                                favoriteWallpaperIds = uiState.favoriteWallpaperIds,
+                                recentWallpaperIds = uiState.recentWallpaperIds,
+                                onApplyWallpaper = { target, idOrPath ->
+                                    viewModel.applyWallpaper(target, idOrPath)
+                                },
+                                onUploadImageUri = { uri, target ->
+                                    viewModel.uploadWallpaperFromUri(uri, target)
+                                },
+                                onDeleteUploadedWallpaper = { path ->
+                                    viewModel.deleteCustomWallpaper(path)
+                                },
+                                onToggleFavorite = { idOrPath ->
+                                    viewModel.toggleWallpaperFavorite(idOrPath)
+                                },
+                                onResetTarget = { target ->
+                                    viewModel.resetWallpaperForTarget(target)
+                                },
+                                onResetAll = {
+                                    viewModel.resetAllWallpapers()
+                                },
+                                onDismiss = {
+                                    viewModel.toggleWallpaperCustomizer(false)
                                 }
                             )
                         }

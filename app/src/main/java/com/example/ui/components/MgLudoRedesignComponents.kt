@@ -247,6 +247,19 @@ fun MgLudoTopHeader(
                 }
             }
 
+            // Music Player Button (🎵)
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(if (isMusicPlaying) Color(0xFF00E676).copy(alpha = 0.35f) else Color(0xFF0D2554).copy(alpha = 0.7f))
+                    .border(1.dp, if (isMusicPlaying) Color(0xFF00E676) else Color(0xFF40C4FF).copy(alpha = 0.5f), CircleShape)
+                    .clickable { onMusicClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(if (isMusicPlaying) "🎵" else "🔇", fontSize = 16.sp)
+            }
+
             // Notification Bell with Red Badge "3"
             Box(
                 modifier = Modifier
@@ -401,15 +414,15 @@ fun MgLudoSideActionButton(
 ) {
     Box(
         modifier = modifier
-            .size(width = 52.dp, height = 54.dp)
-            .shadow(6.dp, RoundedCornerShape(14.dp))
-            .clip(RoundedCornerShape(14.dp))
+            .size(width = 44.dp, height = 46.dp)
+            .shadow(4.dp, RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(
                 Brush.verticalGradient(
                     listOf(Color(0xFF0288D1), Color(0xFF01579B))
                 )
             )
-            .border(1.5.dp, Color(0xFF40C4FF).copy(alpha = 0.9f), RoundedCornerShape(14.dp))
+            .border(1.2.dp, Color(0xFF40C4FF).copy(alpha = 0.9f), RoundedCornerShape(12.dp))
             .clickable { onClick() }
             .padding(horizontal = 2.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center
@@ -418,14 +431,14 @@ fun MgLudoSideActionButton(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(icon, fontSize = 18.sp)
+            Text(icon, fontSize = 16.sp)
             Text(
                 text = label,
                 color = Color.White,
-                fontSize = 8.sp,
+                fontSize = 7.5.sp,
                 fontWeight = FontWeight.ExtraBold,
                 textAlign = TextAlign.Center,
-                lineHeight = 9.sp,
+                lineHeight = 8.5.sp,
                 maxLines = 2
             )
         }
@@ -435,22 +448,205 @@ fun MgLudoSideActionButton(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(x = 4.dp, y = (-4).dp)
+                    .offset(x = 3.dp, y = (-3).dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(badgeColor)
-                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                    .padding(horizontal = 3.dp, vertical = 1.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = badgeText,
                     color = Color.White,
-                    fontSize = 7.sp,
+                    fontSize = 6.5.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
             }
         }
     }
 }
+
+/**
+ * Left Action Column matching reference image (7 buttons):
+ * 1. Get 1k Coins
+ * 2. Key Free
+ * 3. Treasure (BONUS)
+ * 4. Like
+ * 5. Avatar
+ * 6. Queries
+ * 7. Offers (%)
+ */
+@Composable
+fun MgLudoLeftActionColumn(
+    keysCount: Int,
+    onGetCoinsClick: () -> Unit,
+    onKeyFreeClick: () -> Unit,
+    onTreasureClick: () -> Unit,
+    onLikeClick: () -> Unit,
+    onAvatarClick: () -> Unit,
+    onQueriesClick: () -> Unit,
+    onOffersClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 1. Get 1k Coins
+        MgLudoSideActionButton(
+            icon = "🪙",
+            label = "Get 1k",
+            badgeText = "AD",
+            badgeColor = Color(0xFF00E676),
+            onClick = onGetCoinsClick
+        )
+
+        // 2. Key Free
+        MgLudoSideActionButton(
+            icon = "🔑",
+            label = "Key Free",
+            badgeText = "$keysCount/7",
+            badgeColor = Color(0xFFFFD600),
+            onClick = onKeyFreeClick
+        )
+
+        // 3. Treasure
+        MgLudoSideActionButton(
+            icon = "🎪",
+            label = "Treasure",
+            badgeText = "BONUS",
+            badgeColor = Color(0xFFFF1744),
+            onClick = onTreasureClick
+        )
+
+        // 4. Like
+        MgLudoSideActionButton(
+            icon = "👍",
+            label = "Like",
+            onClick = onLikeClick
+        )
+
+        // 5. Avatar
+        MgLudoSideActionButton(
+            icon = "👥",
+            label = "Avatar",
+            badgeText = "VIP",
+            badgeColor = Color(0xFFFFD600),
+            onClick = onAvatarClick
+        )
+
+        // 6. Queries
+        MgLudoSideActionButton(
+            icon = "📋",
+            label = "Queries",
+            onClick = onQueriesClick
+        )
+
+        // 7. Offers
+        MgLudoSideActionButton(
+            icon = "🏷️",
+            label = "Offers",
+            badgeText = "%",
+            badgeColor = Color(0xFFFF6D00),
+            onClick = onOffersClick
+        )
+    }
+}
+
+/**
+ * Right Action Column matching reference image (5 buttons):
+ * 1. Daily Reward
+ * 2. Missions
+ * 3. Tasks
+ * 4. Mail (badge 5)
+ * 5. Support
+ */
+@Composable
+fun MgLudoRightActionColumn(
+    mailCount: Int = 5,
+    onDailyRewardClick: () -> Unit,
+    onMissionsClick: () -> Unit,
+    onTasksClick: () -> Unit,
+    onMailClick: () -> Unit,
+    onSupportClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 1. Daily Reward
+        MgLudoSideActionButton(
+            icon = "🎁",
+            label = "Daily",
+            badgeText = "FREE",
+            badgeColor = Color(0xFF00E676),
+            onClick = onDailyRewardClick
+        )
+
+        // 2. Missions
+        MgLudoSideActionButton(
+            icon = "📋",
+            label = "Missions",
+            badgeText = "NEW",
+            badgeColor = Color(0xFFFF1744),
+            onClick = onMissionsClick
+        )
+
+        // 3. Tasks
+        MgLudoSideActionButton(
+            icon = "⭐",
+            label = "Tasks",
+            onClick = onTasksClick
+        )
+
+        // 4. Mail
+        MgLudoSideActionButton(
+            icon = "✉️",
+            label = "Mail",
+            badgeText = mailCount.toString(),
+            badgeColor = Color(0xFFFF1744),
+            onClick = onMailClick
+        )
+
+        // 5. Support
+        MgLudoSideActionButton(
+            icon = "🎧",
+            label = "Support",
+            onClick = onSupportClick
+        )
+    }
+}
+
+/**
+ * 4 Carousel Indicator Dots below the promotional card
+ */
+@Composable
+fun MgLudoCarouselDots(
+    selectedIndex: Int = 0,
+    totalCount: Int = 4,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        for (i in 0 until totalCount) {
+            val isSelected = i == selectedIndex
+            Box(
+                modifier = Modifier
+                    .size(if (isSelected) 8.dp else 6.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isSelected) Color(0xFF00E5FF) else Color.White.copy(alpha = 0.45f)
+                    )
+            )
+        }
+    }
+}
+
 
 /**
  * Events Hub Banner matching the reference image:

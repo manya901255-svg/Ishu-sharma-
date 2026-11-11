@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import com.example.ui.components.MgLudoRoyalBackground
+import com.example.ui.components.WallpaperBackgroundView
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -167,8 +168,13 @@ fun ProfileScreen(
             .fillMaxSize()
             .testTag("player_profile_screen")
     ) {
-        // MG Ludo Royal Deep Blue Background
-        MgLudoRoyalBackground()
+        // Dynamic Profile Background (Customizable)
+        WallpaperBackgroundView(
+            wallpaperIdOrPath = uiState.activeWallpapers[com.example.model.WallpaperTarget.PROFILE.id],
+            target = com.example.model.WallpaperTarget.PROFILE,
+            modifier = Modifier.fillMaxSize(),
+            dimOverlayAlpha = 0.25f
+        )
 
         // Centered Player Profile Card (matching Screenshot 5 & 12)
         Column(
@@ -445,6 +451,16 @@ fun ProfileScreen(
                                                         modifier = Modifier.height(30.dp)
                                                     ) {
                                                         Text("👑 Sovereign Avatars", color = Color(0xFFFFD54F), fontSize = 11.sp, fontWeight = FontWeight.Black)
+                                                    }
+
+                                                    Button(
+                                                        onClick = { viewModel.toggleWallpaperCustomizer(true, com.example.model.WallpaperTarget.PROFILE) },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0)),
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                                        modifier = Modifier.height(30.dp)
+                                                    ) {
+                                                        Text("🎨 Wallpaper", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black)
                                                     }
                                                 }
                                             }
@@ -739,6 +755,38 @@ fun ProfileScreen(
                     viewModel.equipAncientAvatar(avatarId, title)
                 },
                 onDismiss = { viewModel.toggleDynamicProfileDialog(false) }
+            )
+        }
+
+        // MG Ludo Custom Wallpaper Studio Dialog
+        if (uiState.showWallpaperCustomizerDialog) {
+            com.example.ui.components.CustomWallpaperDialog(
+                initialTarget = uiState.activeWallpaperTarget,
+                wallpapersPerTarget = uiState.activeWallpapers,
+                customUploadedWallpapers = uiState.customUploadedWallpapers,
+                favoriteWallpaperIds = uiState.favoriteWallpaperIds,
+                recentWallpaperIds = uiState.recentWallpaperIds,
+                onApplyWallpaper = { target, idOrPath ->
+                    viewModel.applyWallpaper(target, idOrPath)
+                },
+                onUploadImageUri = { uri, target ->
+                    viewModel.uploadWallpaperFromUri(uri, target)
+                },
+                onDeleteUploadedWallpaper = { path ->
+                    viewModel.deleteCustomWallpaper(path)
+                },
+                onToggleFavorite = { idOrPath ->
+                    viewModel.toggleWallpaperFavorite(idOrPath)
+                },
+                onResetTarget = { target ->
+                    viewModel.resetWallpaperForTarget(target)
+                },
+                onResetAll = {
+                    viewModel.resetAllWallpapers()
+                },
+                onDismiss = {
+                    viewModel.toggleWallpaperCustomizer(false)
+                }
             )
         }
     }

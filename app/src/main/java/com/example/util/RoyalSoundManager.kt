@@ -50,6 +50,7 @@ class RoyalSoundManager(private val context: Context) {
 
     // MediaPlayer for sequential Royal Kingdom background music playlist
     private var bgmPlayer: MediaPlayer? = null
+    @Volatile
     private var isBgmPrepared = false
     var isBuffering = false
         private set
@@ -78,20 +79,28 @@ class RoyalSoundManager(private val context: Context) {
     }
 
     fun seekTo(positionMs: Int) {
+        if (!isBgmPrepared) return
         try {
             bgmPlayer?.seekTo(positionMs)
         } catch (_: Exception) {}
     }
 
-    fun getCurrentPosition(): Int = try {
-        bgmPlayer?.currentPosition ?: 0
-    } catch (_: Exception) { 0 }
+    fun getCurrentPosition(): Int {
+        if (!isBgmPrepared) return 0
+        return try {
+            bgmPlayer?.currentPosition ?: 0
+        } catch (_: Exception) { 0 }
+    }
 
-    fun getDuration(): Int = try {
-        val d = bgmPlayer?.duration ?: 0
-        if (d > 0) d else (currentPlayingTrack?.durationSeconds ?: 0) * 1000
-    } catch (_: Exception) {
-        (currentPlayingTrack?.durationSeconds ?: 0) * 1000
+    fun getDuration(): Int {
+        val fallback = (currentPlayingTrack?.durationSeconds ?: 0) * 1000
+        if (!isBgmPrepared) return fallback
+        return try {
+            val d = bgmPlayer?.duration ?: 0
+            if (d > 0) d else fallback
+        } catch (_: Exception) {
+            fallback
+        }
     }
 
     // Vibrator for tactile haptic feedback
@@ -258,7 +267,11 @@ class RoyalSoundManager(private val context: Context) {
         listener(isPlaying())
     }
 
-    fun isPlaying(): Boolean = bgmPlayer?.isPlaying == true
+    fun isPlaying(): Boolean = try {
+        isBgmPrepared && bgmPlayer?.isPlaying == true
+    } catch (_: Exception) {
+        false
+    }
 
     /**
      * Plays a specific BgmTrack directly (supporting online streaming URLs and local assets),
@@ -299,13 +312,13 @@ class RoyalSoundManager(private val context: Context) {
     private fun playTrackInternal(track: BgmTrack, safeIndex: Int) {
         currentTrackIndex = safeIndex
         currentPlayingTrack = track
+        isBgmPrepared = false
 
         try {
             bgmPlayer?.let { player ->
-                if (player.isPlaying) {
-                    player.stop()
-                }
-                player.reset()
+                try {
+                    player.reset()
+                } catch (_: Exception) {}
             }
             if (bgmPlayer == null) {
                 bgmPlayer = MediaPlayer().apply {
@@ -313,12 +326,14 @@ class RoyalSoundManager(private val context: Context) {
                         handleTrackCompletion()
                     }
                     setOnErrorListener { _, what, extra ->
-                        Log.e("RoyalSoundManager", "MediaPlayer streaming error: what=$what, extra=$extra. Advancing to next track.")
+                        Log.e("RoyalSoundManager", "MediaPlayer error: what=$what, extra=$extra.")
                         isBuffering = false
                         isBgmPrepared = false
                         onBufferingListener?.invoke(false)
                         onPlaybackStateListener?.invoke(false)
-                        playNextTrack()
+                        if (what != -38 && extra != -38) {
+                            playNextTrack()
+                        }
                         true
                     }
                 }
@@ -507,7 +522,7 @@ class RoyalSoundManager(private val context: Context) {
             stopAmbientBgm()
             return false
         }
-        val playing = bgmPlayer?.isPlaying == true
+        val playing = try { isBgmPrepared && bgmPlayer?.isPlaying == true } catch (_: Exception) { false }
         if (playing) {
             pauseAmbientBgm()
             return false
@@ -533,7 +548,8 @@ class RoyalSoundManager(private val context: Context) {
             } else {
                 requestAudioFocus()
                 bgmPlayer?.setVolume(bgmVolume, bgmVolume)
-                if (bgmPlayer?.isPlaying == false) {
+                val isPlaying = try { bgmPlayer?.isPlaying == true } catch (_: Exception) { false }
+                if (!isPlaying) {
                     bgmPlayer?.start()
                 }
                 onPlaybackStateListener?.invoke(true)
@@ -545,7 +561,8 @@ class RoyalSoundManager(private val context: Context) {
 
     fun pauseAmbientBgm() {
         try {
-            if (bgmPlayer?.isPlaying == true) {
+            val isPlaying = try { isBgmPrepared && bgmPlayer?.isPlaying == true } catch (_: Exception) { false }
+            if (isPlaying) {
                 bgmPlayer?.pause()
                 onPlaybackStateListener?.invoke(false)
             }
@@ -560,7 +577,8 @@ class RoyalSoundManager(private val context: Context) {
             return
         }
         try {
-            if (isBgmEnabled && bgmPlayer?.isPlaying == false && isBgmPrepared) {
+            val isPlaying = try { bgmPlayer?.isPlaying == true } catch (_: Exception) { false }
+            if (isBgmEnabled && !isPlaying && isBgmPrepared) {
                 requestAudioFocus()
                 bgmPlayer?.start()
                 onPlaybackStateListener?.invoke(true)
@@ -573,11 +591,12 @@ class RoyalSoundManager(private val context: Context) {
     fun stopAmbientBgm() {
         try {
             abandonAudioFocus()
-            if (bgmPlayer?.isPlaying == true) {
-                bgmPlayer?.stop()
-                isBgmPrepared = false
-                onPlaybackStateListener?.invoke(false)
+            val isPlaying = try { bgmPlayer?.isPlaying == true } catch (_: Exception) { false }
+            if (isPlaying) {
+                try { bgmPlayer?.stop() } catch (_: Exception) {}
             }
+            isBgmPrepared = false
+            onPlaybackStateListener?.invoke(false)
         } catch (e: Exception) {
             Log.e("RoyalSoundManager", "Error stopping BGM", e)
         }
@@ -590,9 +609,14 @@ class RoyalSoundManager(private val context: Context) {
             if (enabled) {
                 requestAudioFocus()
                 bgmPlayer?.setVolume(bgmVolume, bgmVolume)
-                if (bgmPlayer?.isPlaying == false) {
-                    bgmPlayer?.start()
-                    onPlaybackStateListener?.invoke(true)
+                val isPlaying = try { isBgmPrepared && bgmPlayer?.isPlaying == true } catch (_: Exception) { false }
+                if (!isPlaying) {
+                    if (isBgmPrepared) {
+                        bgmPlayer?.start()
+                        onPlaybackStateListener?.invoke(true)
+                    } else {
+                        startAmbientBgm()
+                    }
                 }
             } else {
                 pauseAmbientBgm()

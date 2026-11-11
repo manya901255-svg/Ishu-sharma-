@@ -63,11 +63,10 @@ fun HomeScreen(
             .fillMaxSize()
             .testTag("home_screen")
     ) {
-        // 1. Restored Classic Purple Woodgrain Background (Screenshot 1, 2, 3)
-        Image(
-            painter = painterResource(id = R.drawable.bg_purple_wood),
-            contentDescription = "Royal Purple Wood Background",
-            contentScale = ContentScale.Crop,
+        // 1. Dynamic Wallpaper Background for Home Screen (Customizable)
+        WallpaperBackgroundView(
+            wallpaperIdOrPath = uiState.activeWallpapers[com.example.model.WallpaperTarget.HOME.id],
+            target = com.example.model.WallpaperTarget.HOME,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -90,6 +89,7 @@ fun HomeScreen(
                 isMusicPlaying = uiState.isMusicPlaying,
                 onProfileClick = { viewModel.navigateTo(AppScreen.PROFILE) },
                 onMusicClick = { viewModel.toggleMusicPlayerDialog(true) },
+                onWallpaperClick = { viewModel.toggleWallpaperCustomizer(true, com.example.model.WallpaperTarget.HOME) },
                 onSettingsClick = { viewModel.toggleSoundSettings(true) },
                 onAddCoins = {
                     adRewardTitle = "2,500 Bonus Coins"
@@ -169,6 +169,15 @@ fun HomeScreen(
                         badgeColor = Color(0xFFFFD600)
                     ) {
                         viewModel.toggleDynamicProfileDialog(true)
+                    }
+
+                    LudoClubActionBadge(
+                        icon = "🎨",
+                        label = "Wallpaper",
+                        badge = "CUSTOM",
+                        badgeColor = Color(0xFF00E5FF)
+                    ) {
+                        viewModel.toggleWallpaperCustomizer(true, com.example.model.WallpaperTarget.HOME)
                     }
 
                     LudoClubActionBadge(
@@ -493,7 +502,40 @@ fun HomeScreen(
                 onTestStarSafe = { viewModel.soundAndHaptics.playStarSafe() },
                 onTestSixRolled = { viewModel.soundAndHaptics.playSixRolled() },
                 onOpenMusicPlayer = { viewModel.toggleMusicPlayerDialog(true) },
+                onOpenWallpaperCustomizer = { viewModel.toggleWallpaperCustomizer(true) },
                 onDismiss = { viewModel.toggleSoundSettings(false) }
+            )
+        }
+
+        // MG Ludo Custom Wallpaper Studio Dialog
+        if (uiState.showWallpaperCustomizerDialog) {
+            CustomWallpaperDialog(
+                initialTarget = uiState.activeWallpaperTarget,
+                wallpapersPerTarget = uiState.activeWallpapers,
+                customUploadedWallpapers = uiState.customUploadedWallpapers,
+                favoriteWallpaperIds = uiState.favoriteWallpaperIds,
+                recentWallpaperIds = uiState.recentWallpaperIds,
+                onApplyWallpaper = { target, idOrPath ->
+                    viewModel.applyWallpaper(target, idOrPath)
+                },
+                onUploadImageUri = { uri, target ->
+                    viewModel.uploadWallpaperFromUri(uri, target)
+                },
+                onDeleteUploadedWallpaper = { path ->
+                    viewModel.deleteCustomWallpaper(path)
+                },
+                onToggleFavorite = { idOrPath ->
+                    viewModel.toggleWallpaperFavorite(idOrPath)
+                },
+                onResetTarget = { target ->
+                    viewModel.resetWallpaperForTarget(target)
+                },
+                onResetAll = {
+                    viewModel.resetAllWallpapers()
+                },
+                onDismiss = {
+                    viewModel.toggleWallpaperCustomizer(false)
+                }
             )
         }
 
@@ -581,6 +623,10 @@ fun HomeScreen(
                 initialColor = uiState.userChosenColor,
                 initialMode = mode,
                 titleText = modeTitle,
+                lobbyWallpaper = uiState.activeWallpapers[com.example.model.WallpaperTarget.LOBBY.id],
+                onCustomizeWallpaper = {
+                    viewModel.toggleWallpaperCustomizer(true, com.example.model.WallpaperTarget.LOBBY)
+                },
                 onDismiss = { selectedModeForSetup = null },
                 onStartGame = { playerCount, wager, chosenColor, gameMode ->
                     selectedModeForSetup = null
@@ -597,6 +643,10 @@ fun HomeScreen(
         if (uiState.showPrivateRoomDialog) {
             PrivateRoomDialog(
                 roomCode = uiState.roomCode,
+                roomWallpaper = uiState.activeWallpapers[com.example.model.WallpaperTarget.PRIVATE_ROOM.id],
+                onCustomizeWallpaper = {
+                    viewModel.toggleWallpaperCustomizer(true, com.example.model.WallpaperTarget.PRIVATE_ROOM)
+                },
                 onDismiss = { viewModel.closePrivateRoomDialog() },
                 onCreateRoom = { count ->
                     viewModel.closePrivateRoomDialog()
@@ -865,6 +915,7 @@ private fun LudoClubTopHeader(
     onProfileClick: () -> Unit,
     onMenuClick: () -> Unit = {},
     onMusicClick: () -> Unit = {},
+    onWallpaperClick: () -> Unit = {},
     onSettingsClick: () -> Unit,
     onAddCoins: () -> Unit,
     onAddGems: () -> Unit
@@ -1050,6 +1101,17 @@ private fun LudoClubTopHeader(
                     Text(
                         text = if (isMusicPlaying) "🎶" else "🎵",
                         fontSize = 20.sp
+                    )
+                }
+
+                // Wallpaper Studio Quick Button
+                IconButton(
+                    onClick = onWallpaperClick,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Text(
+                        text = "🎨",
+                        fontSize = 19.sp
                     )
                 }
 
@@ -2200,6 +2262,8 @@ private fun ModeSetupDialog(
 @Composable
 private fun PrivateRoomDialog(
     roomCode: String,
+    roomWallpaper: String? = null,
+    onCustomizeWallpaper: () -> Unit = {},
     onDismiss: () -> Unit,
     onCreateRoom: (Int) -> Unit,
     onJoinRoom: (String) -> Unit
@@ -2218,22 +2282,44 @@ private fun PrivateRoomDialog(
             colors = CardDefaults.cardColors(containerColor = LudoClubPurplePlank),
             border = androidx.compose.foundation.BorderStroke(2.dp, RoyalGold)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp)
+            WallpaperBackgroundView(
+                wallpaperIdOrPath = roomWallpaper,
+                target = com.example.model.WallpaperTarget.PRIVATE_ROOM,
+                dimOverlayAlpha = 0.5f
             ) {
-                Text(
-                    text = "👑 Private Royal Room",
-                    color = RoyalGold,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Play with friends in a private chamber",
-                    color = TextMuted,
-                    fontSize = 12.sp
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "👑 Private Royal Room",
+                                color = RoyalGold,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Play with friends in a private chamber",
+                                color = TextMuted,
+                                fontSize = 12.sp
+                            )
+                        }
+                        IconButton(
+                            onClick = onCustomizeWallpaper,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF0F2652))
+                        ) {
+                            Text("🎨", fontSize = 16.sp)
+                        }
+                    }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -2375,6 +2461,7 @@ private fun PrivateRoomDialog(
             }
         }
     }
+}
 }
 
 @Composable

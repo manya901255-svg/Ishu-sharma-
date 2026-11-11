@@ -242,4 +242,116 @@ class ProfilePreferences(private val context: Context) {
             .putString(KEY_CUSTOM_PHOTO_URI, finalPhotoUri)
             .apply()
     }
+
+    // ==========================================
+    // MG LUDO CUSTOM WALLPAPER SYSTEM PERSISTENCE
+    // ==========================================
+
+    fun getWallpaperForTarget(targetId: String, defaultId: String): String {
+        val saved = prefs.getString("pref_wallpaper_$targetId", null)
+        if (saved == null || saved == "default_midnight_board" || saved == "default_purple_wood") {
+            return defaultId
+        }
+        return saved
+    }
+
+    fun setWallpaperForTarget(targetId: String, wallpaperIdOrPath: String) {
+        prefs.edit().putString("pref_wallpaper_$targetId", wallpaperIdOrPath).apply()
+        addRecentlyUsedWallpaper(wallpaperIdOrPath)
+    }
+
+    fun resetWallpaperForTarget(targetId: String, defaultId: String) {
+        prefs.edit().putString("pref_wallpaper_$targetId", defaultId).apply()
+    }
+
+    fun resetAllWallpapers() {
+        val editor = prefs.edit()
+        editor.remove("pref_wallpaper_target_home")
+        editor.remove("pref_wallpaper_target_board")
+        editor.remove("pref_wallpaper_target_lobby")
+        editor.remove("pref_wallpaper_target_profile")
+        editor.remove("pref_wallpaper_target_private_room")
+        editor.apply()
+    }
+
+    fun getCustomUploadedWallpapers(): List<String> {
+        val raw = prefs.getString("pref_custom_wallpapers_list", "") ?: ""
+        if (raw.isEmpty()) return emptyList()
+        return raw.split(";").filter { it.isNotBlank() }
+    }
+
+    fun addCustomUploadedWallpaper(filePath: String) {
+        val current = getCustomUploadedWallpapers().toMutableList()
+        if (!current.contains(filePath)) {
+            current.add(0, filePath)
+            prefs.edit().putString("pref_custom_wallpapers_list", current.joinToString(";")).apply()
+        }
+    }
+
+    fun deleteCustomUploadedWallpaper(filePath: String) {
+        val current = getCustomUploadedWallpapers().toMutableList()
+        current.remove(filePath)
+        prefs.edit().putString("pref_custom_wallpapers_list", current.joinToString(";")).apply()
+        try {
+            val file = File(filePath)
+            if (file.exists()) file.delete()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun getFavoriteWallpaperIds(): Set<String> {
+        return prefs.getStringSet("pref_favorite_wallpapers_set", emptySet()) ?: emptySet()
+    }
+
+    fun toggleFavoriteWallpaper(idOrPath: String): Boolean {
+        val current = getFavoriteWallpaperIds().toMutableSet()
+        val isNowFav = if (current.contains(idOrPath)) {
+            current.remove(idOrPath)
+            false
+        } else {
+            current.add(idOrPath)
+            true
+        }
+        prefs.edit().putStringSet("pref_favorite_wallpapers_set", current).apply()
+        return isNowFav
+    }
+
+    fun getRecentlyUsedWallpapers(): List<String> {
+        val raw = prefs.getString("pref_recent_wallpapers_list", "") ?: ""
+        if (raw.isEmpty()) return emptyList()
+        return raw.split(";").filter { it.isNotBlank() }
+    }
+
+    fun addRecentlyUsedWallpaper(idOrPath: String) {
+        val current = getRecentlyUsedWallpapers().toMutableList()
+        current.remove(idOrPath)
+        current.add(0, idOrPath)
+        val trimmed = if (current.size > 12) current.take(12) else current
+        prefs.edit().putString("pref_recent_wallpapers_list", trimmed.joinToString(";")).apply()
+    }
+
+    /**
+     * Saves a user-picked image into the app's persistent private wallpapers folder.
+     */
+    fun saveWallpaperImageLocally(sourceUri: Uri): String? {
+        return try {
+            val dir = File(context.filesDir, "wallpapers")
+            if (!dir.exists()) dir.mkdirs()
+            val fileName = "wallpaper_${System.currentTimeMillis()}.jpg"
+            val targetFile = File(dir, fileName)
+            context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                targetFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            } ?: return null
+            val absolutePath = targetFile.absolutePath
+            addCustomUploadedWallpaper(absolutePath)
+            absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
 }
+
