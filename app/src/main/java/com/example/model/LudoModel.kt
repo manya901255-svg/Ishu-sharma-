@@ -163,16 +163,55 @@ data class DiceSkin(
     val pipColor: Color,
     val iconEmoji: String = "🎲",
     val priceCoins: Long = 0L,
-    val isDefault: Boolean = false
+    val isDefault: Boolean = false,
+    val category: String = "Classic Dice"
 )
 
 val BUILT_IN_DICE_SKINS = listOf(
-    DiceSkin("dice_imperial_gold", "Imperial Gold", "Pure Jaipur bullion dice with ruby pips", Color(0xFFFFD700), Color(0xFFFFA000), Color(0xFFC62828), "👑", 0L, true),
-    DiceSkin("dice_maharaja_ruby", "Maharaja Ruby", "Faceted royal crimson gem with gold pips", Color(0xFFD50000), Color(0xFF880E4F), Color(0xFFFFD700), "💎", 2500L),
-    DiceSkin("dice_emerald_empire", "Emerald Empire", "Royal Mughal emerald with diamond pips", Color(0xFF00C853), Color(0xFF1B5E20), Color(0xFFE0F7FA), "🟢", 3000L),
-    DiceSkin("dice_cyber_neon", "Cyber Neon", "Electrified arcade synth neon dice", Color(0xFF00E5FF), Color(0xFFD500F9), Color(0xFFFFFFFF), "⚡", 4000L),
-    DiceSkin("dice_royal_platinum", "Royal Platinum", "Mirror-polished white platinum with sapphire pips", Color(0xFFECEFF1), Color(0xFF90A4AE), Color(0xFF0277BD), "✨", 5000L),
-    DiceSkin("dice_classic_ivory", "Classic Ivory", "Hand-carved vintage ivory bone dice", Color(0xFFFFF8E1), Color(0xFFFFE082), Color(0xFF212121), "🎲", 0L)
+    // 1. Classic Dice
+    DiceSkin("dice_classic_ivory", "Classic Ivory", "Hand-carved vintage ivory bone with deep ebony pips", Color(0xFFFFF8E1), Color(0xFFFFE082), Color(0xFF212121), "🎲", 0L, true, "Classic Dice"),
+    DiceSkin("dice_royal_teak", "Royal Teak Wood", "Polished Rajasthan teak wood with antique brass pips", Color(0xFF8D6E63), Color(0xFF5D4037), Color(0xFFFFD54F), "🪵", 1500L, false, "Classic Dice"),
+    DiceSkin("dice_makrana_marble", "Makrana Marble", "Pristine white Makrana marble with onyx pips", Color(0xFFECEFF1), Color(0xFFCFD8DC), Color(0xFF263238), "🏛️", 2500L, false, "Classic Dice"),
+
+    // 2. Neon Dice
+    DiceSkin("dice_cyber_neon", "Cyber Neon", "Electrified synthwave cyan with radioactive magenta pips", Color(0xFF00E5FF), Color(0xFF00B0FF), Color(0xFFFF007F), "⚡", 3500L, false, "Neon Dice"),
+    DiceSkin("dice_laser_pulse", "Laser Pulse", "Deep midnight purple with pulsing electric yellow pips", Color(0xFF7C4DFF), Color(0xFF651FFF), Color(0xFFFFFF00), "🟣", 4000L, false, "Neon Dice"),
+    DiceSkin("dice_matrix_green", "Matrix Phosphor", "Arcade phosphor green with cybernetic emerald pips", Color(0xFF00E676), Color(0xFF00C853), Color(0xFF003300), "🟢", 4500L, false, "Neon Dice"),
+
+    // 3. Fire Dice
+    DiceSkin("dice_molten_lava", "Molten Lava", "Volcanic basalt stone with searing magma glow pips", Color(0xFFFF3D00), Color(0xFFDD2C00), Color(0xFFFFEB3B), "🌋", 4500L, false, "Fire Dice"),
+    DiceSkin("dice_solar_flare", "Solar Flare", "Blazing solar flare core with coronal ruby pips", Color(0xFFFF6D00), Color(0xFFFFAB00), Color(0xFFD50000), "🔥", 5500L, false, "Fire Dice"),
+    DiceSkin("dice_dragon_flame", "Dragon Flame", "Mythic crimson dragon scales with infernal ember pips", Color(0xFFC62828), Color(0xFF8E0000), Color(0xFFFFC107), "🐉", 6500L, false, "Fire Dice"),
+
+    // 4. Ice Dice
+    DiceSkin("dice_glacial_frost", "Glacial Frost", "Sub-zero crystalline iceberg with frostbite cyan pips", Color(0xFF80DEEA), Color(0xFF00ACC1), Color(0xFFFFFFFF), "❄️", 4500L, false, "Ice Dice"),
+    DiceSkin("dice_arctic_blizzard", "Arctic Blizzard", "Chilled permafrost blizzard glass with diamond ice pips", Color(0xFFB2EBF2), Color(0xFF4DD0E1), Color(0xFF006064), "🧊", 5500L, false, "Ice Dice"),
+    DiceSkin("dice_frozen_nebula", "Frozen Nebula", "Deep cryogenic violet frost with starlight pips", Color(0xFF9FA8DA), Color(0xFF5C6BC0), Color(0xFFE0F7FA), "🌌", 6500L, false, "Ice Dice"),
+
+    // 5. Golden Dice
+    DiceSkin("dice_imperial_gold", "Imperial Jaipur Gold", "Pure 24K bullion gold minted with royal ruby pips", Color(0xFFFFD700), Color(0xFFFFA000), Color(0xFFC62828), "👑", 5000L, false, "Golden Dice"),
+    DiceSkin("dice_sun_temple_gold", "Sun Temple Gold", "Sacred carved solar disc gold with emerald crystal pips", Color(0xFFFFC107), Color(0xFFFF8F00), Color(0xFF00E676), "☀️", 7500L, false, "Golden Dice"),
+    DiceSkin("dice_crown_sovereign", "Crown Sovereign", "Heavy royal treasury gold bullion with sapphire pips", Color(0xFFFFAB00), Color(0xFFFF6F00), Color(0xFF2979FF), "🪙", 10000L, false, "Golden Dice"),
+
+    // 6. Diamond Dice
+    DiceSkin("dice_kohinoor_diamond", "Kohinoor Diamond", "Faceted translucent diamond prism with rainbow refractions", Color(0xFFE0F7FA), Color(0xFFB2EBF2), Color(0xFF00B0FF), "💎", 8000L, false, "Diamond Dice"),
+    DiceSkin("dice_star_sapphire", "Royal Star Sapphire", "Deep celestial midnight sapphire with diamond starlight pips", Color(0xFF1A237E), Color(0xFF283593), Color(0xFFFFFFFF), "⭐", 9500L, false, "Diamond Dice"),
+    DiceSkin("dice_celestial_amethyst", "Celestial Amethyst", "Majestic cut royal amethyst crystal with gold pips", Color(0xFF6A1B9A), Color(0xFF4A148C), Color(0xFFFFD700), "✨", 11000L, false, "Diamond Dice"),
+
+    // 7. Cartoon Dice
+    DiceSkin("dice_bubble_gum", "Bubble Gum Pop", "Sweet bubblegum pink with playful candy white pips", Color(0xFFFF4081), Color(0xFFF50057), Color(0xFFFFFFFF), "🍬", 2000L, false, "Cartoon Dice"),
+    DiceSkin("dice_playful_emoji", "Playful Emoji", "Sunny yellow smiley dice with joyful heart pips", Color(0xFFFFEB3B), Color(0xFFFDD835), Color(0xFFFF1744), "😍", 2500L, false, "Cartoon Dice"),
+    DiceSkin("dice_retro_arcade", "8-Bit Arcade", "Retro 1980s pixel block dice with rainbow pips", Color(0xFF00E5FF), Color(0xFFFF007F), Color(0xFFFFFF00), "👾", 3000L, false, "Cartoon Dice"),
+
+    // 8. Royal Dice
+    DiceSkin("dice_maharaja_ruby", "Maharaja Ruby", "Faceted royal crimson gem with Mughal gold pips", Color(0xFFD50000), Color(0xFF880E4F), Color(0xFFFFD700), "👑", 6000L, false, "Royal Dice"),
+    DiceSkin("dice_emerald_empire", "Emerald Empire", "Royal Mughal emerald with brilliant diamond pips", Color(0xFF00C853), Color(0xFF1B5E20), Color(0xFFE0F7FA), "🟢", 7000L, false, "Royal Dice"),
+    DiceSkin("dice_royal_platinum", "Royal Platinum", "Mirror-polished white platinum with royal sapphire pips", Color(0xFFECEFF1), Color(0xFF90A4AE), Color(0xFF0277BD), "✨", 8500L, false, "Royal Dice"),
+
+    // 9. Animated Dice
+    DiceSkin("dice_thunder_shock", "Thunderstorm Shock", "Arcing plasma lightning bolts with electrifying shockwave pips", Color(0xFFFFEA00), Color(0xFFFF9100), Color(0xFF00E5FF), "⚡", 9000L, false, "Animated Dice"),
+    DiceSkin("dice_cosmic_void", "Cosmic Void", "Swirling black hole galaxy with supernova starburst pips", Color(0xFF12005E), Color(0xFF311B92), Color(0xFF00E5FF), "🌌", 12000L, false, "Animated Dice"),
+    DiceSkin("dice_phoenix_rebirth", "Phoenix Rebirth", "Golden solar fire aura with immortal flame feather pips", Color(0xFFFF6D00), Color(0xFFDD2C00), Color(0xFFFFD700), "🪶", 15000L, false, "Animated Dice")
 )
 
 data class TokenSkin(

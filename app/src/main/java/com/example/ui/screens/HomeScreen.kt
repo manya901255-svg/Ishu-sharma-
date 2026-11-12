@@ -111,7 +111,14 @@ fun HomeScreen(
                 onVaultKeyClick = { showVaultKeyDialog = true }
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Grand Promotional Championship Banner (High-Impact Royal Arena)
+            GrandChampionshipPromoBanner(
+                onEnterCup = { selectedModeForSetup = GameMode.ONLINE_MULTIPLAYER }
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
 
             // C. Center Carousel & Side Action Badges (Screenshot 1, 2, 3)
             Box(
@@ -370,9 +377,10 @@ fun HomeScreen(
                     LudoClubActionBadge(
                         icon = "📋",
                         label = "Tasks",
-                        badge = null
+                        badge = "DAILY",
+                        badgeColor = Color(0xFF00E676)
                     ) {
-                        showTasksDialog = true
+                        viewModel.toggleDailyMissionsDialog(true)
                     }
 
                     LudoClubActionBadge(
@@ -405,78 +413,130 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // EVENTS HUB Button
+                // EVENTS HUB Button (High Impact Redesigned Banner)
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                        .shadow(6.dp, RoundedCornerShape(16.dp))
-                        .clip(RoundedCornerShape(16.dp))
+                        .weight(1.15f)
+                        .height(64.dp)
+                        .shadow(10.dp, RoundedCornerShape(18.dp))
+                        .clip(RoundedCornerShape(18.dp))
                         .background(
                             Brush.horizontalGradient(
-                                listOf(Color(0xFFFFB300), Color(0xFFFF6F00))
+                                listOf(Color(0xFFFF8F00), Color(0xFFFF6F00), Color(0xFFD84315))
                             )
                         )
-                        .border(1.5.dp, Color(0xFFFFE082), RoundedCornerShape(16.dp))
+                        .border(
+                            2.dp,
+                            Brush.linearGradient(listOf(Color(0xFFFFD54F), Color.White, Color(0xFFFFD54F))),
+                            RoundedCornerShape(18.dp)
+                        )
                         .clickable { showEventsDialog = true }
-                        .padding(horizontal = 8.dp),
+                        .padding(horizontal = 10.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_events_hub),
-                            contentDescription = "Events Hub",
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .border(1.dp, Color.White, CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                "EVENTS HUB",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Black
-                            )
-                            Text(
-                                "Live Tournaments",
-                                color = Color.White.copy(alpha = 0.9f),
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Medium
-                            )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF280B4A))
+                                    .border(1.5.dp, Color(0xFFFFD54F), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("🏆", fontSize = 22.sp)
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        "EVENTS HUB",
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(Color(0xFFFF1744))
+                                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                                    ) {
+                                        Text("LIVE", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Black)
+                                    }
+                                }
+                                Text(
+                                    "Championship Tournaments",
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
+
+                        Text("▶", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
-                // DAILY SPIN Button
+                // DAILY SPIN Button (High Impact Redesigned Banner)
                 Box(
                     modifier = Modifier
-                        .height(52.dp)
-                        .shadow(6.dp, RoundedCornerShape(16.dp))
-                        .clip(RoundedCornerShape(16.dp))
+                        .weight(0.95f)
+                        .height(64.dp)
+                        .shadow(10.dp, RoundedCornerShape(18.dp))
+                        .clip(RoundedCornerShape(18.dp))
                         .background(
                             Brush.horizontalGradient(
-                                listOf(Color(0xFF7E57C2), Color(0xFF512DA8))
+                                listOf(Color(0xFF7E57C2), Color(0xFF4A148C), Color(0xFF311B92))
                             )
                         )
-                        .border(1.5.dp, Color(0xFFD1C4E9), RoundedCornerShape(16.dp))
+                        .border(
+                            2.dp,
+                            Brush.linearGradient(listOf(Color(0xFFE1BEE7), Color(0xFFFFD54F), Color(0xFFE1BEE7))),
+                            RoundedCornerShape(18.dp)
+                        )
                         .clickable { viewModel.toggleDailySpin(true) }
-                        .padding(horizontal = 14.dp),
+                        .padding(horizontal = 10.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("🎡", fontSize = 20.sp)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            "DAILY SPIN",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Black
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("🎡", fontSize = 26.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column {
+                                Text(
+                                    "DAILY SPIN",
+                                    color = Color(0xFFFFD54F),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                                Text(
+                                    "Win 50K Coins!",
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF00E676))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text("FREE", color = Color(0xFF071738), fontSize = 8.sp, fontWeight = FontWeight.Black)
+                        }
                     }
                 }
             }
@@ -961,11 +1021,12 @@ fun HomeScreen(
             )
         }
 
-        // Daily Tasks Dialog
+        // Daily Tasks / Missions Dialog
         if (showTasksDialog) {
-            DailyTasksDialog(
-                onClaimTask = { rewardCoins ->
-                    viewModel.claimDailySpinReward(rewardCoins, 0)
+            com.example.ui.components.DailyMissionsDialog(
+                missions = uiState.dailyMissions,
+                onClaimMission = { mission ->
+                    viewModel.claimDailyMission(mission)
                 },
                 onDismiss = { showTasksDialog = false }
             )
@@ -1340,6 +1401,99 @@ private fun LudoClubTopEventPills(
 }
 
 @Composable
+private fun GrandChampionshipPromoBanner(
+    onEnterCup: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp)
+            .shadow(10.dp, RoundedCornerShape(18.dp))
+            .clickable { onEnterCup() },
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = androidx.compose.foundation.BorderStroke(
+            2.dp,
+            Brush.horizontalGradient(
+                listOf(Color(0xFFFFD54F), Color(0xFFFF6F00), Color(0xFFFFD54F))
+            )
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(Color(0xFF280B4A), Color(0xFF4A148C), Color(0xFF1A0636))
+                    )
+                )
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(listOf(Color(0xFFFFD54F), Color(0xFFFF8F00)))
+                            )
+                            .border(1.5.dp, Color.White, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("🏆", fontSize = 24.sp)
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFFF1744))
+                                    .padding(horizontal = 6.dp, vertical = 1.dp)
+                            ) {
+                                Text("LIVE 🔴", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Black)
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("⚡ ₹50,000 POT", color = Color(0xFFFFD54F), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            "MAHA LUDO GRAND PRIX",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            "Live Tournaments • 2D Classic Fair RNG Board",
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFFFFB300), Color(0xFFFF6F00))
+                            )
+                        )
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text("JOIN 🏆", color = Color(0xFF1A0636), fontSize = 11.sp, fontWeight = FontWeight.Black)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun EventPillButton(
     title: String,
     timer: String,
@@ -1459,15 +1613,20 @@ private fun LudoClubImageCard(
 ) {
     Card(
         modifier = Modifier
-            .width(200.dp)
-            .height(265.dp)
-            .shadow(16.dp, RoundedCornerShape(28.dp))
-            .clip(RoundedCornerShape(28.dp))
+            .width(235.dp)
+            .height(315.dp)
+            .shadow(20.dp, RoundedCornerShape(30.dp))
+            .clip(RoundedCornerShape(30.dp))
             .clickable { onClick() }
             .testTag("mode_card_${title.replace(" ", "_")}"),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(30.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        border = androidx.compose.foundation.BorderStroke(3.dp, Color.White.copy(alpha = 0.9f))
+        border = androidx.compose.foundation.BorderStroke(
+            3.5.dp,
+            Brush.linearGradient(
+                listOf(Color(0xFFFFD54F), Color(0xFFFF8F00), Color(0xFFFFD54F))
+            )
+        )
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Image(
@@ -1476,12 +1635,91 @@ private fun LudoClubImageCard(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
+
+            // Top Badges
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp)
+                    .align(Alignment.TopCenter),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFFF1744))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text("🔥 POPULAR #1", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text("🟢 18.4K LIVE", color = Color(0xFF00E676), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // Bottom Gradient Overlay with Title and CTA
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color(0xCC000000), Color(0xF0071328))
+                        )
+                    )
+                    .padding(horizontal = 14.dp, vertical = 12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = title,
+                        color = Color(0xFFFFD54F),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Black,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "⚔️ Real-Time 2-4 Players Battle",
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(Color(0xFFFFB300), Color(0xFFFF6F00))
+                                )
+                            )
+                            .padding(horizontal = 20.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text = "PLAY NOW ▶",
+                            color = Color(0xFF071738),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
 /**
- * Procedural fallback cards for other modes (Quick Rush, AI, Private Room)
+ * Procedural fallback cards for other modes (Classic, 2 vs 2, Quick Rush, AI, Private Room)
  */
 @Composable
 private fun LudoClubProceduralCard(
@@ -1495,15 +1733,20 @@ private fun LudoClubProceduralCard(
 ) {
     Card(
         modifier = Modifier
-            .width(200.dp)
-            .height(265.dp)
-            .shadow(16.dp, RoundedCornerShape(28.dp))
-            .clip(RoundedCornerShape(28.dp))
+            .width(235.dp)
+            .height(315.dp)
+            .shadow(20.dp, RoundedCornerShape(30.dp))
+            .clip(RoundedCornerShape(30.dp))
             .clickable { onClick() }
             .testTag("mode_card_${title.replace(" ", "_")}"),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(30.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        border = androidx.compose.foundation.BorderStroke(3.dp, Color.White.copy(alpha = 0.9f))
+        border = androidx.compose.foundation.BorderStroke(
+            3.dp,
+            Brush.linearGradient(
+                listOf(Color(0xFFFFD54F), Color.White.copy(alpha = 0.8f), Color(0xFFFFD54F))
+            )
+        )
     ) {
         Box(
             modifier = Modifier
@@ -1511,25 +1754,49 @@ private fun LudoClubProceduralCard(
                 .background(Brush.verticalGradient(bgGradient))
                 .padding(16.dp)
         ) {
-            Text(text = icon, fontSize = 28.sp, modifier = Modifier.align(Alignment.TopStart))
+            // Top Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .border(1.5.dp, Color(0xFFFFD54F), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = icon, fontSize = 20.sp)
+                }
 
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(text = badge, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // Center Visual
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Black.copy(alpha = 0.35f))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .size(100.dp)
+                    .align(Alignment.Center)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.08f)),
+                contentAlignment = Alignment.Center
             ) {
-                Text(text = badge, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Text(text = decorEmoji, fontSize = 60.sp)
             }
 
-            Column(
-                modifier = Modifier.align(Alignment.Center),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(text = decorEmoji, fontSize = 52.sp)
-            }
-
+            // Bottom Section with Title, Subtitle, and CTA Button
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -1539,16 +1806,31 @@ private fun LudoClubProceduralCard(
                 Text(
                     text = title,
                     color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Black,
                     textAlign = TextAlign.Center
                 )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    color = Color.White.copy(alpha = 0.85f),
+                    color = Color.White.copy(alpha = 0.9f),
                     fontSize = 11.sp,
                     textAlign = TextAlign.Center
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF00E676))
+                        .padding(horizontal = 20.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = "START GAME ▶",
+                        color = Color(0xFF071738),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
             }
         }
     }

@@ -272,7 +272,12 @@ private fun MissionCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (mission.rewardCoins > 0) {
-                        RewardPill("🪙 ${mission.rewardCoins / 1000}K", Color(0xFFFFD54F))
+                        val coinsText = if (mission.rewardCoins >= 1000L && mission.rewardCoins % 1000L == 0L) {
+                            "🪙 ${mission.rewardCoins / 1000L}K"
+                        } else {
+                            "🪙 ${mission.rewardCoins}"
+                        }
+                        RewardPill(coinsText, Color(0xFFFFD54F))
                     }
                     if (mission.rewardGems > 0) {
                         RewardPill("💎 ${mission.rewardGems}", Color(0xFF00E5FF))
@@ -282,7 +287,7 @@ private fun MissionCard(
                     }
                 }
 
-                // Claim Button
+                // Claim Button with clear verification status
                 Button(
                     onClick = onClaim,
                     enabled = mission.isCompleted && !mission.isClaimed,
@@ -297,10 +302,10 @@ private fun MissionCard(
                     Text(
                         text = when {
                             mission.isClaimed -> "Claimed ✓"
-                            mission.isCompleted -> "CLAIM 🎁"
-                            else -> "In Progress"
+                            mission.isCompleted -> "CLAIM REWARD 🎁"
+                            else -> "In Progress (${mission.currentProgress}/${mission.targetProgress})"
                         },
-                        color = Color.White,
+                        color = if (mission.isClaimed) Color.White.copy(alpha = 0.6f) else Color.White,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )

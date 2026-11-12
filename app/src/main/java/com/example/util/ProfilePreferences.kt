@@ -363,5 +363,69 @@ class ProfilePreferences(private val context: Context) {
             null
         }
     }
+
+    // ==========================================
+    // DAILY MISSIONS & REWARDS PERSISTENCE
+    // ==========================================
+
+    fun getMissionProgress(missionId: String): Int {
+        return prefs.getInt("pref_mission_prog_$missionId", 0)
+    }
+
+    fun setMissionProgress(missionId: String, progress: Int) {
+        prefs.edit().putInt("pref_mission_prog_$missionId", progress).apply()
+    }
+
+    fun isMissionClaimed(missionId: String): Boolean {
+        return prefs.getBoolean("pref_mission_claimed_$missionId", false)
+    }
+
+    fun setMissionClaimed(missionId: String, claimed: Boolean) {
+        prefs.edit().putBoolean("pref_mission_claimed_$missionId", claimed).apply()
+    }
+
+    fun getLastMissionResetDay(): Long {
+        return prefs.getLong("pref_last_mission_reset_day", 0L)
+    }
+
+    fun setLastMissionResetDay(day: Long) {
+        prefs.edit().putLong("pref_last_mission_reset_day", day).apply()
+    }
+
+    fun resetDailyMissions(missionIds: List<String>) {
+        val editor = prefs.edit()
+        for (id in missionIds) {
+            editor.putInt("pref_mission_prog_$id", 0)
+            editor.putBoolean("pref_mission_claimed_$id", false)
+        }
+        val currentDay = System.currentTimeMillis() / (1000L * 60L * 60L * 24L)
+        editor.putLong("pref_last_mission_reset_day", currentDay)
+        editor.apply()
+    }
+
+    // ==========================================
+    // STORE & INVENTORY ITEMS PERSISTENCE
+    // ==========================================
+
+    fun getOwnedItems(): Set<String> {
+        val defaults = setOf(
+            DEFAULT_DICE_SKIN,
+            DEFAULT_TOKEN_SKIN,
+            DEFAULT_BOARD_THEME,
+            DEFAULT_CROWN_AVATAR
+        )
+        val saved = prefs.getStringSet("pref_owned_inventory_items", emptySet()) ?: emptySet()
+        return defaults + saved
+    }
+
+    fun addOwnedItem(itemId: String) {
+        val current = getOwnedItems().toMutableSet()
+        current.add(itemId)
+        prefs.edit().putStringSet("pref_owned_inventory_items", current).apply()
+    }
+
+    fun isItemOwned(itemId: String): Boolean {
+        return getOwnedItems().contains(itemId)
+    }
 }
 

@@ -22,63 +22,57 @@ data class DailyMission(
 
 val DEFAULT_DAILY_MISSIONS = listOf(
     DailyMission(
-        id = "quest_gold_pawns",
-        title = "Win 3 games with Gold Pawns",
-        description = "Command the royal yellow gold battalion to victory 3 times in battle",
-        icon = "🟡👑",
-        currentProgress = 0,
-        targetProgress = 3,
-        rewardCoins = 5000L,
-        rewardGems = 25,
-        rewardCosmeticId = "avatar_vikramaditya",
-        rewardCosmeticName = "Maharaja Vikramaditya Avatar 🤴"
-    ),
-    DailyMission(
-        id = "quest_capture_pawns",
-        title = "Capture 5 Opponent Pawns in Battle",
-        description = "Strike down 5 enemy pawns and send them back to their base",
-        icon = "⚔️💥",
-        currentProgress = 0,
-        targetProgress = 5,
-        rewardCoins = 3500L,
-        rewardGems = 15,
-        rewardCosmeticId = "avatar_rajput_king",
-        rewardCosmeticName = "Maharana Pratap Avatar ⚔️"
-    ),
-    DailyMission(
-        id = "quest_roll_sixes",
-        title = "Roll three 6s in Royal Court Matches",
-        description = "Summon royal luck by rolling lucky sixes during live games",
-        icon = "🎲✨",
-        currentProgress = 0,
-        targetProgress = 3,
-        rewardCoins = 2500L,
-        rewardGems = 10,
-        rewardCosmeticId = "crown_kohinoor_diamond",
-        rewardCosmeticName = "Kohinoor Diamond Diadem 💎"
-    ),
-    DailyMission(
-        id = "quest_online_matches",
-        title = "Complete 2 Online Multiplayer Matches",
-        description = "Compete with players across kingdoms in online rooms",
+        id = "task_win_online",
+        title = "Win 1 online match",
+        description = "Defeat royal opponents in an online multiplayer match",
         icon = "🌐🏆",
         currentProgress = 0,
-        targetProgress = 2,
-        rewardCoins = 4000L,
-        rewardGems = 20,
-        rewardCosmeticId = "avatar_ashoka",
-        rewardCosmeticName = "Samrat Ashoka Avatar 🦁"
+        targetProgress = 1,
+        rewardCoins = 100L,
+        rewardGems = 5,
+        rewardCosmeticId = "avatar_vikramaditya",
+        rewardCosmeticName = "Maharaja Vikramaditya 🤴"
     ),
     DailyMission(
-        id = "quest_home_run",
-        title = "Reach Home Palace with 4 Pawns",
-        description = "Guide all 4 royal pawns safely to the center finish triangle",
-        icon = "🏛️⭐",
+        id = "task_complete_matches",
+        title = "Complete 2 matches",
+        description = "Play and finish 2 full matches in any Ludo game mode",
+        icon = "⚔️🎮",
         currentProgress = 0,
-        targetProgress = 4,
-        rewardCoins = 6000L,
-        rewardGems = 30,
-        rewardCosmeticId = "avatar_rani_padmini",
-        rewardCosmeticName = "Rani Padmini Avatar 👸"
+        targetProgress = 2,
+        rewardCoins = 150L,
+        rewardGems = 10
+    ),
+    DailyMission(
+        id = "task_roll_dice",
+        title = "Roll the dice 10 times",
+        description = "Roll the royal dice 10 times across your battles",
+        icon = "🎲✨",
+        currentProgress = 0,
+        targetProgress = 10,
+        rewardCoins = 50L,
+        rewardGems = 5
+    ),
+    DailyMission(
+        id = "task_token_safety",
+        title = "Move a token to safety",
+        description = "Move your royal pawn onto a safe star cell or into the home runway",
+        icon = "⭐🛡️",
+        currentProgress = 0,
+        targetProgress = 1,
+        rewardCoins = 100L,
+        rewardGems = 5
+    ),
+    DailyMission(
+        id = "task_quick_match",
+        title = "Finish 1 quick match",
+        description = "Complete 1 lightning-fast Quick Rush match",
+        icon = "⚡🔥",
+        currentProgress = 0,
+        targetProgress = 1,
+        rewardCoins = 200L,
+        rewardGems = 15,
+        rewardCosmeticId = "crown_kohinoor_diamond",
+        rewardCosmeticName = "Kohinoor Diadem 💎"
     )
 )

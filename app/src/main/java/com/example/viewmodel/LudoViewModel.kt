@@ -211,6 +211,18 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         }
         val savedFavorites = profilePreferences.getFavoriteSongIds()
 
+        // Daily missions persistence & daily reset
+        val currentDay = System.currentTimeMillis() / (1000L * 60L * 60L * 24L)
+        val lastResetDay = profilePreferences.getLastMissionResetDay()
+        if (lastResetDay == 0L || currentDay > lastResetDay) {
+            profilePreferences.resetDailyMissions(com.example.model.DEFAULT_DAILY_MISSIONS.map { it.id })
+        }
+        val initialMissions = com.example.model.DEFAULT_DAILY_MISSIONS.map { mission ->
+            val prog = profilePreferences.getMissionProgress(mission.id)
+            val claimed = profilePreferences.isMissionClaimed(mission.id)
+            mission.copy(currentProgress = prog, isClaimed = claimed)
+        }
+
         _uiState.update {
             it.copy(
                 userCoins = savedCoins,
@@ -239,6 +251,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 musicRepeatMode = savedRepeatMode,
                 isMusicShuffleEnabled = profilePreferences.isMusicShuffleEnabled(),
                 favoriteSongIds = savedFavorites,
+                dailyMissions = initialMissions,
                 savedReplays = listOf(
                     com.example.model.MatchReplaySession(
                         id = "replay_royal_cup_01",
@@ -868,8 +881,9 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     fun updateMissionProgress(missionId: String, increment: Int = 1) {
         _uiState.update { s ->
             val updated = s.dailyMissions.map { m ->
-                if (m.id == missionId && !m.isCompleted) {
+                if (m.id == missionId && !m.isCompleted && !m.isClaimed) {
                     val newProgress = (m.currentProgress + increment).coerceAtMost(m.targetProgress)
+                    profilePreferences.setMissionProgress(missionId, newProgress)
                     m.copy(currentProgress = newProgress)
                 } else m
             }
@@ -878,24 +892,27 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun claimDailyMission(mission: com.example.model.DailyMission) {
-        soundAndHaptics.soundManager.playVictoryFanfare()
-        triggerCelebration(CelebrationType.MATCH_WON)
-        val newCoins = _uiState.value.userCoins + mission.rewardCoins
-        val newGems = _uiState.value.userGems + mission.rewardGems
+        val target = _uiState.value.dailyMissions.find { it.id == mission.id } ?: return
+        if (!target.isCompleted || target.isClaimed) return
+
+        profilePreferences.setMissionClaimed(target.id, true)
+        val newCoins = _uiState.value.userCoins + target.rewardCoins
+        val newGems = _uiState.value.userGems + target.rewardGems
         profilePreferences.setUserCoins(newCoins)
         profilePreferences.setUserGems(newGems)
 
-        val newAvatar = mission.rewardCosmeticId ?: _uiState.value.playerCrownAvatar
-        if (mission.rewardCosmeticId != null) {
+        val newAvatar = target.rewardCosmeticId ?: _uiState.value.playerCrownAvatar
+        if (target.rewardCosmeticId != null) {
             profilePreferences.setCrownAvatar(newAvatar)
+            profilePreferences.addOwnedItem(newAvatar)
         }
 
         _uiState.update { s ->
             val updatedMissions = s.dailyMissions.map {
-                if (it.id == mission.id) it.copy(isClaimed = true) else it
+                if (it.id == target.id) it.copy(isClaimed = true) else it
             }
             val updatedPlayers = s.players.map { p ->
-                if ((p.name == s.playerNickname || p.id == "p_0") && mission.rewardCosmeticId != null) {
+                if ((p.name == s.playerNickname || p.id == "p_0") && target.rewardCosmeticId != null) {
                     p.copy(avatar = newAvatar)
                 } else p
             }
@@ -905,16 +922,112 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 playerCrownAvatar = newAvatar,
                 players = updatedPlayers,
                 dailyMissions = updatedMissions,
-                bannerNotice = "🎉 Quest Completed: Claimed +🪙 ${mission.rewardCoins} & +💎 ${mission.rewardGems}!"
+                bannerNotice = "🎉 Quest Completed: Claimed +🪙 ${target.rewardCoins} & +💎 ${target.rewardGems}!"
             )
         }
+        soundAndHaptics.soundManager.playVictoryFanfare()
+        triggerCelebration(CelebrationType.MATCH_WON)
         showPopUpNotice(
             title = "📜 Royal Mission Claimed! 👑",
-            message = "Completed: ${mission.title}\nClaimed +🪙 ${mission.rewardCoins} Coins & +💎 ${mission.rewardGems} Gems" +
-                    if (mission.rewardCosmeticName != null) "\nUnlocked: ${mission.rewardCosmeticName}" else "",
+            message = "Completed: ${target.title}\nClaimed +🪙 ${target.rewardCoins} Coins & +💎 ${target.rewardGems} Gems" +
+                    if (target.rewardCosmeticName != null) "\nUnlocked: ${target.rewardCosmeticName}" else "",
             icon = "📜",
             type = "REWARD"
         )
+    }
+
+    fun buyDiceSkin(skin: com.example.model.DiceSkin) {
+        if (profilePreferences.isItemOwned(skin.id)) {
+            equipDiceSkin(skin.id)
+            return
+        }
+        if (_uiState.value.userCoins < skin.priceCoins) {
+            showPopUpNotice(
+                title = "🪙 Insufficient Coins",
+                message = "You need 🪙 ${skin.priceCoins} Coins to purchase ${skin.name}. Current balance: 🪙 ${_uiState.value.userCoins}.",
+                icon = "🪙",
+                type = "WARNING"
+            )
+            return
+        }
+        val newCoins = _uiState.value.userCoins - skin.priceCoins
+        profilePreferences.setUserCoins(newCoins)
+        profilePreferences.addOwnedItem(skin.id)
+        profilePreferences.setEquippedDiceSkin(skin.id)
+        _uiState.update {
+            it.copy(
+                userCoins = newCoins,
+                equippedDiceSkin = skin.id,
+                bannerNotice = "🎉 Acquired & Equipped ${skin.name} Dice!"
+            )
+        }
+        soundAndHaptics.soundManager.playVictoryFanfare()
+        showPopUpNotice(
+            title = "🎲 Dice Skin Unlocked!",
+            message = "Successfully purchased and equipped ${skin.name} (${skin.category})!",
+            icon = "🎲",
+            type = "REWARD"
+        )
+    }
+
+    fun equipDiceSkin(skinId: String) {
+        profilePreferences.setEquippedDiceSkin(skinId)
+        _uiState.update {
+            it.copy(
+                equippedDiceSkin = skinId,
+                bannerNotice = "🎲 Equipped Dice: $skinId"
+            )
+        }
+        soundAndHaptics.playDiceRoll()
+    }
+
+    fun buyTokenSkin(skin: com.example.model.TokenSkin) {
+        if (profilePreferences.isItemOwned(skin.id)) {
+            equipTokenSkin(skin.id)
+            return
+        }
+        if (_uiState.value.userCoins < skin.priceCoins) {
+            showPopUpNotice(
+                title = "🪙 Insufficient Coins",
+                message = "You need 🪙 ${skin.priceCoins} Coins to purchase ${skin.name}. Current balance: 🪙 ${_uiState.value.userCoins}.",
+                icon = "🪙",
+                type = "WARNING"
+            )
+            return
+        }
+        val newCoins = _uiState.value.userCoins - skin.priceCoins
+        profilePreferences.setUserCoins(newCoins)
+        profilePreferences.addOwnedItem(skin.id)
+        profilePreferences.setEquippedTokenSkin(skin.id)
+        _uiState.update {
+            it.copy(
+                userCoins = newCoins,
+                equippedPawnSkin = skin.id,
+                bannerNotice = "👑 Acquired & Equipped ${skin.name} Token!"
+            )
+        }
+        soundAndHaptics.soundManager.playVictoryFanfare()
+        showPopUpNotice(
+            title = "👑 Token Skin Unlocked!",
+            message = "Successfully purchased and equipped ${skin.name}!",
+            icon = "👑",
+            type = "REWARD"
+        )
+    }
+
+    fun equipTokenSkin(skinId: String) {
+        profilePreferences.setEquippedTokenSkin(skinId)
+        _uiState.update {
+            it.copy(
+                equippedPawnSkin = skinId,
+                bannerNotice = "👑 Equipped Token: $skinId"
+            )
+        }
+        soundAndHaptics.playPawnMove()
+    }
+
+    fun isItemOwned(itemId: String): Boolean {
+        return profilePreferences.isItemOwned(itemId)
     }
 
     fun claimDailyReward() {
@@ -1291,10 +1404,13 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
+            if (!currentPlayer.isAi) {
+                updateMissionProgress("task_roll_dice", 1)
+            }
+
             if (rollValue == 6) {
                 soundAndHaptics.playSixRolled()
                 triggerCelebration(CelebrationType.SIX_ROLLED)
-                updateMissionProgress("quest_roll_sixes", 1)
             }
 
             val updatedPawns = currentPlayer.pawns.map { pawn ->
@@ -1422,6 +1538,9 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             } else if (LudoEngine.isSafePosition(movedPawn.trackPosition) || movedPawn.state == PawnState.IN_HOME_STRETCH) {
                 // Landing on safe tile / star square / safe column
                 soundAndHaptics.playSafeTile()
+                if (!currentPlayer.isAi) {
+                    updateMissionProgress("task_token_safety", 1)
+                }
             }
 
             // Check if pawn reached home
@@ -1430,7 +1549,6 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 triggerCelebration(CelebrationType.PAWN_FINISHED)
                 bannerMsg = "👑 Royal Home! A pawn entered the center triangle! Bonus Turn!"
                 gaveExtraTurn = true
-                updateMissionProgress("quest_home_run", 1)
             }
 
             // Check if rolled 6
@@ -1451,9 +1569,14 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 triggerCelebration(CelebrationType.MATCH_WON)
                 profilePreferences.recordGameFinished(isWin = isHumanWin, captures = captures.size)
-                
-                if (updatedCurrentPlayer.color == com.example.model.LudoColor.YELLOW) {
-                    updateMissionProgress("quest_gold_pawns", 1)
+
+                // Track daily tasks on game finish
+                updateMissionProgress("task_complete_matches", 1)
+                if (isHumanWin && state.gameMode == GameMode.ONLINE_MULTIPLAYER) {
+                    updateMissionProgress("task_win_online", 1)
+                }
+                if (state.gameMode == GameMode.QUICK_RUSH || state.gameMode == GameMode.RUSH) {
+                    updateMissionProgress("task_quick_match", 1)
                 }
 
                 val matchWager = state.currentWager
@@ -2522,20 +2645,6 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     // Armory & Customizer (Dice, Tokens, Sound)
     fun toggleCustomizerShop(show: Boolean) {
         _uiState.update { it.copy(showCustomizerShopDialog = show) }
-    }
-
-    fun equipDiceSkin(skinId: String) {
-        profilePreferences.setEquippedDiceSkin(skinId)
-        val skinName = BUILT_IN_DICE_SKINS.firstOrNull { it.id == skinId }?.name ?: skinId
-        _uiState.update { it.copy(equippedDiceSkin = skinId, bannerNotice = "Equipped $skinName Dice!") }
-        soundAndHaptics.playButtonClick()
-    }
-
-    fun equipTokenSkin(skinId: String) {
-        profilePreferences.setEquippedTokenSkin(skinId)
-        val skinName = BUILT_IN_TOKEN_SKINS.firstOrNull { it.id == skinId }?.name ?: skinId
-        _uiState.update { it.copy(equippedPawnSkin = skinId, bannerNotice = "Equipped $skinName Token!") }
-        soundAndHaptics.playButtonClick()
     }
 
     fun equipSoundTheme(themeId: String) {

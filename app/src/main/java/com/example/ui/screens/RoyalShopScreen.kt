@@ -6,12 +6,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,6 +40,12 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.model.BUILT_IN_DICE_SKINS
+import com.example.model.BUILT_IN_TOKEN_SKINS
+import com.example.model.DiceSkin
+import com.example.model.TokenSkin
+import com.example.model.LudoColor
+import com.example.ui.components.Realistic3DDice
 import com.example.ui.components.RewardedAdDialog
 import com.example.ui.components.formatCompactCoins
 import com.example.ui.components.MgLudoRoyalBackground
@@ -45,17 +53,6 @@ import com.example.ui.theme.*
 import com.example.viewmodel.LudoUiState
 import com.example.viewmodel.LudoViewModel
 
-/**
- * RoyalShopScreen faithfully implements all 5 Store sections from Screenshots 7, 8, 9, 10, 11:
- * - Top header with Currency Counters (1.25M Coins, 72 Cash), Back arrow, and "SALE" banner
- * - Decorative Magical Book & Vines header
- * - 5 Tabs:
- *   1. Themes (Screenshot 7: Easter & Wiccap pawns, Neon, Garden, Ocean boards)
- *   2. Coins (Screenshot 10: 500 ad to 560M coins with Rupee prices and extra bonuses)
- *   3. Cash (Screenshot 9: 2 cash ad, 1000 cash VIP bunny, emoji pack 2, enchanted dice)
- *   4. Chests (Screenshot 11: Emerald Wealth special offer, Diamond, Emerald, Ruby chests)
- *   5. Passes & Ads (Screenshot 8: No Ads 30D/Life, Voice Passes 1D, 3D, 30D)
- */
 @Composable
 fun RoyalShopScreen(
     uiState: LudoUiState,
@@ -63,8 +60,8 @@ fun RoyalShopScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    var selectedTab by remember { mutableStateOf("Coins") }
-    val tabs = listOf("Coins", "Cash", "Themes", "Chests", "Passes")
+    var selectedTab by remember { mutableStateOf("Dice Shop") }
+    val tabs = listOf("Dice Shop", "Token Skins", "Coins", "Cash", "Themes", "Chests", "Passes")
 
     var showRewardedAdDialog by remember { mutableStateOf(false) }
     var adRewardType by remember { mutableStateOf("Coins") } // "Coins" or "Cash"
@@ -218,11 +215,12 @@ fun RoyalShopScreen(
                     }
                 }
 
-                // Tab Bar
-                TabRow(
-                    selectedTabIndex = tabs.indexOf(selectedTab),
+                // Scrollable Tab Bar
+                ScrollableTabRow(
+                    selectedTabIndex = tabs.indexOf(selectedTab).coerceAtLeast(0),
                     containerColor = Color(0xFF1E0A3A),
-                    contentColor = Color(0xFFFFD54F)
+                    contentColor = Color(0xFFFFD54F),
+                    edgePadding = 12.dp
                 ) {
                     tabs.forEach { tabName ->
                         Tab(
@@ -251,6 +249,30 @@ fun RoyalShopScreen(
             MgLudoRoyalBackground()
 
             when (selectedTab) {
+                // ==========================================
+                // 0. DICE SHOP (9 Categories)
+                // ==========================================
+                "Dice Shop" -> {
+                    DiceShopSection(
+                        equippedDiceSkinId = uiState.equippedDiceSkin,
+                        isItemOwned = { viewModel.isItemOwned(it) },
+                        onBuyDice = { viewModel.buyDiceSkin(it) },
+                        onEquipDice = { viewModel.equipDiceSkin(it) }
+                    )
+                }
+
+                // ==========================================
+                // 0B. TOKEN SKINS
+                // ==========================================
+                "Token Skins" -> {
+                    TokenSkinsSection(
+                        equippedTokenSkinId = uiState.equippedPawnSkin,
+                        isItemOwned = { viewModel.isItemOwned(it) },
+                        onBuyToken = { viewModel.buyTokenSkin(it) },
+                        onEquipToken = { viewModel.equipTokenSkin(it) }
+                    )
+                }
+
                 // ==========================================
                 // 1. COINS STORE (Screenshot 10)
                 // ==========================================
@@ -1373,6 +1395,466 @@ private fun StorePassCard(
                 contentAlignment = Alignment.Center
             ) {
                 Text(price, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black)
+            }
+        }
+    }
+}
+
+// ==========================================
+// 9-CATEGORY DICE SHOP COMPOSABLES
+// ==========================================
+
+@Composable
+private fun DiceShopSection(
+    equippedDiceSkinId: String,
+    isItemOwned: (String) -> Boolean,
+    onBuyDice: (DiceSkin) -> Unit,
+    onEquipDice: (String) -> Unit
+) {
+    val categories = listOf(
+        "All",
+        "Classic Dice",
+        "Neon Dice",
+        "Fire Dice",
+        "Ice Dice",
+        "Golden Dice",
+        "Diamond Dice",
+        "Cartoon Dice",
+        "Royal Dice",
+        "Animated Dice"
+    )
+    var selectedCategory by remember { mutableStateOf("All") }
+
+    val filteredDice = remember(selectedCategory) {
+        if (selectedCategory == "All") {
+            BUILT_IN_DICE_SKINS
+        } else {
+            BUILT_IN_DICE_SKINS.filter { it.category == selectedCategory }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        // Fair Dice & Category Filter Header
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF102852)),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFFD54F))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🎲", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            "ROYAL DICE VAULT",
+                            color = Color(0xFFFFD54F),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            "Provably Fair 1/6 Uniform Probability • 9 Unique Themes",
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF00C853))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text("FAIR RNG", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // Horizontal Category Filter Pills
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            categories.forEach { cat ->
+                val isSelected = selectedCategory == cat
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (isSelected) Color(0xFFFFB300) else Color(0xFF1E3A5F))
+                        .border(
+                            1.dp,
+                            if (isSelected) Color.White else Color(0xFF42A5F5).copy(alpha = 0.5f),
+                            RoundedCornerShape(16.dp)
+                        )
+                        .clickable { selectedCategory = cat }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = cat,
+                        color = if (isSelected) Color(0xFF0D1B2A) else Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        // Grid of Dice
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(bottom = 20.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(filteredDice, key = { it.id }) { dice ->
+                val isEquipped = equippedDiceSkinId == dice.id
+                val isOwned = dice.isDefault || isItemOwned(dice.id)
+
+                DiceSkinShopCard(
+                    dice = dice,
+                    isEquipped = isEquipped,
+                    isOwned = isOwned,
+                    onBuy = { onBuyDice(dice) },
+                    onEquip = { onEquipDice(dice.id) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiceSkinShopCard(
+    dice: DiceSkin,
+    isEquipped: Boolean,
+    isOwned: Boolean,
+    onBuy: () -> Unit,
+    onEquip: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(6.dp, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F2B56)),
+        border = androidx.compose.foundation.BorderStroke(
+            width = if (isEquipped) 2.dp else 1.dp,
+            color = if (isEquipped) Color(0xFF00E676) else Color(0xFFFFD54F).copy(alpha = 0.7f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Category Badge & Emoji
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFF071738))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(dice.category, color = Color(0xFFFFD54F), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Text(dice.iconEmoji, fontSize = 16.sp)
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // 3D Realistic Dice Preview
+            Box(
+                modifier = Modifier
+                    .size(68.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        Brush.radialGradient(
+                            listOf(Color(0xFF1E3A5F), Color(0xFF09172E))
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Realistic3DDice(
+                    diceValue = 6,
+                    isRolling = false,
+                    playerColor = LudoColor.YELLOW,
+                    isTurnActive = false,
+                    diceSize = 54.dp,
+                    diceSkinId = dice.id,
+                    onRollClick = {}
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Dice Name & Synopsis
+            Text(
+                text = dice.name,
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = dice.description,
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 9.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                modifier = Modifier.height(26.dp)
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Action Button: Equipped / Equip / Buy
+            when {
+                isEquipped -> {
+                    Button(
+                        onClick = {},
+                        enabled = false,
+                        colors = ButtonDefaults.buttonColors(
+                            disabledContainerColor = Color(0xFF00C853),
+                            disabledContentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(32.dp)
+                    ) {
+                        Text("EQUIPPED ✓", fontSize = 10.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+                isOwned -> {
+                    Button(
+                        onClick = onEquip,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFB300)),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(32.dp)
+                    ) {
+                        Text("EQUIP 🎲", color = Color(0xFF071738), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+                else -> {
+                    Button(
+                        onClick = onBuy,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676)),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(32.dp)
+                    ) {
+                        Text(
+                            text = if (dice.priceCoins == 0L) "FREE" else "🪙 ${formatCompactCoins(dice.priceCoins)}",
+                            color = Color(0xFF071738),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// TOKEN SKINS COMPOSABLES
+// ==========================================
+
+@Composable
+private fun TokenSkinsSection(
+    equippedTokenSkinId: String,
+    isItemOwned: (String) -> Boolean,
+    onBuyToken: (TokenSkin) -> Unit,
+    onEquipToken: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 10.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF102852)),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFFD54F))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("👑", fontSize = 24.sp)
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        "ROYAL TOKEN EMBLEMS",
+                        color = Color(0xFFFFD54F),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Text(
+                        "Command the Board with Custom Crown & Heraldic Tokens",
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontSize = 10.sp
+                    )
+                }
+            }
+        }
+
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(bottom = 20.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(BUILT_IN_TOKEN_SKINS, key = { it.id }) { token ->
+                val isEquipped = equippedTokenSkinId == token.id
+                val isOwned = token.isDefault || isItemOwned(token.id)
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(6.dp, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0F2B56)),
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = if (isEquipped) 2.dp else 1.dp,
+                        color = if (isEquipped) Color(0xFF00E676) else Color(0xFFFFD54F).copy(alpha = 0.7f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFFFF6F00))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(token.badgeTitle, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF071738))
+                                .border(2.dp, Color(0xFFFFD54F), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(token.symbolEmoji, fontSize = 32.sp)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = token.name,
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = token.description,
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 10.sp,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            modifier = Modifier.height(28.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        when {
+                            isEquipped -> {
+                                Button(
+                                    onClick = {},
+                                    enabled = false,
+                                    colors = ButtonDefaults.buttonColors(
+                                        disabledContainerColor = Color(0xFF00C853),
+                                        disabledContentColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(32.dp)
+                                ) {
+                                    Text("EQUIPPED ✓", fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                }
+                            }
+                            isOwned -> {
+                                Button(
+                                    onClick = { onEquipToken(token.id) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFB300)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(32.dp)
+                                ) {
+                                    Text("EQUIP 👑", color = Color(0xFF071738), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                }
+                            }
+                            else -> {
+                                Button(
+                                    onClick = { onBuyToken(token) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(32.dp)
+                                ) {
+                                    Text(
+                                        text = if (token.priceCoins == 0L) "FREE" else "🪙 ${formatCompactCoins(token.priceCoins)}",
+                                        color = Color(0xFF071738),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
