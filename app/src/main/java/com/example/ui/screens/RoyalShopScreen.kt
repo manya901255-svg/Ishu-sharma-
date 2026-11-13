@@ -253,11 +253,17 @@ fun RoyalShopScreen(
                 // 0. DICE SHOP (9 Categories)
                 // ==========================================
                 "Dice Shop" -> {
-                    DiceShopSection(
-                        equippedDiceSkinId = uiState.equippedDiceSkin,
-                        isItemOwned = { viewModel.isItemOwned(it) },
-                        onBuyDice = { viewModel.buyDiceSkin(it) },
-                        onEquipDice = { viewModel.equipDiceSkin(it) }
+                    PremiumDiceCatalogContent(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        onAddCoinsClick = {
+                            adRewardType = "Coins"
+                            showRewardedAdDialog = true
+                        },
+                        onOpenFullStore = {
+                            viewModel.navigateTo(com.example.viewmodel.AppScreen.PREMIUM_DICE_STORE)
+                        },
+                        showStandaloneBanner = false
                     )
                 }
 

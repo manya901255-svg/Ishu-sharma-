@@ -68,7 +68,8 @@ fun MaharajaLudoBoardView(
     onPawnClick: (Pawn) -> Unit,
     modifier: Modifier = Modifier,
     pawnCrownEmoji: String = "👑",
-    pawnSkinId: String = "crown_maharaja"
+    pawnSkinId: String = "crown_maharaja",
+    isPawnTrailEnabled: Boolean = true
 ) {
     // Shimmer animation for golden filigree accents
     val infiniteTransition = rememberInfiniteTransition(label = "maharajaBoardShimmer")
@@ -111,7 +112,7 @@ fun MaharajaLudoBoardView(
             )
             .padding(6.dp)
             .testTag("maharaja_ludo_board_view"),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.TopStart
     ) {
         val boardSize = maxWidth
         val cellSize = boardSize / 15f
@@ -448,9 +449,9 @@ fun MaharajaLudoBoardView(
                 }
             } else 0.dp to 0.dp
 
-            val pawnCenterLeft = (baseX * cellSize) + (cellSize / 2f) + stackOffsetX
-            val pawnCenterTop = (baseY * cellSize) + (cellSize / 2f) + stackOffsetY
-            val pawnRenderSize = if (pawn.state == PawnState.IN_BASE) 28.dp else 25.dp
+            val pawnCenterLeft = (cellSize * baseX) + (cellSize / 2f) + stackOffsetX
+            val pawnCenterTop = (cellSize * baseY) + (cellSize / 2f) + stackOffsetY
+            val pawnRenderSize = if (pawn.state == PawnState.IN_BASE) cellSize * 1.15f else cellSize * 0.98f
 
             Box(
                 modifier = Modifier
@@ -464,6 +465,7 @@ fun MaharajaLudoBoardView(
                     size = pawnRenderSize,
                     crownEmoji = pawnCrownEmoji,
                     pawnSkin = pawnSkinId,
+                    isTrailEnabled = isPawnTrailEnabled,
                     onClick = if (pawn.isMovable) { { onPawnClick(pawn) } } else null
                 )
             }
@@ -824,13 +826,15 @@ private fun DrawScope.drawMaharajaImperialStar(
     )
 }
 
+private enum class MaharajaArrowDirection { UP, DOWN, LEFT, RIGHT }
+
 /**
  * Draws an ornate directional arrow for runway entrances
  */
 private fun DrawScope.drawMaharajaArrow(
     center: Offset,
     size: Float,
-    direction: ArrowDirection,
+    direction: MaharajaArrowDirection,
     color: Color
 ) {
     val path = Path()
@@ -838,28 +842,28 @@ private fun DrawScope.drawMaharajaArrow(
     val tip = size * 0.6f
 
     when (direction) {
-        ArrowDirection.RIGHT -> {
+        MaharajaArrowDirection.RIGHT -> {
             path.moveTo(center.x + tip, center.y)
             path.lineTo(center.x - half, center.y - half)
             path.lineTo(center.x - half * 0.4f, center.y)
             path.lineTo(center.x - half, center.y + half)
             path.close()
         }
-        ArrowDirection.DOWN -> {
+        MaharajaArrowDirection.DOWN -> {
             path.moveTo(center.x, center.y + tip)
             path.lineTo(center.x - half, center.y - half)
             path.lineTo(center.x, center.y - half * 0.4f)
             path.lineTo(center.x + half, center.y - half)
             path.close()
         }
-        ArrowDirection.LEFT -> {
+        MaharajaArrowDirection.LEFT -> {
             path.moveTo(center.x - tip, center.y)
             path.lineTo(center.x + half, center.y - half)
             path.lineTo(center.x + half * 0.4f, center.y)
             path.lineTo(center.x + half, center.y + half)
             path.close()
         }
-        ArrowDirection.UP -> {
+        MaharajaArrowDirection.UP -> {
             path.moveTo(center.x, center.y - tip)
             path.lineTo(center.x - half, center.y + half)
             path.lineTo(center.x, center.y + half * 0.4f)

@@ -16,6 +16,17 @@ data class RegalBoardTheme(
 
 val REGAL_BOARD_THEMES = listOf(
     RegalBoardTheme(
+        id = "maharaja_palace",
+        name = "Maharaja Gold Durbar",
+        subtitle = "Carved teakwood, Makrana marble & 24K gold Durbar inlays",
+        outerFrameColor = Color(0xFF1B0C04),
+        borderColor = Color(0xFFFFD54F),
+        trackBgColor = Color(0xFFFBF7F0),
+        gridLineColor = Color(0xFFC5A059),
+        accentStarColor = Color(0xFFFFD54F),
+        previewGradient = listOf(Color(0xFFB71C1C), Color(0xFFFFB300))
+    ),
+    RegalBoardTheme(
         id = "imperial_navy",
         name = "Imperial Royal Navy",
         subtitle = "Classic deep sapphire court with golden trim",
@@ -102,6 +113,39 @@ val REGAL_BOARD_THEMES = listOf(
         gridLineColor = Color(0xFF80DEEA),
         accentStarColor = Color(0xFFFF4081),
         previewGradient = listOf(Color(0xFF006064), Color(0xFF00BCD4))
+    ),
+    RegalBoardTheme(
+        id = "board_luxor",
+        name = "Luxor Pharaoh Gold",
+        subtitle = "Ancient sandstone gold with royal lapis lazuli inlays",
+        outerFrameColor = Color(0xFF3E2723),
+        borderColor = Color(0xFFD4AF37),
+        trackBgColor = Color(0xFFFFF8E1),
+        gridLineColor = Color(0xFFD7CCC8),
+        accentStarColor = Color(0xFF00B0FF),
+        previewGradient = listOf(Color(0xFF5D4037), Color(0xFFD4AF37))
+    ),
+    RegalBoardTheme(
+        id = "board_campout",
+        name = "Midnight Campout Trail",
+        subtitle = "Evergreen pine forest illuminated by cozy campfire amber",
+        outerFrameColor = Color(0xFF1B3B2B),
+        borderColor = Color(0xFFFF8F00),
+        trackBgColor = Color(0xFFF1F8E9),
+        gridLineColor = Color(0xFFA5D6A7),
+        accentStarColor = Color(0xFFFF6D00),
+        previewGradient = listOf(Color(0xFF1B5E20), Color(0xFFFF8F00))
+    ),
+    RegalBoardTheme(
+        id = "board_fiesta",
+        name = "Royal Carnival Fiesta",
+        subtitle = "Vibrant marigold, magenta & turquoise festival celebration",
+        outerFrameColor = Color(0xFF6A1B9A),
+        borderColor = Color(0xFFFFC107),
+        trackBgColor = Color(0xFFFFF3E0),
+        gridLineColor = Color(0xFFF8BBD0),
+        accentStarColor = Color(0xFFE91E63),
+        previewGradient = listOf(Color(0xFFE91E63), Color(0xFFFFC107))
     )
 )
 

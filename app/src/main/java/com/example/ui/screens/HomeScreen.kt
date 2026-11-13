@@ -83,6 +83,7 @@ fun HomeScreen(
                 playerName = uiState.playerNickname,
                 crownAvatarId = uiState.playerCrownAvatar,
                 customPhotoUri = uiState.customProfilePhotoUri,
+                equippedFrameId = uiState.equippedFrameId,
                 level = uiState.playerLevel,
                 coins = uiState.userCoins,
                 gems = uiState.userGems,
@@ -600,7 +601,7 @@ fun HomeScreen(
         LudoClubBottomDock(
             currentScreen = uiState.currentScreen,
             onScreenSelected = { viewModel.navigateTo(it) },
-            onInventoryClick = { viewModel.navigateTo(AppScreen.SHOP) },
+            onInventoryClick = { viewModel.navigateTo(AppScreen.INVENTORY) },
             onFriendsClick = { viewModel.toggleFriendsDialog(true) },
             onClubClick = { showEventsDialog = true },
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -762,6 +763,9 @@ fun HomeScreen(
                 onResetDailyRewards = { viewModel.adminResetDailyRewards() },
                 onResetDailyMissions = { viewModel.adminResetDailyMissions() },
                 onClearReports = { viewModel.adminClearReports() },
+                diceCatalog = uiState.diceStoreUiState.catalog,
+                onSaveDice = { dice -> viewModel.adminSaveOrUpdateDice(dice) },
+                onDeleteDice = { diceId -> viewModel.adminDeleteDice(diceId) },
                 onDismiss = { viewModel.toggleAdminDashboard(false) }
             )
         }
@@ -950,6 +954,9 @@ fun HomeScreen(
                         viewModel.rewardUserForAd(coins = 1000L, gems = 0)
                     }
                 },
+                onAdSkippedOrFailed = {
+                    viewModel.recordAdSkippedOrFailed("home_ad_skip_${System.currentTimeMillis()}")
+                },
                 onDismiss = { showRewardedAdDialog = false }
             )
         }
@@ -1097,6 +1104,7 @@ private fun LudoClubTopHeader(
     playerName: String,
     crownAvatarId: String,
     customPhotoUri: String? = null,
+    equippedFrameId: String = "frame_royal_crest",
     level: Int,
     coins: Long,
     gems: Int,
@@ -1124,7 +1132,7 @@ private fun LudoClubTopHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Player Profile on Left (Square Avatar + Online Dot + Level Badge + Progress bar)
+            // Player Profile on Left (Framed Avatar + Online Dot + Level Badge + Progress bar)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -1132,24 +1140,32 @@ private fun LudoClubTopHeader(
                     .padding(2.dp)
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF0D2D68))
-                        .border(1.5.dp, RoyalGoldLight, RoundedCornerShape(10.dp)),
+                    modifier = Modifier.size(44.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (!customPhotoUri.isNullOrBlank()) {
-                        coil.compose.AsyncImage(
-                            model = customPhotoUri,
-                            contentDescription = "Custom Profile Photo",
+                    com.example.ui.components.FramedAvatarBox(
+                        frameId = equippedFrameId,
+                        size = 44.dp,
+                        shape = RoundedCornerShape(10.dp),
+                        showCornerBadge = true
+                    ) {
+                        Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .clip(RoundedCornerShape(9.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Text(getCrownAvatarEmoji(crownAvatarId), fontSize = 24.sp)
+                                .background(Color(0xFF0D2D68)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (!customPhotoUri.isNullOrBlank()) {
+                                coil.compose.AsyncImage(
+                                    model = customPhotoUri,
+                                    contentDescription = "Custom Profile Photo",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Text(getCrownAvatarEmoji(crownAvatarId), fontSize = 22.sp)
+                            }
+                        }
                     }
 
                     // Green online indicator dot
@@ -1876,7 +1892,7 @@ private fun LudoClubBottomDock(
             DockTabButton(
                 icon = "🎲",
                 label = "INVENTORY",
-                isSelected = false,
+                isSelected = currentScreen == AppScreen.INVENTORY,
                 hasBadge = true
             ) {
                 onInventoryClick()

@@ -37,7 +37,8 @@ import kotlinx.coroutines.delay
 fun RewardedAdDialog(
     rewardTitle: String = "1,000 Coins",
     onRewardEarned: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onAdSkippedOrFailed: () -> Unit = {}
 ) {
     var secondsRemaining by remember { mutableIntStateOf(5) }
     var isAdCompleted by remember { mutableStateOf(false) }
@@ -274,7 +275,10 @@ fun RewardedAdDialog(
                                     Text("KEEP WATCHING", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
                                 OutlinedButton(
-                                    onClick = onDismiss,
+                                    onClick = {
+                                        onAdSkippedOrFailed()
+                                        onDismiss()
+                                    },
                                     modifier = Modifier.weight(1f).height(34.dp)
                                 ) {
                                     Text("DISCARD", fontSize = 10.sp, color = Color(0xFFFF8A80))

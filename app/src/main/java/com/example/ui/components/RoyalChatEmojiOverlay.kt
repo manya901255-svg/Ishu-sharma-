@@ -94,6 +94,7 @@ fun RoyalChatEmojiDialog(
     onSendEmoji: (String) -> Unit,
     currentSenderName: String = "You",
     currentSenderColor: LudoColor = LudoColor.RED,
+    emojiDeckItemIds: List<String?> = emptyList(),
     onReportPlayerClick: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
@@ -508,85 +509,126 @@ fun RoyalChatEmojiDialog(
                     }
 
                     2 -> {
-                        // 3. Emojis & Stickers Grid
-                        Column(
+                        // 3. Emojis & Stickers Grid (Includes Player's Equipped 18-Slot Emoji Deck)
+                        val deckItems = remember(emojiDeckItemIds) {
+                            emojiDeckItemIds.mapNotNull { id -> id?.let { com.example.model.ItemCatalog.findById(it) } }
+                        }
+                        LazyColumn(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
                         ) {
-                            Text(
-                                text = "REGAL ANIMATED EMOJIS",
-                                color = RoyalGoldLight,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                REGAL_THEMED_EMOJIS.chunked(4).forEach { rowEmojis ->
-                                    Row(
+                            if (deckItems.isNotEmpty()) {
+                                item {
+                                    Text(
+                                        text = "MY EQUIPPED EMOJI DECK (${deckItems.size}/18)",
+                                        color = Color(0xFF00E5FF),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Column(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        rowEmojis.forEach { emoji ->
-                                            RegalEmojiButton(
-                                                emoji = emoji,
-                                                isRegal = true,
-                                                onClick = {
-                                                    onSendEmoji(emoji)
-                                                    selectedCategory = 0
+                                        deckItems.chunked(4).forEach { rowItems ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                rowItems.forEach { item ->
+                                                    RegalEmojiButton(
+                                                        emoji = item.iconEmoji,
+                                                        isRegal = true,
+                                                        onClick = {
+                                                            onSendEmoji(item.iconEmoji)
+                                                            selectedCategory = 0
+                                                        }
+                                                    )
                                                 }
-                                            )
+                                            }
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
+                            }
+
+                            item {
+                                Text(
+                                    text = "REGAL ANIMATED EMOJIS",
+                                    color = RoyalGoldLight,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    REGAL_THEMED_EMOJIS.chunked(4).forEach { rowEmojis ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            rowEmojis.forEach { emoji ->
+                                                RegalEmojiButton(
+                                                    emoji = emoji,
+                                                    isRegal = true,
+                                                    onClick = {
+                                                        onSendEmoji(emoji)
+                                                        selectedCategory = 0
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
-                            }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
 
-                            Text(
-                                text = "CLASSIC EXPRESSIONS",
-                                color = RoyalGoldLight,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "CLASSIC EXPRESSIONS",
+                                    color = RoyalGoldLight,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                CLASSIC_EXPRESSIVE_EMOJIS.take(4).forEach { emoji ->
-                                    RegalEmojiButton(
-                                        emoji = emoji,
-                                        isRegal = false,
-                                        onClick = {
-                                            onSendEmoji(emoji)
-                                            selectedCategory = 0
-                                        }
-                                    )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    CLASSIC_EXPRESSIVE_EMOJIS.take(4).forEach { emoji ->
+                                        RegalEmojiButton(
+                                            emoji = emoji,
+                                            isRegal = false,
+                                            onClick = {
+                                                onSendEmoji(emoji)
+                                                selectedCategory = 0
+                                            }
+                                        )
+                                    }
                                 }
-                            }
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                CLASSIC_EXPRESSIVE_EMOJIS.drop(4).take(4).forEach { emoji ->
-                                    RegalEmojiButton(
-                                        emoji = emoji,
-                                        isRegal = false,
-                                        onClick = {
-                                            onSendEmoji(emoji)
-                                            selectedCategory = 0
-                                        }
-                                    )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    CLASSIC_EXPRESSIVE_EMOJIS.drop(4).take(4).forEach { emoji ->
+                                        RegalEmojiButton(
+                                            emoji = emoji,
+                                            isRegal = false,
+                                            onClick = {
+                                                onSendEmoji(emoji)
+                                                selectedCategory = 0
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }

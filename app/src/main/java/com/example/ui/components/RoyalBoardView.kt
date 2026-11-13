@@ -57,6 +57,8 @@ fun RoyalBoardView(
     onPawnClick: (Pawn) -> Unit,
     pawnCrownEmoji: String = "👑",
     boardTheme: RegalBoardTheme,
+    pawnSkinId: String = "crown_maharaja",
+    isPawnTrailEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(
@@ -64,11 +66,11 @@ fun RoyalBoardView(
             .aspectRatio(1f)
             .shadow(16.dp, RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.White)
+            .background(boardTheme.outerFrameColor)
             .border(
                 width = 3.dp,
                 brush = Brush.linearGradient(
-                    listOf(Color(0xFFB0BEC5), Color(0xFF78909C), Color(0xFF455A64))
+                    listOf(boardTheme.borderColor, boardTheme.accentStarColor, boardTheme.borderColor)
                 ),
                 shape = RoundedCornerShape(16.dp)
             )
@@ -82,8 +84,8 @@ fun RoyalBoardView(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val cellPx = size.width / 15f
 
-            // Board Canvas Base Background (Clean Off-White)
-            drawRect(color = Color(0xFFFAFBFD))
+            // Board Canvas Base Background (Uses selected Board Theme track color)
+            drawRect(color = boardTheme.trackBgColor)
 
             // 1A. Four Classic Colored Home Quadrants (6x6 each)
             // Top-Left: Blue
@@ -196,7 +198,7 @@ fun RoyalBoardView(
             }
 
             // 1D. Crisp Classic Grid Lines over all 52 track cells + home runways
-            val gridBorderColor = Color(0xFF90A4AE)
+            val gridBorderColor = boardTheme.gridLineColor
             for (pos in StandardLudoBoardLayout.TRACK_COORDINATES) {
                 drawRect(
                     color = gridBorderColor,
@@ -357,7 +359,7 @@ fun RoyalBoardView(
             for ((sc, sr) in safeSquareCoords) {
                 val starCenterX = (sc + 0.5f) * cellPx
                 val starCenterY = (sr + 0.5f) * cellPx
-                drawStarIcon(starCenterX, starCenterY, cellPx * 0.35f, Color(0xFFFFB300), Color(0xFFE65100))
+                drawStarIcon(starCenterX, starCenterY, cellPx * 0.35f, boardTheme.accentStarColor, Color(0xFFE65100))
             }
         }
 
@@ -418,6 +420,8 @@ fun RoyalBoardView(
                 rowFloat = rowFloat,
                 cellSize = cellSize,
                 pawnCrownEmoji = pawnCrownEmoji,
+                pawnSkinId = pawnSkinId,
+                isTrailEnabled = isPawnTrailEnabled,
                 onPawnClick = onPawnClick
             )
         }
@@ -656,6 +660,8 @@ private fun ClassicLudoPawn(
     rowFloat: Float,
     cellSize: Dp,
     pawnCrownEmoji: String,
+    pawnSkinId: String = "crown_maharaja",
+    isTrailEnabled: Boolean = true,
     onPawnClick: (Pawn) -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pawnGlow")
@@ -672,6 +678,7 @@ private fun ClassicLudoPawn(
     val xOffset = cellSize * colFloat
     val yOffset = cellSize * rowFloat
     val pawnDiameter = cellSize * 0.90f
+    val catalogPawn = com.example.model.ItemCatalog.findById(pawnSkinId)
 
     Box(
         modifier = Modifier
@@ -679,6 +686,21 @@ private fun ClassicLudoPawn(
             .size(cellSize),
         contentAlignment = Alignment.Center
     ) {
+        // Movement Trail Glow on active board pawns when Trail is ON
+        if (isTrailEnabled && pawn.state != PawnState.IN_BASE) {
+            val trailTint = catalogPawn?.accentColor ?: pawn.color.light
+            Box(
+                modifier = Modifier
+                    .size(pawnDiameter * 1.12f)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            listOf(trailTint.copy(alpha = 0.55f), Color.Transparent)
+                        )
+                    )
+            )
+        }
+
         // Movable Turn Halo Glow
         if (pawn.isMovable) {
             Box(
@@ -728,7 +750,7 @@ private fun ClassicLudoPawn(
                 )
                 .border(
                     width = 1.8.dp,
-                    color = Color.White.copy(alpha = 0.85f),
+                    color = catalogPawn?.accentColor?.copy(alpha = 0.9f) ?: Color.White.copy(alpha = 0.85f),
                     shape = CircleShape
                 )
                 .clickable(enabled = pawn.isMovable) {
@@ -749,8 +771,13 @@ private fun ClassicLudoPawn(
             )
 
             // Inner Center Token Pin / Crown Emblem
+            val displayCrest = when {
+                catalogPawn != null && pawnSkinId != "crown_maharaja" -> catalogPawn.iconEmoji
+                pawnCrownEmoji.isNotBlank() && pawnCrownEmoji != "👑" -> pawnCrownEmoji
+                else -> "★"
+            }
             Text(
-                text = if (pawnCrownEmoji.isNotBlank() && pawnCrownEmoji != "👑") pawnCrownEmoji else "★",
+                text = displayCrest,
                 color = if (pawn.color == LudoColor.YELLOW) Color(0xFF5D4037) else Color.White,
                 fontSize = (cellSize.value * 0.42f).sp,
                 fontWeight = FontWeight.Black

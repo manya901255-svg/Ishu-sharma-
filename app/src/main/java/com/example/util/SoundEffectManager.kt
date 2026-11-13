@@ -186,6 +186,20 @@ class SoundEffectManager(private val context: Context) {
     }
 
     /**
+     * Plays an authentic custom acoustic sound effect tailored to a Premium Dice theme.
+     */
+    fun playDiceRollForTheme(soundEffect: com.example.model.DiceSoundEffect) {
+        if (!isGameActive) return
+        if (isHapticsEnabled) {
+            vibrateDiceRollPattern()
+        }
+        if (!isEnabled || volume <= 0.01f) return
+        playProceduralSound {
+            ProceduralAudioSynthesizer.generateThemedDiceRollPcm(soundEffect, volume)
+        }
+    }
+
+    /**
      * 2. MOVING PAWNS
      * Plays a crisp, satisfying wooden/stone pawn tap on the board square.
      * Supports pitch scaling based on movement progress (e.g. stepIndex 1 to 6)
@@ -719,6 +733,55 @@ class SoundEffectManager(private val context: Context) {
                 val masterEnv = (1.0 - (t / durationSec)).coerceIn(0.0, 1.0)
                 val finalVal = (signal * masterEnv * volume * 18000.0).toInt().coerceIn(-32767, 32767)
                 samples[i] = finalVal.toShort()
+            }
+            return samples
+        }
+
+        fun generateThemedDiceRollPcm(
+            soundEffect: com.example.model.DiceSoundEffect,
+            volume: Float
+        ): ShortArray {
+            val durationSec = 0.48f
+            val numSamples = (SAMPLE_RATE * durationSec).toInt()
+            val samples = ShortArray(numSamples)
+            val impactTimes = listOf(0.02f, 0.10f, 0.19f, 0.29f, 0.38f)
+
+            val (baseFreq, shimmerFreq, noiseAmt) = when (soundEffect) {
+                com.example.model.DiceSoundEffect.FIRE_CRACKLE -> Triple(280.0, 920.0, 0.45)
+                com.example.model.DiceSoundEffect.LION_ROAR -> Triple(135.0, 270.0, 0.35)
+                com.example.model.DiceSoundEffect.ICE_CHIME -> Triple(1180.0, 2360.0, 0.08)
+                com.example.model.DiceSoundEffect.CRYSTAL_CHIME,
+                com.example.model.DiceSoundEffect.SAPPHIRE_PRISM -> Triple(980.0, 1960.0, 0.10)
+                com.example.model.DiceSoundEffect.EMERALD_RESONANCE -> Triple(740.0, 1480.0, 0.12)
+                com.example.model.DiceSoundEffect.RUBY_BELL -> Triple(880.0, 1760.0, 0.12)
+                com.example.model.DiceSoundEffect.GOLDEN_CHIME,
+                com.example.model.DiceSoundEffect.GOLDEN_LEAF_CHIME -> Triple(1046.5, 1567.9, 0.10)
+                com.example.model.DiceSoundEffect.CARNIVAL_DRUM -> Triple(220.0, 440.0, 0.30)
+                com.example.model.DiceSoundEffect.BALLOON_POP -> Triple(620.0, 1240.0, 0.35)
+                com.example.model.DiceSoundEffect.CAT_CHIRP -> Triple(920.0, 1380.0, 0.12)
+                com.example.model.DiceSoundEffect.NATURE_BREEZE,
+                com.example.model.DiceSoundEffect.SUNSET_HARP -> Triple(659.2, 1318.5, 0.10)
+                com.example.model.DiceSoundEffect.DESERT_WIND -> Triple(310.0, 620.0, 0.32)
+                com.example.model.DiceSoundEffect.CITRUS_POP -> Triple(780.0, 1560.0, 0.18)
+                else -> Triple(410.0, 820.0, 0.22)
+            }
+
+            for (i in 0 until numSamples) {
+                val t = i.toFloat() / SAMPLE_RATE
+                var signal = 0.0
+                for (idx in impactTimes.indices) {
+                    val hitTime = impactTimes[idx]
+                    if (t >= hitTime) {
+                        val dt = t - hitTime
+                        val decay = exp(-dt * 32.0)
+                        val f = baseFreq * (1.0 + idx * 0.08)
+                        val tone = sin(2.0 * PI * f * dt) + 0.35 * sin(2.0 * PI * shimmerFreq * dt)
+                        val noise = (Random.nextDouble() * 2.0 - 1.0) * noiseAmt
+                        signal += (tone + noise) * decay * 0.5
+                    }
+                }
+                val masterEnv = (1.0 - (t / durationSec)).coerceIn(0.0, 1.0)
+                samples[i] = (signal * masterEnv * volume * 18500.0).toInt().coerceIn(-32767, 32767).toShort()
             }
             return samples
         }

@@ -54,7 +54,10 @@ fun PlayerCornerSlotPanel(
     modifier: Modifier = Modifier,
     floatingEmoji: String? = null,
     alignRight: Boolean = false,
-    diceSkinId: String = "dice_imperial_gold"
+    diceSkinId: String = "dice_imperial_gold",
+    diceItemOverride: com.example.model.PremiumDiceItem? = null,
+    equippedFrameId: String = "frame_royal_crest",
+    powerupCountLeft: Int = 15
 ) {
     if (player == null) return
 
@@ -93,7 +96,8 @@ fun PlayerCornerSlotPanel(
                 boardCount = boardCount,
                 homeCount = homeCount,
                 onProfileClick = onProfileClick,
-                floatingEmoji = floatingEmoji
+                floatingEmoji = floatingEmoji,
+                equippedFrameId = if (isHuman) equippedFrameId else "frame_royal_crest"
             )
 
             Spacer(modifier = Modifier.width(6.dp))
@@ -108,15 +112,16 @@ fun PlayerCornerSlotPanel(
                 consecutiveSixes = consecutiveSixes,
                 timeRemainingSec = timeRemainingSec,
                 diceSkinId = diceSkinId,
+                diceItemOverride = diceItemOverride,
                 onRollClick = onRollClick
             )
 
             if (isHuman) {
                 Spacer(modifier = Modifier.width(6.dp))
 
-                // Lightning Power-Up Card Widget (15 left, ⚡, 💵 2, ?)
+                // Lightning Power-Up Card Widget (X left, ⚡, 💵 2, ?)
                 LightningPowerUpCardWidget(
-                    countLeft = 15,
+                    countLeft = powerupCountLeft,
                     costCash = 2,
                     onClick = onLightningClick
                 )
@@ -132,6 +137,7 @@ fun PlayerCornerSlotPanel(
                 consecutiveSixes = consecutiveSixes,
                 timeRemainingSec = timeRemainingSec,
                 diceSkinId = diceSkinId,
+                diceItemOverride = diceItemOverride,
                 onRollClick = onRollClick
             )
 
@@ -148,7 +154,8 @@ fun PlayerCornerSlotPanel(
                 boardCount = boardCount,
                 homeCount = homeCount,
                 onProfileClick = onProfileClick,
-                floatingEmoji = floatingEmoji
+                floatingEmoji = floatingEmoji,
+                equippedFrameId = if (isHuman) equippedFrameId else "frame_royal_crest"
             )
         }
     }
@@ -166,7 +173,8 @@ private fun PlayerInfoBox(
     boardCount: Int,
     homeCount: Int,
     onProfileClick: () -> Unit,
-    floatingEmoji: String?
+    floatingEmoji: String?,
+    equippedFrameId: String = "frame_royal_crest"
 ) {
     Box(
         modifier = Modifier
@@ -211,28 +219,31 @@ private fun PlayerInfoBox(
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(player.color.dark)
-                        .border(1.5.dp, if (isActiveTurn) Color.White else player.color.light, RoundedCornerShape(10.dp)),
-                    contentAlignment = Alignment.Center
+                FramedAvatarBox(
+                    frameId = equippedFrameId,
+                    size = 40.dp,
+                    shape = RoundedCornerShape(10.dp),
+                    showCornerBadge = false
                 ) {
-                    if (!player.customPhotoUri.isNullOrBlank()) {
-                        coil.compose.AsyncImage(
-                            model = player.customPhotoUri,
-                            contentDescription = "Player photo",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(9.dp)),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                        )
-                    } else {
-                        Text(
-                            text = getCrownAvatarEmoji(player.avatar),
-                            fontSize = 20.sp
-                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(player.color.dark),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!player.customPhotoUri.isNullOrBlank()) {
+                            coil.compose.AsyncImage(
+                                model = player.customPhotoUri,
+                                contentDescription = "Player photo",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
+                        } else {
+                            Text(
+                                text = getCrownAvatarEmoji(player.avatar),
+                                fontSize = 18.sp
+                            )
+                        }
                     }
                 }
 
@@ -406,6 +417,7 @@ private fun CornerDiceWidget(
     consecutiveSixes: Int,
     timeRemainingSec: Int,
     diceSkinId: String = "dice_imperial_gold",
+    diceItemOverride: com.example.model.PremiumDiceItem? = null,
     onRollClick: () -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "dicePulse")
@@ -461,6 +473,7 @@ private fun CornerDiceWidget(
                 isTurnActive = isActiveTurn,
                 diceSize = 34.dp,
                 diceSkinId = diceSkinId,
+                diceItemOverride = diceItemOverride,
                 onRollClick = {
                     if (canRoll) {
                         onRollClick()

@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -44,6 +45,9 @@ fun RoyalAdminDashboardDialog(
     onResetDailyRewards: () -> Unit,
     onResetDailyMissions: () -> Unit,
     onClearReports: () -> Unit,
+    diceCatalog: List<com.example.model.PremiumDiceItem> = emptyList(),
+    onSaveDice: (com.example.model.PremiumDiceItem) -> Unit = {},
+    onDeleteDice: (String) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var enteredPin by remember { mutableStateOf("") }
@@ -223,25 +227,26 @@ fun RoyalAdminDashboardDialog(
                         }
                     }
                 } else {
-                    // Authenticated Chamber Tabs
+                    // Authenticated Chamber Tabs (horizontally scrollable for 5 tabs)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
                             .background(Color(0xFF102754))
+                            .horizontalScroll(rememberScrollState())
                             .padding(3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        val tabLabels = listOf("Economy 🪙", "Modes 🎮", "Safety 🛡️", "Telemetry 📊")
+                        val tabLabels = listOf("Economy 🪙", "Modes 🎮", "Safety 🛡️", "Telemetry 📊", "Dice Admin 🎲")
                         tabLabels.forEachIndexed { index, label ->
                             val isSelected = activeTab == index
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (isSelected) RoyalGold else Color.Transparent)
                                     .clickable { activeTab = index }
-                                    .padding(vertical = 6.dp),
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .testTag("admin_tab_$index"),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -457,6 +462,14 @@ fun RoyalAdminDashboardDialog(
                                     }
                                 }
                             }
+                            4 -> {
+                                // LIVE DICE STORE ADMIN EDITOR
+                                AdminDiceManagementPanel(
+                                    diceCatalog = diceCatalog,
+                                    onSaveDice = onSaveDice,
+                                    onDeleteDice = onDeleteDice
+                                )
+                            }
                         }
                     }
                 }
@@ -464,3 +477,385 @@ fun RoyalAdminDashboardDialog(
         }
     }
 }
+
+@Composable
+private fun AdminDiceManagementPanel(
+    diceCatalog: List<com.example.model.PremiumDiceItem>,
+    onSaveDice: (com.example.model.PremiumDiceItem) -> Unit,
+    onDeleteDice: (String) -> Unit
+) {
+    var selectedDiceId by remember { mutableStateOf<String?>(diceCatalog.firstOrNull()?.id) }
+    var isCreatingNew by remember { mutableStateOf(false) }
+
+    val activeSource = remember(selectedDiceId, diceCatalog, isCreatingNew) {
+        if (isCreatingNew) null
+        else diceCatalog.firstOrNull { it.id == selectedDiceId } ?: diceCatalog.firstOrNull()
+    }
+
+    var nameInput by remember(activeSource, isCreatingNew) {
+        mutableStateOf(activeSource?.name ?: "Maharaja Nebula Dice")
+    }
+    var coinPriceInput by remember(activeSource, isCreatingNew) {
+        mutableStateOf((activeSource?.coinPrice ?: 12000L).toString())
+    }
+    var inrPriceInput by remember(activeSource, isCreatingNew) {
+        mutableStateOf((activeSource?.inrPrice ?: 69).toString())
+    }
+    var benefitSummaryInput by remember(activeSource, isCreatingNew) {
+        mutableStateOf(activeSource?.benefits?.visualEffectSummary ?: "Cosmic purple vortex spin with golden sparks")
+    }
+    var selectedGroup by remember(activeSource, isCreatingNew) {
+        mutableStateOf(activeSource?.collectionGroup ?: com.example.model.DiceCollectionGroup.SPECIAL_THEMED)
+    }
+    var selectedRarity by remember(activeSource, isCreatingNew) {
+        mutableStateOf(activeSource?.rarity ?: com.example.model.DiceRarity.EPIC)
+    }
+    var selectedAvailability by remember(activeSource, isCreatingNew) {
+        mutableStateOf(activeSource?.availabilityType ?: com.example.model.DiceAvailabilityType.ALWAYS_AVAILABLE)
+    }
+    var selectedAnim by remember(activeSource, isCreatingNew) {
+        mutableStateOf(activeSource?.benefits?.animationStyle ?: com.example.model.DiceAnimationStyle.METEOR_SPIN)
+    }
+    var selectedParticle by remember(activeSource, isCreatingNew) {
+        mutableStateOf(activeSource?.benefits?.particleEffect ?: com.example.model.DiceParticleEffect.GOLD_SPARKLE)
+    }
+    var selectedSound by remember(activeSource, isCreatingNew) {
+        mutableStateOf(activeSource?.benefits?.soundEffect ?: com.example.model.DiceSoundEffect.GOLDEN_CHIME)
+    }
+    var canBuyCoins by remember(activeSource, isCreatingNew) {
+        mutableStateOf(activeSource?.canBuyWithCoins ?: true)
+    }
+    var canBuyInr by remember(activeSource, isCreatingNew) {
+        mutableStateOf(activeSource?.canBuyWithInr ?: true)
+    }
+    var isPublished by remember(activeSource, isCreatingNew) {
+        mutableStateOf(activeSource?.isPublished ?: true)
+    }
+    var isAvailable by remember(activeSource, isCreatingNew) {
+        mutableStateOf(activeSource?.isAvailable ?: true)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("admin_dice_management_panel"),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Live Dice Catalog (${diceCatalog.size})",
+                color = RoyalGold,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+            OutlinedButton(
+                onClick = { isCreatingNew = !isCreatingNew },
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.testTag("admin_new_dice_toggle")
+            ) {
+                Text(
+                    text = if (isCreatingNew) "Edit Existing" else "+ Add New Dice",
+                    color = Color(0xFF00E5FF),
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        if (!isCreatingNew && diceCatalog.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                diceCatalog.forEach { d ->
+                    val chosen = d.id == activeSource?.id
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (chosen) RoyalGold else Color(0xFF142952))
+                            .border(1.dp, if (chosen) Color.White else Color(0xFF284888), RoundedCornerShape(8.dp))
+                            .clickable { selectedDiceId = d.id }
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
+                            .testTag("admin_select_dice_${d.id}")
+                    ) {
+                        Text(
+                            text = "${d.iconEmoji} ${d.name}",
+                            color = if (chosen) Color.Black else Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        OutlinedTextField(
+            value = nameInput,
+            onValueChange = { nameInput = it },
+            label = { Text("Dice Name", color = Color(0xFF80D8FF), fontSize = 10.sp) },
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = RoyalGold,
+                unfocusedBorderColor = Color(0xFF3949AB)
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("admin_dice_name_input")
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = coinPriceInput,
+                onValueChange = { coinPriceInput = it.filter { ch -> ch.isDigit() } },
+                label = { Text("Coins", color = RoyalGold, fontSize = 10.sp) },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = RoyalGold,
+                    unfocusedBorderColor = Color(0xFF3949AB)
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("admin_dice_coin_input")
+            )
+            OutlinedTextField(
+                value = inrPriceInput,
+                onValueChange = { inrPriceInput = it.filter { ch -> ch.isDigit() } },
+                label = { Text("INR (₹)", color = Color(0xFF00E676), fontSize = 10.sp) },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = Color(0xFF00E676),
+                    unfocusedBorderColor = Color(0xFF3949AB)
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("admin_dice_inr_input")
+            )
+        }
+
+        OutlinedTextField(
+            value = benefitSummaryInput,
+            onValueChange = { benefitSummaryInput = it },
+            label = { Text("Fair Benefit / Effect Summary", color = Color(0xFF80D8FF), fontSize = 10.sp) },
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = RoyalGold,
+                unfocusedBorderColor = Color(0xFF3949AB)
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("admin_dice_benefit_input")
+        )
+
+        // Cycle selectors for Rarity, Group, Availability, Animation
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            AdminCycleChip(
+                label = "Rarity: ${selectedRarity.label}",
+                modifier = Modifier.weight(1f)
+            ) {
+                val values = com.example.model.DiceRarity.entries
+                selectedRarity = values[(values.indexOf(selectedRarity) + 1) % values.size]
+            }
+            AdminCycleChip(
+                label = "Group: ${selectedGroup.badge}",
+                modifier = Modifier.weight(1f)
+            ) {
+                val values = com.example.model.DiceCollectionGroup.entries
+                selectedGroup = values[(values.indexOf(selectedGroup) + 1) % values.size]
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            AdminCycleChip(
+                label = "Mode: ${selectedAvailability.label}",
+                modifier = Modifier.weight(1f)
+            ) {
+                val values = com.example.model.DiceAvailabilityType.entries
+                selectedAvailability = values[(values.indexOf(selectedAvailability) + 1) % values.size]
+            }
+            AdminCycleChip(
+                label = "Anim: ${selectedAnim.displayName}",
+                modifier = Modifier.weight(1f)
+            ) {
+                val values = com.example.model.DiceAnimationStyle.entries
+                selectedAnim = values[(values.indexOf(selectedAnim) + 1) % values.size]
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            AdminCycleChip(
+                label = "Particles: ${selectedParticle.displayName}",
+                modifier = Modifier.weight(1f)
+            ) {
+                val values = com.example.model.DiceParticleEffect.entries
+                selectedParticle = values[(values.indexOf(selectedParticle) + 1) % values.size]
+            }
+            AdminCycleChip(
+                label = "Sound: ${selectedSound.displayName}",
+                modifier = Modifier.weight(1f)
+            ) {
+                val values = com.example.model.DiceSoundEffect.entries
+                selectedSound = values[(values.indexOf(selectedSound) + 1) % values.size]
+            }
+        }
+
+        // Toggles: Coins / INR / Available / Published
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            AdminTogglePill("Coins", canBuyCoins, Modifier.weight(1f)) { canBuyCoins = !canBuyCoins }
+            AdminTogglePill("INR ₹", canBuyInr, Modifier.weight(1f)) { canBuyInr = !canBuyInr }
+            AdminTogglePill("Avail", isAvailable, Modifier.weight(1f)) { isAvailable = !isAvailable }
+            AdminTogglePill("Pub", isPublished, Modifier.weight(1f)) { isPublished = !isPublished }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = {
+                    val base = activeSource
+                    val cleanSlug = nameInput.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_').ifBlank { "custom" }
+                    val newId = if (isCreatingNew || base == null) "dice_admin_${cleanSlug}_${System.currentTimeMillis() % 10000}" else base.id
+                    val updatedItem = com.example.model.PremiumDiceItem(
+                        id = newId,
+                        name = nameInput.ifBlank { "Custom Dice" },
+                        description = base?.description ?: "Admin crafted custom royal dice",
+                        collectionGroup = selectedGroup,
+                        rarity = selectedRarity,
+                        coinPrice = coinPriceInput.toLongOrNull() ?: 0L,
+                        inrPrice = inrPriceInput.toIntOrNull() ?: 0,
+                        skuId = base?.skuId ?: "mg_$newId",
+                        canBuyWithCoins = canBuyCoins,
+                        canBuyWithInr = canBuyInr,
+                        isAvailable = isAvailable,
+                        availabilityType = selectedAvailability,
+                        eventEndTimeMillis = if (selectedAvailability == com.example.model.DiceAvailabilityType.LIMITED_TIME || selectedAvailability == com.example.model.DiceAvailabilityType.DAILY_OFFER) {
+                            (base?.eventEndTimeMillis ?: 0L).takeIf { it > System.currentTimeMillis() } ?: (System.currentTimeMillis() + 86400000L)
+                        } else 0L,
+                        challengeRequirementText = base?.challengeRequirementText.orEmpty(),
+                        challengeTargetCount = base?.challengeTargetCount ?: 0,
+                        benefits = com.example.model.DiceBenefits(
+                            animationStyle = selectedAnim,
+                            particleEffect = selectedParticle,
+                            soundEffect = selectedSound,
+                            visualEffectSummary = benefitSummaryInput,
+                            vipStatusLabel = if (selectedRarity == com.example.model.DiceRarity.VIP) "VIP Royal Member" else base?.benefits?.vipStatusLabel
+                        ),
+                        primaryColorHex = base?.primaryColorHex ?: 0xFF3F51B5,
+                        secondaryColorHex = base?.secondaryColorHex ?: 0xFF1A237E,
+                        accentColorHex = base?.accentColorHex ?: 0xFFFFD54F,
+                        pipColorHex = base?.pipColorHex ?: 0xFFFFFFFF,
+                        iconEmoji = base?.iconEmoji ?: "🎲",
+                        isStarterDefault = base?.isStarterDefault ?: false,
+                        isPublished = isPublished,
+                        sortOrder = base?.sortOrder ?: (diceCatalog.size + 1),
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    onSaveDice(updatedItem)
+                    selectedDiceId = updatedItem.id
+                    isCreatingNew = false
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C853)),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("admin_save_dice_button")
+            ) {
+                Text(
+                    text = if (isCreatingNew) "Create & Publish 🎲" else "Save Live Changes ✓",
+                    color = Color.White,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 11.sp
+                )
+            }
+
+            if (!isCreatingNew && activeSource != null && !activeSource.isStarterDefault) {
+                Button(
+                    onClick = {
+                        onDeleteDice(activeSource.id)
+                        selectedDiceId = diceCatalog.firstOrNull { it.id != activeSource.id }?.id
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD50000)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.testTag("admin_delete_dice_button")
+                ) {
+                    Text("Delete", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminCycleChip(
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFF142952))
+            .border(1.dp, Color(0xFF2E5499), RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = Color.White, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun AdminTogglePill(
+    label: String,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onToggle: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (enabled) Color(0xFF00695C) else Color(0xFF37474F))
+            .border(1.dp, if (enabled) Color(0xFF00E676) else Color.Gray, RoundedCornerShape(8.dp))
+            .clickable { onToggle() }
+            .padding(vertical = 5.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (enabled) "$label ✓" else "$label ✕",
+            color = Color.White,
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+

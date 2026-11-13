@@ -23,8 +23,63 @@ enum class AppScreen {
     GAME,
     LEADERBOARD,
     SHOP,
+    PREMIUM_DICE_STORE,
+    INVENTORY,
     PROFILE,
     TECH_BLUEPRINT
+}
+
+data class DiceStoreUiState(
+    val catalog: List<PremiumDiceItem> = PremiumDiceCatalog.buildDefaultSeedCatalog(),
+    val ownedDiceIds: Set<String> = setOf("dice_imperial_gold"),
+    val equippedDiceId: String = "dice_imperial_gold",
+    val pendingBillingDiceIds: Set<String> = emptySet(),
+    val eventRewards: Map<String, DiceEventRewardProgress> = emptyMap(),
+    val recentPurchaseHistory: List<String> = emptyList(),
+    val selectedGroup: String = "ALL", // ALL, CLASSIC_PREMIUM, VIP, SPECIAL_THEMED, DAILY_EVENT
+    val selectedRarity: DiceRarity? = null,
+    val searchQuery: String = "",
+    val selectedDetailDiceId: String? = null,
+    val isProcessingPurchase: Boolean = false,
+    val isBillingConnected: Boolean = false,
+    val purchaseSuccessDice: PremiumDiceItem? = null,
+    val insufficientCoinsDialogDice: PremiumDiceItem? = null,
+    val statusBanner: String? = null,
+    val errorMessage: String? = null
+) {
+    fun findDice(diceId: String): PremiumDiceItem? = catalog.firstOrNull { it.id == diceId }
+    fun isOwned(diceId: String): Boolean = diceId in ownedDiceIds
+    fun isPendingBilling(diceId: String): Boolean = diceId in pendingBillingDiceIds
+}
+
+data class InventoryUiState(
+    val playerId: String = com.example.util.ProfilePreferences.DEFAULT_PLAYER_ID,
+    val selectedCategory: InventoryCategory = InventoryCategory.DICE,
+    val searchQuery: String = "",
+    val selectedFilter: InventoryFilter = InventoryFilter.ALL,
+    val ownedItems: List<OwnedItems> = emptyList(),
+    val ownedItemIds: Set<String> = ItemCatalog.defaultOwnedItemIds(),
+    val equippedDiceId: String = "dice_imperial_gold",
+    val equippedFrameId: String = "frame_royal_crest",
+    val equippedBoardId: String = "imperial_navy",
+    val equippedPawnId: String = "crown_maharaja",
+    val isPawnTrailEnabled: Boolean = true,
+    val emojiDeckSlots: List<String?> = List(EmojiDeck.MAX_SLOTS) { null },
+    val activePowerups: List<ActivePowerups> = emptyList(),
+    val eventProgressMap: Map<String, EventProgress> = emptyMap(),
+    val isLoading: Boolean = false,
+    val isProcessingTransaction: Boolean = false,
+    val lastSuccessItem: InventoryItem? = null,
+    val lastSuccessMessage: String? = null,
+    val errorMessage: String? = null
+) {
+    fun getQuantity(itemId: String): Int = ownedItems.firstOrNull { it.itemId == itemId }?.quantity ?: 0
+    fun isOwned(itemId: String): Boolean = itemId in ownedItemIds
+    fun uniqueOwnedCountFor(category: InventoryCategory): Int {
+        val catIds = ItemCatalog.ALL_ITEMS.filter { it.category == category }.map { it.id }.toSet()
+        return ownedItemIds.count { it in catIds }
+    }
+    fun totalUniqueOwnedCount(): Int = ownedItemIds.size
 }
 
 data class LudoUiState(
@@ -76,18 +131,23 @@ data class LudoUiState(
     val equippedDiceSkin: String = "dice_imperial_gold",
     val equippedBoardSkin: String = "board_jaipur_marble",
     val equippedBoardTheme: String = "imperial_navy",
+    val equippedFrameId: String = "frame_royal_crest",
+    val isPawnTrailEnabled: Boolean = true,
     val activeCelebration: CelebrationType? = null,
     val playerNickname: String = "Ishu",
     val playerCrownAvatar: String = "crown_imperial_gold",
     val customProfilePhotoUri: String? = null,
     val playerTitle: String = "Maharaja",
     val playerLevel: Int = 18,
+    val playerXp: Int = 68,
     // Player Career Statistics
     val totalWins: Int = 28,
     val totalGamesPlayed: Int = 42,
     val totalCaptures: Int = 89,
     val winStreak: Int = 4,
     val equippedPawnCrownAvatar: String = "crown_imperial_gold",
+    val inventoryUiState: InventoryUiState = InventoryUiState(),
+    val diceStoreUiState: DiceStoreUiState = DiceStoreUiState(),
     // Audio & Atmosphere - Continuous Background Music Sequential Playlist (44 Songs)
     val isBgmEnabled: Boolean = true,
     val isSfxEnabled: Boolean = true,
@@ -169,6 +229,11 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     val indianMusicRepository = com.example.network.IndianMusicRepository()
     private val profilePreferences = com.example.util.ProfilePreferences(application)
     private val repository = com.example.data.LudoRepository(application)
+    val inventoryRepository = com.example.data.InventoryRepository(application)
+    val diceStoreRepository = com.example.data.DiceStoreRepository(application, inventoryRepository)
+    val playBillingManager = com.example.billing.PlayBillingManager(application) { sku ->
+        _uiState.value.diceStoreUiState.catalog.firstOrNull { it.skuId == sku }?.id
+    }
 
     private val _uiState = MutableStateFlow(LudoUiState())
     val uiState: StateFlow<LudoUiState> = _uiState.asStateFlow()
@@ -200,6 +265,8 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         val savedBoardTheme = profilePreferences.getBoardTheme()
         val savedDiceSkin = profilePreferences.getEquippedDiceSkin()
         val savedTokenSkin = profilePreferences.getEquippedTokenSkin()
+        val savedFrameId = profilePreferences.getEquippedFrameId()
+        val savedTrailEnabled = profilePreferences.isPawnTrailEnabled()
         val savedCoins = profilePreferences.getUserCoins()
         val savedGems = profilePreferences.getUserGems()
         val savedPhotoUri = profilePreferences.getCustomPhotoUri()
@@ -241,6 +308,8 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 equippedPawnSkin = savedTokenSkin,
                 equippedDiceSkin = savedDiceSkin,
                 equippedBoardTheme = savedBoardTheme,
+                equippedFrameId = savedFrameId,
+                isPawnTrailEnabled = savedTrailEnabled,
                 isBgmEnabled = bgmOn,
                 isSfxEnabled = sfxOn,
                 isHapticsEnabled = hapticsOn,
@@ -305,8 +374,19 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-        // Initialize Room Database persistence for Match History and Daily Rewards
+        // Initialize Room Database persistence for Inventory, Premium Dice Store, Match History and Daily Rewards
         viewModelScope.launch {
+            val invSnapshot = inventoryRepository.ensureInitialized(
+                playerId = profilePreferences.getCurrentPlayerId(),
+                initialCoins = savedCoins,
+                initialCash = savedGems
+            )
+            applyInventorySnapshot(invSnapshot)
+
+            val diceSnap = diceStoreRepository.ensureInitialized(profilePreferences.getCurrentPlayerId())
+            applyDiceStoreSnapshot(diceSnap)
+            playBillingManager.initialize(diceSnap.catalog.map { it.skuId }.filter { it.isNotBlank() })
+
             repository.initializeSampleHistoryIfEmpty()
             val rewardStatus = repository.getDailyRewardStatus()
             _uiState.update { it.copy(dailyRewardStatus = rewardStatus) }
@@ -456,6 +536,20 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             voiceChatManager.voiceChatNotification.collect { notif ->
                 _uiState.update { it.copy(voiceChatNotification = notif) }
+            }
+        }
+
+        // Observe Google Play Billing live connection and purchase updates
+        viewModelScope.launch {
+            playBillingManager.isConnected.collect { connected ->
+                _uiState.update {
+                    it.copy(diceStoreUiState = it.diceStoreUiState.copy(isBillingConnected = connected))
+                }
+            }
+        }
+        viewModelScope.launch {
+            playBillingManager.events.collect { event ->
+                handlePlayBillingEvent(event)
             }
         }
 
@@ -961,6 +1055,12 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 bannerNotice = "🎉 Acquired & Equipped ${skin.name} Dice!"
             )
         }
+        viewModelScope.launch {
+            inventoryRepository.syncWalletBalance(goldCoins = newCoins, cashNotes = _uiState.value.userGems)
+            inventoryRepository.grantItem(itemId = skin.id, source = "SHOP_PURCHASE")
+            val (_, snap) = inventoryRepository.equipItem(itemId = skin.id)
+            applyInventorySnapshot(snap)
+        }
         soundAndHaptics.soundManager.playVictoryFanfare()
         showPopUpNotice(
             title = "🎲 Dice Skin Unlocked!",
@@ -971,14 +1071,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun equipDiceSkin(skinId: String) {
-        profilePreferences.setEquippedDiceSkin(skinId)
-        _uiState.update {
-            it.copy(
-                equippedDiceSkin = skinId,
-                bannerNotice = "🎲 Equipped Dice: $skinId"
-            )
-        }
-        soundAndHaptics.playDiceRoll()
+        equipPremiumDice(skinId)
     }
 
     fun buyTokenSkin(skin: com.example.model.TokenSkin) {
@@ -1006,6 +1099,12 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 bannerNotice = "👑 Acquired & Equipped ${skin.name} Token!"
             )
         }
+        viewModelScope.launch {
+            inventoryRepository.syncWalletBalance(goldCoins = newCoins, cashNotes = _uiState.value.userGems)
+            inventoryRepository.grantItem(itemId = skin.id, source = "SHOP_PURCHASE")
+            val (_, snap) = inventoryRepository.equipItem(itemId = skin.id)
+            applyInventorySnapshot(snap)
+        }
         soundAndHaptics.soundManager.playVictoryFanfare()
         showPopUpNotice(
             title = "👑 Token Skin Unlocked!",
@@ -1023,11 +1122,15 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 bannerNotice = "👑 Equipped Token: $skinId"
             )
         }
+        viewModelScope.launch {
+            val (ok, snap) = inventoryRepository.equipItem(itemId = skinId)
+            if (ok) applyInventorySnapshot(snap)
+        }
         soundAndHaptics.playPawnMove()
     }
 
     fun isItemOwned(itemId: String): Boolean {
-        return profilePreferences.isItemOwned(itemId)
+        return _uiState.value.inventoryUiState.isOwned(itemId) || profilePreferences.isItemOwned(itemId)
     }
 
     fun claimDailyReward() {
@@ -1075,19 +1178,38 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun rewardUserForAd(coins: Long = 1000L, gems: Int = 0) {
-        soundAndHaptics.vibrateVictory()
-        soundAndHaptics.playCoinReward()
-        _uiState.update {
-            val newCoins = it.userCoins + coins
-            val newGems = it.userGems + gems
-            profilePreferences.setUserCoins(newCoins)
-            profilePreferences.setUserGems(newGems)
-            it.copy(
-                userCoins = newCoins,
-                userGems = newGems,
-                bannerNotice = "🎬 Ad Completed: +$coins Royal Coins added to your vault!"
+    fun rewardUserForAd(
+        coins: Long = 1000L,
+        gems: Int = 0,
+        adTransactionId: String = "ad_${UUID.randomUUID()}",
+        verified: Boolean = true,
+        targetProgressItemId: String? = "emoji_guy_crying"
+    ) {
+        if (!verified) {
+            _uiState.update {
+                it.copy(bannerNotice = "Ad skipped — no reward or progress granted.")
+            }
+            return
+        }
+        viewModelScope.launch {
+            val (result, snapshot) = inventoryRepository.recordVerifiedAdCompletion(
+                adTransactionId = adTransactionId,
+                verified = true,
+                coinsReward = coins,
+                cashReward = gems,
+                targetProgressItemId = targetProgressItemId
             )
+            applyInventorySnapshot(snapshot)
+            if (result is AdVerificationResult.Verified) {
+                soundAndHaptics.vibrateVictory()
+                soundAndHaptics.playCoinReward()
+                val unlockedText = if (result.unlockedItemIds.isNotEmpty()) {
+                    " Unlocked: ${result.unlockedItemIds.mapNotNull { ItemCatalog.findById(it)?.name }.joinToString()}"
+                } else ""
+                _uiState.update {
+                    it.copy(bannerNotice = "🎬 Ad Completed: +$coins Coins, +$gems Cash!$unlockedText")
+                }
+            }
         }
     }
 
@@ -1371,7 +1493,12 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 else -> rawRollValue
             }
             _uiState.update { it.copy(isRolling = true, currentDiceValue = rollValue, fairDiceProof = proof, activePowerUp = null) }
-            soundAndHaptics.playDiceRoll()
+            val equippedDice = state.diceStoreUiState.findDice(state.equippedDiceSkin)
+            if (equippedDice != null) {
+                soundAndHaptics.playDiceRoll(equippedDice.benefits.soundEffect)
+            } else {
+                soundAndHaptics.playDiceRoll()
+            }
 
             // Intermediate bounce 1 impact haptics
             delay(400)
@@ -1406,6 +1533,10 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
 
             if (!currentPlayer.isAi) {
                 updateMissionProgress("task_roll_dice", 1)
+                viewModelScope.launch {
+                    val (_, dSnap) = diceStoreRepository.incrementChallengeProgress(delta = 1)
+                    applyDiceStoreSnapshot(dSnap)
+                }
             }
 
             if (rollValue == 6) {
@@ -1639,9 +1770,23 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                     moves = updatedReplayMoves
                 )
 
+                val now = System.currentTimeMillis()
+                val activeXpBoost = _uiState.value.inventoryUiState.activePowerups.any {
+                    it.powerupType == "XP_BOOSTER" && it.isCurrentlyActive(now)
+                }
+                val activeRecoverShield = _uiState.value.inventoryUiState.activePowerups.any {
+                    it.powerupType == "RECOVER_COINS" && it.isCurrentlyActive(now)
+                }
+                val xpGain = (if (isHumanWin) 120 else 35) * (if (activeXpBoost) 2 else 1)
+                val recoveredCoins = if (!isHumanWin && activeRecoverShield && matchWager > 0) matchWager / 2 else 0L
+
                 _uiState.update { s ->
-                    val newCoins = if (isHumanWin) s.userCoins + coinWinnings else s.userCoins
-                    if (isHumanWin) {
+                    val newCoins = when {
+                        isHumanWin -> s.userCoins + coinWinnings
+                        recoveredCoins > 0L -> s.userCoins + recoveredCoins
+                        else -> s.userCoins
+                    }
+                    if (isHumanWin || recoveredCoins > 0L) {
                         profilePreferences.setUserCoins(newCoins)
                     }
                     s.copy(
@@ -1651,15 +1796,29 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                         showSpecialOfferDialog = triggerSpecialOffer,
                         onlineGamesPlayedCount = newOnlineCount,
                         wonChestBoxName = wonChest,
+                        playerXp = s.playerXp + xpGain,
                         totalWins = profilePreferences.getTotalWins(),
                         totalGamesPlayed = profilePreferences.getGamesPlayed(),
                         winStreak = profilePreferences.getWinStreak(),
                         totalCaptures = profilePreferences.getTotalCaptures(),
-                        bannerNotice = if (isHumanWin) "🏆 2X DOUBLE PRIZE! ${updatedCurrentPlayer.name} won +🪙 ${com.example.ui.components.formatCompactCoins(coinWinnings)} and received $wonChest!" else "Match concluded.",
+                        bannerNotice = when {
+                            isHumanWin -> "🏆 2X DOUBLE PRIZE! ${updatedCurrentPlayer.name} won +🪙 ${com.example.ui.components.formatCompactCoins(coinWinnings)} (+${xpGain} XP)!"
+                            recoveredCoins > 0L -> "🛡️ Recover Coins Shield activated! Recovered 🪙 ${com.example.ui.components.formatCompactCoins(recoveredCoins)}!"
+                            else -> "Match concluded. Earned +${xpGain} XP."
+                        },
                         userCoins = newCoins,
                         savedReplays = listOf(completedReplaySession) + s.savedReplays,
                         currentMatchReplayMoves = emptyList()
                     )
+                }
+                viewModelScope.launch {
+                    val current = _uiState.value
+                    val snap = inventoryRepository.syncWalletBalance(goldCoins = current.userCoins, cashNotes = current.userGems)
+                    applyInventorySnapshot(snap)
+                    if (!isHumanWin || isHumanWin) {
+                        val (_, evSnap) = inventoryRepository.incrementEventItemProgress(itemId = "emoji_squall", delta = 1)
+                        applyInventorySnapshot(evSnap)
+                    }
                 }
                 turnTimerJob?.cancel()
                 if (triggerSpecialOffer) {
@@ -1916,6 +2075,10 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 equippedBoardTheme = themeId,
                 bannerNotice = "Regal board theme updated to ${themeId.replace('_', ' ').replaceFirstChar { c -> c.uppercase() }}!"
             )
+        }
+        viewModelScope.launch {
+            val (ok, snap) = inventoryRepository.equipItem(itemId = themeId)
+            if (ok) applyInventorySnapshot(snap)
         }
     }
 
@@ -2671,9 +2834,804 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ========================================================
+    // ADVANCED INVENTORY SYSTEM ENGINE & GAMEPLAY INTEGRATION
+    // ========================================================
+
+    fun applyInventorySnapshot(snapshot: PlayerInventory) {
+        val currentPlayerId = profilePreferences.getCurrentPlayerId()
+        if (snapshot.playerId != currentPlayerId) return
+
+        val progressMap = snapshot.eventProgress.associateBy { it.eventOrItemId }
+        val ownedIds = snapshot.ownedItemIds
+        val equipped = snapshot.equippedItems
+
+        profilePreferences.setUserCoins(snapshot.currency.goldCoins)
+        profilePreferences.setUserGems(snapshot.currency.cashNotes)
+        profilePreferences.setEquippedDiceSkin(equipped.diceId)
+        profilePreferences.setEquippedFrameId(equipped.frameId)
+        profilePreferences.setBoardTheme(equipped.boardId)
+        profilePreferences.setEquippedTokenSkin(equipped.pawnId)
+        profilePreferences.setPawnTrailEnabled(equipped.pawnTrailEnabled)
+
+        _uiState.update { current ->
+            current.copy(
+                userCoins = snapshot.currency.goldCoins,
+                userGems = snapshot.currency.cashNotes,
+                equippedDiceSkin = equipped.diceId,
+                equippedFrameId = equipped.frameId,
+                equippedBoardTheme = equipped.boardId,
+                equippedPawnSkin = equipped.pawnId,
+                isPawnTrailEnabled = equipped.pawnTrailEnabled,
+                inventoryUiState = current.inventoryUiState.copy(
+                    playerId = snapshot.playerId,
+                    ownedItems = snapshot.ownedItems,
+                    ownedItemIds = ownedIds,
+                    equippedDiceId = equipped.diceId,
+                    equippedFrameId = equipped.frameId,
+                    equippedBoardId = equipped.boardId,
+                    equippedPawnId = equipped.pawnId,
+                    isPawnTrailEnabled = equipped.pawnTrailEnabled,
+                    emojiDeckSlots = snapshot.emojiDeck.slots,
+                    activePowerups = snapshot.activePowerups,
+                    eventProgressMap = progressMap,
+                    isLoading = false,
+                    isProcessingTransaction = false
+                )
+            )
+        }
+    }
+
+    fun selectInventoryCategory(category: InventoryCategory) {
+        soundAndHaptics.vibrateClick()
+        _uiState.update {
+            it.copy(
+                inventoryUiState = it.inventoryUiState.copy(
+                    selectedCategory = category,
+                    errorMessage = null
+                )
+            )
+        }
+    }
+
+    fun updateInventorySearch(query: String) {
+        _uiState.update {
+            it.copy(inventoryUiState = it.inventoryUiState.copy(searchQuery = query))
+        }
+    }
+
+    fun selectInventoryFilter(filter: InventoryFilter) {
+        soundAndHaptics.vibrateClick()
+        _uiState.update {
+            it.copy(inventoryUiState = it.inventoryUiState.copy(selectedFilter = filter))
+        }
+    }
+
+    suspend fun purchaseInventoryItemSync(itemId: String): PurchaseResult {
+        _uiState.update {
+            it.copy(inventoryUiState = it.inventoryUiState.copy(isProcessingTransaction = true, errorMessage = null))
+        }
+        val (result, snapshot) = inventoryRepository.purchaseItem(itemId = itemId)
+        applyInventorySnapshot(snapshot)
+
+        when (result) {
+            is PurchaseResult.Success -> {
+                soundAndHaptics.playCoinReward()
+                if (!result.item.isConsumable &&
+                    result.item.category in listOf(
+                        InventoryCategory.DICE,
+                        InventoryCategory.FRAME,
+                        InventoryCategory.BOARD,
+                        InventoryCategory.PAWN
+                    )
+                ) {
+                    val (_, equippedSnap) = inventoryRepository.equipItem(itemId = result.item.id)
+                    applyInventorySnapshot(equippedSnap)
+                }
+                _uiState.update {
+                    it.copy(
+                        inventoryUiState = it.inventoryUiState.copy(
+                            lastSuccessItem = result.item,
+                            lastSuccessMessage = "Unlocked ${result.item.name}!",
+                            isProcessingTransaction = false
+                        ),
+                        bannerNotice = "🎉 Purchased ${result.item.name}!"
+                    )
+                }
+            }
+            is PurchaseResult.AlreadyOwned -> {
+                _uiState.update {
+                    it.copy(
+                        inventoryUiState = it.inventoryUiState.copy(
+                            errorMessage = "${result.item.name} is already in your inventory.",
+                            isProcessingTransaction = false
+                        )
+                    )
+                }
+            }
+            is PurchaseResult.InsufficientBalance -> {
+                val label = if (result.currencyType == CurrencyType.COINS) "Gold Coins" else "Cash"
+                _uiState.update {
+                    it.copy(
+                        inventoryUiState = it.inventoryUiState.copy(
+                            errorMessage = "Insufficient $label! Need ${result.required}, available ${result.available}.",
+                            isProcessingTransaction = false
+                        )
+                    )
+                }
+            }
+            is PurchaseResult.RequirementNotMet -> {
+                _uiState.update {
+                    it.copy(
+                        inventoryUiState = it.inventoryUiState.copy(
+                            errorMessage = result.message,
+                            isProcessingTransaction = false
+                        )
+                    )
+                }
+            }
+            is PurchaseResult.EventExpired -> {
+                _uiState.update {
+                    it.copy(
+                        inventoryUiState = it.inventoryUiState.copy(
+                            errorMessage = "Event has ended (${result.eventId}).",
+                            isProcessingTransaction = false
+                        )
+                    )
+                }
+            }
+            is PurchaseResult.NotFound, is PurchaseResult.Error -> {
+                _uiState.update {
+                    it.copy(
+                        inventoryUiState = it.inventoryUiState.copy(
+                            errorMessage = "Transaction failed. Please try again.",
+                            isProcessingTransaction = false
+                        )
+                    )
+                }
+            }
+        }
+        return result
+    }
+
+    fun purchaseInventoryItem(itemId: String) {
+        viewModelScope.launch {
+            purchaseInventoryItemSync(itemId)
+        }
+    }
+
+    fun equipInventoryItem(itemId: String) {
+        soundAndHaptics.vibrateClick()
+        viewModelScope.launch {
+            val (ok, snapshot) = inventoryRepository.equipItem(itemId = itemId)
+            applyInventorySnapshot(snapshot)
+            if (ok) {
+                val itemName = ItemCatalog.findById(itemId)?.name ?: itemId
+                _uiState.update { it.copy(bannerNotice = "✅ Equipped $itemName!") }
+            }
+        }
+    }
+
+    fun unequipInventoryCategory(category: InventoryCategory) {
+        soundAndHaptics.vibrateClick()
+        viewModelScope.launch {
+            val snapshot = inventoryRepository.unequipCategory(category = category)
+            applyInventorySnapshot(snapshot)
+            _uiState.update { it.copy(bannerNotice = "Reset ${category.title} to default.") }
+        }
+    }
+
+    fun setPawnTrailEnabled(enabled: Boolean) {
+        soundAndHaptics.vibrateClick()
+        viewModelScope.launch {
+            val snapshot = inventoryRepository.setPawnTrailEnabled(enabled = enabled)
+            applyInventorySnapshot(snapshot)
+            _uiState.update {
+                it.copy(bannerNotice = if (enabled) "✨ Pawn Movement Trail ON" else "Pawn Movement Trail OFF")
+            }
+        }
+    }
+
+    fun assignEmojiToDeckSlot(slotIndex: Int, emojiItemId: String) {
+        soundAndHaptics.vibrateClick()
+        viewModelScope.launch {
+            val (ok, snapshot) = inventoryRepository.assignEmojiToDeckSlot(slotIndex = slotIndex, emojiItemId = emojiItemId)
+            applyInventorySnapshot(snapshot)
+            if (ok) {
+                val name = ItemCatalog.findById(emojiItemId)?.name ?: "Emoji"
+                _uiState.update { it.copy(bannerNotice = "😀 Assigned $name to Slot #${slotIndex + 1}!") }
+            } else {
+                _uiState.update {
+                    it.copy(inventoryUiState = it.inventoryUiState.copy(errorMessage = "Own this emoji first to equip it to your deck."))
+                }
+            }
+        }
+    }
+
+    fun removeEmojiFromDeckSlot(slotIndex: Int) {
+        soundAndHaptics.vibrateClick()
+        viewModelScope.launch {
+            val snapshot = inventoryRepository.removeEmojiFromDeckSlot(slotIndex = slotIndex)
+            applyInventorySnapshot(snapshot)
+        }
+    }
+
+    fun swapEmojiDeckSlots(fromSlot: Int, toSlot: Int) {
+        soundAndHaptics.vibrateClick()
+        viewModelScope.launch {
+            val snapshot = inventoryRepository.swapEmojiDeckSlots(fromSlot = fromSlot, toSlot = toSlot)
+            applyInventorySnapshot(snapshot)
+        }
+    }
+
+    suspend fun activateInventoryPowerupSync(itemId: String): PowerupActivationResult {
+        val (result, snapshot) = inventoryRepository.activatePowerup(itemId = itemId)
+        applyInventorySnapshot(snapshot)
+        when (result) {
+            is PowerupActivationResult.Activated -> {
+                soundAndHaptics.playCoinReward()
+                if (result.item.powerupEffectType == "EXTRA_POWERUP") {
+                    _uiState.update { it.copy(lightningCount = it.lightningCount + 2) }
+                } else if (result.item.powerupEffectType == "SEASON_PASS") {
+                    _uiState.update { it.copy(hasVoicePass = true, voicePassDaysRemaining = it.voicePassDaysRemaining + 7) }
+                }
+                _uiState.update {
+                    it.copy(
+                        inventoryUiState = it.inventoryUiState.copy(
+                            lastSuccessItem = result.item,
+                            lastSuccessMessage = "${result.item.name} Activated!",
+                            errorMessage = null
+                        ),
+                        bannerNotice = "🚀 ${result.item.name} Activated!"
+                    )
+                }
+            }
+            is PowerupActivationResult.OnCooldown -> {
+                _uiState.update {
+                    it.copy(
+                        inventoryUiState = it.inventoryUiState.copy(
+                            errorMessage = "Powerup on cooldown (${result.remainingSeconds}s left)."
+                        )
+                    )
+                }
+            }
+            is PowerupActivationResult.DailyLimitReached -> {
+                _uiState.update {
+                    it.copy(
+                        inventoryUiState = it.inventoryUiState.copy(
+                            errorMessage = "Daily activation limit (${result.limit}/day) reached."
+                        )
+                    )
+                }
+            }
+            is PowerupActivationResult.NotOwned -> {
+                _uiState.update {
+                    it.copy(
+                        inventoryUiState = it.inventoryUiState.copy(
+                            errorMessage = "Purchase more to activate this powerup."
+                        )
+                    )
+                }
+            }
+            is PowerupActivationResult.Error -> {
+                _uiState.update {
+                    it.copy(inventoryUiState = it.inventoryUiState.copy(errorMessage = result.message))
+                }
+            }
+        }
+        return result
+    }
+
+    fun activateInventoryPowerup(itemId: String) {
+        soundAndHaptics.vibrateClick()
+        viewModelScope.launch {
+            activateInventoryPowerupSync(itemId)
+        }
+    }
+
+    fun recordAdSkippedOrFailed(adTransactionId: String) {
+        viewModelScope.launch {
+            val (result, snapshot) = inventoryRepository.recordVerifiedAdCompletion(
+                adTransactionId = adTransactionId,
+                verified = false
+            )
+            applyInventorySnapshot(snapshot)
+            if (result is AdVerificationResult.NotVerified) {
+                _uiState.update {
+                    it.copy(
+                        bannerNotice = "Ad skipped — no coins or emoji progress awarded.",
+                        inventoryUiState = it.inventoryUiState.copy(
+                            errorMessage = "Watch the full ad to earn progress and rewards."
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    fun recordEventActionProgress(itemId: String, delta: Int = 1) {
+        viewModelScope.launch {
+            val (_, snapshot) = inventoryRepository.incrementEventItemProgress(itemId = itemId, delta = delta)
+            applyInventorySnapshot(snapshot)
+        }
+    }
+
+    fun dismissInventoryPurchaseSuccess() {
+        _uiState.update {
+            it.copy(
+                inventoryUiState = it.inventoryUiState.copy(
+                    lastSuccessItem = null,
+                    lastSuccessMessage = null
+                )
+            )
+        }
+    }
+
+    fun clearInventoryError() {
+        _uiState.update {
+            it.copy(inventoryUiState = it.inventoryUiState.copy(errorMessage = null))
+        }
+    }
+
+    suspend fun switchPlayerAccountSync(playerId: String, defaultCoins: Long = 25000L, defaultCash: Int = 120): PlayerInventory {
+        profilePreferences.setCurrentPlayerId(playerId)
+        val snapshot = inventoryRepository.ensureInitialized(
+            playerId = playerId,
+            initialCoins = defaultCoins,
+            initialCash = defaultCash
+        )
+        applyInventorySnapshot(snapshot)
+        val diceSnap = diceStoreRepository.ensureInitialized(playerId)
+        applyDiceStoreSnapshot(diceSnap)
+        return snapshot
+    }
+
+    // ========================================================
+    // PREMIUM DICE STORE, PLAY BILLING & ADMIN ENGINE
+    // ========================================================
+
+    fun applyDiceStoreSnapshot(snapshot: DiceStoreSnapshot) {
+        val currentPlayerId = profilePreferences.getCurrentPlayerId()
+        if (snapshot.playerId != currentPlayerId) return
+
+        profilePreferences.setUserCoins(snapshot.goldCoins)
+        profilePreferences.setUserGems(snapshot.cashNotes)
+        profilePreferences.setEquippedDiceSkin(snapshot.equippedDiceId)
+
+        _uiState.update { current ->
+            val mergedOwnedIds = current.inventoryUiState.ownedItemIds + snapshot.ownedDiceIds
+            current.copy(
+                userCoins = snapshot.goldCoins,
+                userGems = snapshot.cashNotes,
+                equippedDiceSkin = snapshot.equippedDiceId,
+                inventoryUiState = current.inventoryUiState.copy(
+                    ownedItemIds = mergedOwnedIds,
+                    equippedDiceId = snapshot.equippedDiceId
+                ),
+                diceStoreUiState = current.diceStoreUiState.copy(
+                    catalog = snapshot.catalog,
+                    ownedDiceIds = snapshot.ownedDiceIds,
+                    equippedDiceId = snapshot.equippedDiceId,
+                    pendingBillingDiceIds = snapshot.pendingBillingDiceIds,
+                    eventRewards = snapshot.eventRewards,
+                    recentPurchaseHistory = snapshot.recentPurchaseHistory,
+                    isProcessingPurchase = false
+                )
+            )
+        }
+    }
+
+    fun selectDiceStoreGroup(groupKey: String) {
+        soundAndHaptics.vibrateClick()
+        _uiState.update {
+            it.copy(diceStoreUiState = it.diceStoreUiState.copy(selectedGroup = groupKey))
+        }
+    }
+
+    fun selectDiceStoreRarity(rarity: DiceRarity?) {
+        soundAndHaptics.vibrateClick()
+        _uiState.update {
+            it.copy(diceStoreUiState = it.diceStoreUiState.copy(selectedRarity = rarity))
+        }
+    }
+
+    fun updateDiceStoreSearch(query: String) {
+        _uiState.update {
+            it.copy(diceStoreUiState = it.diceStoreUiState.copy(searchQuery = query))
+        }
+    }
+
+    fun openDiceDetail(diceId: String) {
+        soundAndHaptics.vibrateClick()
+        _uiState.update {
+            it.copy(
+                diceStoreUiState = it.diceStoreUiState.copy(
+                    selectedDetailDiceId = diceId,
+                    errorMessage = null,
+                    insufficientCoinsDialogDice = null
+                )
+            )
+        }
+    }
+
+    fun dismissDiceDetail() {
+        _uiState.update {
+            it.copy(
+                diceStoreUiState = it.diceStoreUiState.copy(
+                    selectedDetailDiceId = null,
+                    insufficientCoinsDialogDice = null,
+                    purchaseSuccessDice = null,
+                    errorMessage = null
+                )
+            )
+        }
+    }
+
+    fun clearDiceStoreMessages() {
+        _uiState.update {
+            it.copy(
+                diceStoreUiState = it.diceStoreUiState.copy(
+                    errorMessage = null,
+                    statusBanner = null,
+                    purchaseSuccessDice = null,
+                    insufficientCoinsDialogDice = null
+                )
+            )
+        }
+    }
+
+    fun previewDiceSoundAndEffect(dice: PremiumDiceItem) {
+        soundAndHaptics.playDiceRoll(dice.benefits.soundEffect)
+    }
+
+    suspend fun purchasePremiumDiceWithCoinsSync(diceId: String): DiceCoinPurchaseResult {
+        _uiState.update {
+            it.copy(
+                diceStoreUiState = it.diceStoreUiState.copy(
+                    isProcessingPurchase = true,
+                    errorMessage = null,
+                    insufficientCoinsDialogDice = null
+                )
+            )
+        }
+        val (result, snap) = diceStoreRepository.purchaseDiceWithCoins(diceId = diceId)
+        applyDiceStoreSnapshot(snap)
+        val invSnap = inventoryRepository.getInventorySnapshot()
+        applyInventorySnapshot(invSnap)
+
+        when (result) {
+            is DiceCoinPurchaseResult.Success -> {
+                soundAndHaptics.playCoinReward()
+                val (_, eqSnap) = diceStoreRepository.equipDice(diceId = result.dice.id)
+                applyDiceStoreSnapshot(eqSnap)
+                _uiState.update {
+                    it.copy(
+                        diceStoreUiState = it.diceStoreUiState.copy(
+                            purchaseSuccessDice = result.dice,
+                            statusBanner = "Unlocked & Equipped ${result.dice.name}!",
+                            isProcessingPurchase = false
+                        ),
+                        bannerNotice = "🎲 Unlocked ${result.dice.name}!"
+                    )
+                }
+            }
+            is DiceCoinPurchaseResult.InsufficientCoins -> {
+                soundAndHaptics.playInvalidMove()
+                _uiState.update {
+                    it.copy(
+                        diceStoreUiState = it.diceStoreUiState.copy(
+                            insufficientCoinsDialogDice = result.dice,
+                            errorMessage = "Insufficient Coins! Need ${result.required}, you have ${result.available}.",
+                            isProcessingPurchase = false
+                        )
+                    )
+                }
+            }
+            is DiceCoinPurchaseResult.AlreadyOwned -> {
+                _uiState.update {
+                    it.copy(
+                        diceStoreUiState = it.diceStoreUiState.copy(
+                            statusBanner = "${result.dice.name} is already in your collection!",
+                            isProcessingPurchase = false
+                        )
+                    )
+                }
+            }
+            is DiceCoinPurchaseResult.Unavailable -> {
+                _uiState.update {
+                    it.copy(
+                        diceStoreUiState = it.diceStoreUiState.copy(
+                            errorMessage = result.reason,
+                            isProcessingPurchase = false
+                        )
+                    )
+                }
+            }
+            is DiceCoinPurchaseResult.Error -> {
+                _uiState.update {
+                    it.copy(
+                        diceStoreUiState = it.diceStoreUiState.copy(
+                            errorMessage = result.message,
+                            isProcessingPurchase = false
+                        )
+                    )
+                }
+            }
+        }
+        return result
+    }
+
+    fun purchasePremiumDiceWithCoins(diceId: String) {
+        viewModelScope.launch {
+            purchasePremiumDiceWithCoinsSync(diceId)
+        }
+    }
+
+    fun launchGooglePlayDicePurchase(activity: android.app.Activity?, dice: PremiumDiceItem) {
+        if (!dice.isPublished || !dice.isAvailable || !dice.canBuyWithInr || dice.inrPrice <= 0) {
+            _uiState.update {
+                it.copy(diceStoreUiState = it.diceStoreUiState.copy(errorMessage = "${dice.name} is not enabled for INR billing."))
+            }
+            return
+        }
+        _uiState.update {
+            it.copy(
+                diceStoreUiState = it.diceStoreUiState.copy(
+                    isProcessingPurchase = true,
+                    errorMessage = null,
+                    statusBanner = "Connecting to Google Play Billing for ${dice.name} (₹${dice.inrPrice})..."
+                )
+            )
+        }
+        playBillingManager.launchDicePurchaseFlow(
+            activity = activity,
+            skuId = dice.skuId,
+            diceId = dice.id,
+            expectedInrAmount = dice.inrPrice,
+            obfuscatedPlayerId = profilePreferences.getCurrentPlayerId()
+        )
+    }
+
+    fun requestPlayBillingRestore() {
+        soundAndHaptics.vibrateClick()
+        playBillingManager.queryExistingPurchases()
+        viewModelScope.launch {
+            val (count, snap) = diceStoreRepository.restorePurchases(playPurchases = emptyList())
+            applyDiceStoreSnapshot(snap)
+            _uiState.update {
+                it.copy(
+                    diceStoreUiState = it.diceStoreUiState.copy(
+                        statusBanner = if (count > 0) "Restored $count verified dice purchase(s)!" else "Verified purchases synced with your account."
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun processVerifiedBillingPayloadSync(payload: BillingVerificationPayload): DiceBillingResult {
+        val (result, snap) = diceStoreRepository.verifyAndProcessBillingPurchase(payload = payload)
+        applyDiceStoreSnapshot(snap)
+        val invSnap = inventoryRepository.getInventorySnapshot()
+        applyInventorySnapshot(invSnap)
+
+        when (result) {
+            is DiceBillingResult.VerifiedGranted -> {
+                playBillingManager.acknowledgePurchase(result.purchaseToken)
+                soundAndHaptics.playVictory()
+                val (_, eqSnap) = diceStoreRepository.equipDice(diceId = result.dice.id)
+                applyDiceStoreSnapshot(eqSnap)
+                _uiState.update {
+                    it.copy(
+                        diceStoreUiState = it.diceStoreUiState.copy(
+                            purchaseSuccessDice = result.dice,
+                            statusBanner = "Google Play verified! ${result.dice.name} unlocked.",
+                            isProcessingPurchase = false
+                        )
+                    )
+                }
+            }
+            is DiceBillingResult.Pending -> {
+                _uiState.update {
+                    it.copy(
+                        diceStoreUiState = it.diceStoreUiState.copy(
+                            statusBanner = "Payment pending verification for ${result.dice.name}. Dice will unlock once Play confirms.",
+                            isProcessingPurchase = false
+                        )
+                    )
+                }
+            }
+            is DiceBillingResult.DuplicateTokenRejected -> {
+                _uiState.update {
+                    it.copy(
+                        diceStoreUiState = it.diceStoreUiState.copy(
+                            errorMessage = "Duplicate purchase token rejected.",
+                            isProcessingPurchase = false
+                        )
+                    )
+                }
+            }
+            is DiceBillingResult.RefundedRevoked -> {
+                _uiState.update {
+                    it.copy(
+                        diceStoreUiState = it.diceStoreUiState.copy(
+                            statusBanner = "Refund processed: dice entitlement revoked.",
+                            isProcessingPurchase = false
+                        )
+                    )
+                }
+            }
+            is DiceBillingResult.Cancelled -> {
+                _uiState.update {
+                    it.copy(
+                        diceStoreUiState = it.diceStoreUiState.copy(
+                            statusBanner = "Google Play checkout cancelled. No charge made.",
+                            isProcessingPurchase = false
+                        )
+                    )
+                }
+            }
+            is DiceBillingResult.Failed -> {
+                _uiState.update {
+                    it.copy(
+                        diceStoreUiState = it.diceStoreUiState.copy(
+                            errorMessage = result.reason,
+                            isProcessingPurchase = false
+                        )
+                    )
+                }
+            }
+        }
+        return result
+    }
+
+    private fun handlePlayBillingEvent(event: com.example.billing.BillingClientEvent) {
+        viewModelScope.launch {
+            when (event) {
+                is com.example.billing.BillingClientEvent.PurchaseUpdated -> {
+                    event.payloads.forEach { payload ->
+                        processVerifiedBillingPayloadSync(payload)
+                    }
+                }
+                is com.example.billing.BillingClientEvent.RestoredPurchases -> {
+                    val (count, snap) = diceStoreRepository.restorePurchases(playPurchases = event.payloads)
+                    applyDiceStoreSnapshot(snap)
+                    if (count > 0) {
+                        _uiState.update {
+                            it.copy(diceStoreUiState = it.diceStoreUiState.copy(statusBanner = "Restored $count Google Play dice purchase(s)."))
+                        }
+                    }
+                }
+                is com.example.billing.BillingClientEvent.UserCancelled -> {
+                    _uiState.update {
+                        it.copy(
+                            diceStoreUiState = it.diceStoreUiState.copy(
+                                isProcessingPurchase = false,
+                                statusBanner = event.message
+                            )
+                        )
+                    }
+                }
+                is com.example.billing.BillingClientEvent.BillingError -> {
+                    _uiState.update {
+                        it.copy(
+                            diceStoreUiState = it.diceStoreUiState.copy(
+                                isProcessingPurchase = false,
+                                errorMessage = event.debugMessage.ifBlank { "Google Play Billing error (code ${event.responseCode})." }
+                            )
+                        )
+                    }
+                }
+                is com.example.billing.BillingClientEvent.ServiceUnavailable -> {
+                    _uiState.update {
+                        it.copy(
+                            diceStoreUiState = it.diceStoreUiState.copy(
+                                isProcessingPurchase = false,
+                                errorMessage = event.reason
+                            )
+                        )
+                    }
+                }
+                is com.example.billing.BillingClientEvent.ProductDetailsLoaded -> Unit
+            }
+        }
+    }
+
+    fun equipPremiumDice(diceId: String) {
+        soundAndHaptics.vibrateClick()
+        viewModelScope.launch {
+            val (ok, snap) = diceStoreRepository.equipDice(diceId = diceId)
+            applyDiceStoreSnapshot(snap)
+            val (_, invSnap) = inventoryRepository.equipItem(itemId = diceId)
+            applyInventorySnapshot(invSnap)
+            if (ok) {
+                val dice = snap.catalog.firstOrNull { it.id == diceId }
+                if (dice != null) {
+                    soundAndHaptics.playDiceRoll(dice.benefits.soundEffect)
+                }
+                _uiState.update {
+                    it.copy(
+                        bannerNotice = "🎲 Equipped ${dice?.name ?: diceId}!",
+                        diceStoreUiState = it.diceStoreUiState.copy(statusBanner = "Equipped ${dice?.name ?: diceId} for active matches!")
+                    )
+                }
+            }
+        }
+    }
+
+    fun unequipPremiumDice() {
+        soundAndHaptics.vibrateClick()
+        viewModelScope.launch {
+            val snap = diceStoreRepository.unequipDice()
+            applyDiceStoreSnapshot(snap)
+            val invSnap = inventoryRepository.unequipCategory(category = InventoryCategory.DICE)
+            applyInventorySnapshot(invSnap)
+            _uiState.update {
+                it.copy(
+                    bannerNotice = "Reverted to Starter Imperial Gold Dice",
+                    diceStoreUiState = it.diceStoreUiState.copy(statusBanner = "Reverted to Imperial Gold Dice.")
+                )
+            }
+        }
+    }
+
+    fun claimDiceChallengeReward(diceId: String) {
+        soundAndHaptics.vibrateClick()
+        viewModelScope.launch {
+            val (ok, snap) = diceStoreRepository.claimEventOrChallengeDice(diceId = diceId)
+            applyDiceStoreSnapshot(snap)
+            if (ok) {
+                soundAndHaptics.playCoinReward()
+                _uiState.update {
+                    it.copy(
+                        diceStoreUiState = it.diceStoreUiState.copy(
+                            statusBanner = "Challenge Complete! Claimed free dice!"
+                        )
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        diceStoreUiState = it.diceStoreUiState.copy(
+                            errorMessage = "Complete the challenge objective first to claim this dice!"
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    fun adminSaveOrUpdateDice(dice: PremiumDiceItem) {
+        viewModelScope.launch {
+            val snap = diceStoreRepository.adminSaveOrUpdateDice(dice)
+            applyDiceStoreSnapshot(snap)
+            _uiState.update {
+                it.copy(
+                    bannerNotice = "🛡️ Admin updated dice: ${dice.name}",
+                    diceStoreUiState = it.diceStoreUiState.copy(statusBanner = "Admin saved ${dice.name} to live store catalog!")
+                )
+            }
+            soundAndHaptics.playCoinReward()
+        }
+    }
+
+    fun adminDeleteDice(diceId: String) {
+        viewModelScope.launch {
+            val snap = diceStoreRepository.adminDeleteDice(diceId)
+            applyDiceStoreSnapshot(snap)
+            _uiState.update {
+                it.copy(
+                    bannerNotice = "🛡️ Removed dice $diceId from store",
+                    diceStoreUiState = it.diceStoreUiState.copy(statusBanner = "Removed dice $diceId from catalog.")
+                )
+            }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
+        playBillingManager.endConnection()
         soundAndHaptics.release()
     }
 }
+
 

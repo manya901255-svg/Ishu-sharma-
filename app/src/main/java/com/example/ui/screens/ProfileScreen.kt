@@ -287,29 +287,37 @@ fun ProfileScreen(
                                             modifier = Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            // Avatar DP with Level 19 Star Badge
+                                            // Avatar DP with Equipped Frame & Star Badge
                                             Box(
-                                                modifier = Modifier.size(76.dp),
+                                                modifier = Modifier
+                                                    .size(78.dp)
+                                                    .clickable { viewModel.toggleDynamicProfileDialog(true) }
+                                                    .testTag("profile_framed_avatar"),
                                                 contentAlignment = Alignment.BottomEnd
                                             ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(72.dp)
-                                                        .clip(RoundedCornerShape(16.dp))
-                                                        .background(Color(0xFF381559))
-                                                        .border(2.dp, Color.White, RoundedCornerShape(16.dp))
-                                                        .clickable { viewModel.toggleDynamicProfileDialog(true) },
-                                                    contentAlignment = Alignment.Center
+                                                com.example.ui.components.FramedAvatarBox(
+                                                    frameId = uiState.equippedFrameId,
+                                                    size = 76.dp,
+                                                    shape = RoundedCornerShape(16.dp),
+                                                    showCornerBadge = true,
+                                                    modifier = Modifier.align(Alignment.Center)
                                                 ) {
-                                                    if (uiState.customProfilePhotoUri != null) {
-                                                        AsyncImage(
-                                                            model = uiState.customProfilePhotoUri,
-                                                            contentDescription = "DP Photo",
-                                                            contentScale = ContentScale.Crop,
-                                                            modifier = Modifier.fillMaxSize()
-                                                        )
-                                                    } else {
-                                                        Text(getCrownAvatarEmoji(uiState.playerCrownAvatar), fontSize = 36.sp)
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxSize()
+                                                            .background(Color(0xFF381559)),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        if (uiState.customProfilePhotoUri != null) {
+                                                            AsyncImage(
+                                                                model = uiState.customProfilePhotoUri,
+                                                                contentDescription = "DP Photo",
+                                                                contentScale = ContentScale.Crop,
+                                                                modifier = Modifier.fillMaxSize()
+                                                            )
+                                                        } else {
+                                                            Text(getCrownAvatarEmoji(uiState.playerCrownAvatar), fontSize = 36.sp)
+                                                        }
                                                     }
                                                 }
 

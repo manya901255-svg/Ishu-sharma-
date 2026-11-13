@@ -90,6 +90,20 @@ class MainActivity : ComponentActivity() {
                                     onBack = { viewModel.navigateTo(AppScreen.HOME) }
                                 )
                             }
+                            AppScreen.PREMIUM_DICE_STORE -> {
+                                PremiumDiceStoreScreen(
+                                    uiState = uiState,
+                                    viewModel = viewModel,
+                                    onBack = { viewModel.navigateTo(AppScreen.SHOP) }
+                                )
+                            }
+                            AppScreen.INVENTORY -> {
+                                InventoryScreen(
+                                    uiState = uiState,
+                                    viewModel = viewModel,
+                                    onBack = { viewModel.navigateTo(AppScreen.HOME) }
+                                )
+                            }
                             AppScreen.PROFILE -> {
                                 ProfileScreen(
                                     uiState = uiState,

@@ -45,6 +45,7 @@ fun RoyalCrownPawn(
     size: Dp = 26.dp,
     crownEmoji: String? = null,
     pawnSkin: String = "crown_maharaja",
+    isTrailEnabled: Boolean = true,
     onClick: (() -> Unit)? = null
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pawnGlow")
@@ -88,6 +89,21 @@ fun RoyalCrownPawn(
             val w = this.size.width
             val h = this.size.height
             val cy = h * 0.46f + bounceOffset
+
+            // 0. Movement Trail Aura behind active/on-board pawns when enabled
+            if (isTrailEnabled && pawn.state != com.example.model.PawnState.IN_BASE) {
+                val skinCatalog = com.example.model.ItemCatalog.findById(pawnSkin)
+                val trailColor = skinCatalog?.accentColor ?: pawn.color.light
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(trailColor.copy(alpha = 0.45f), Color.Transparent),
+                        center = Offset(w * 0.5f, cy + h * 0.25f),
+                        radius = w * 0.52f
+                    ),
+                    radius = w * 0.52f,
+                    center = Offset(w * 0.5f, cy + h * 0.25f)
+                )
+            }
 
             // 1. Soft Oval Drop Shadow on ground
             drawOval(
@@ -190,11 +206,17 @@ fun RoyalCrownPawn(
 
         // 8. Custom Crown Avatar / Token Crest Topper (when equipped)
         val activeCrest = crownEmoji ?: when (pawnSkin) {
-            "token_lion_shield" -> "🛡️"
+            "token_lion_shield", "pawn_swatty" -> "🛡️"
             "token_lotus_gem" -> "🪷"
             "token_dragon_crest" -> "🐉"
             "token_star_emperor" -> "⭐"
-            else -> "👑"
+            "pawn_roasty" -> "🔥"
+            "pawn_kicko" -> "⚡"
+            "pawn_mambo" -> "💃"
+            "pawn_oakor" -> "🌿"
+            "pawn_rolf" -> "🐺"
+            "pawn_jack" -> "🃏"
+            else -> com.example.model.ItemCatalog.findById(pawnSkin)?.iconEmoji ?: "👑"
         }
         Text(
             text = activeCrest,

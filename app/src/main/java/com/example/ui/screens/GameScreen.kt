@@ -334,7 +334,10 @@ fun GameScreen(
                             onProfileClick = {},
                             floatingEmoji = if (uiState.activeFloatingEmoji?.first == topOpponent.name) uiState.activeFloatingEmoji?.second else null,
                             alignRight = false,
-                            diceSkinId = uiState.equippedDiceSkin
+                            diceSkinId = uiState.equippedDiceSkin,
+                            diceItemOverride = uiState.diceStoreUiState.findDice(uiState.equippedDiceSkin),
+                            equippedFrameId = "frame_royal_crest",
+                            powerupCountLeft = uiState.lightningCount
                         )
                     } else if (!isTwoPlayer && redPlayer != null) {
                         // 4-Player Top-Left: Red Player with individual dice
@@ -352,7 +355,10 @@ fun GameScreen(
                             onProfileClick = if (isRedHuman) { { viewModel.navigateTo(AppScreen.PROFILE) } } else { {} },
                             floatingEmoji = if (uiState.activeFloatingEmoji?.first == redPlayer.name) uiState.activeFloatingEmoji?.second else null,
                             alignRight = false,
-                            diceSkinId = uiState.equippedDiceSkin
+                            diceSkinId = uiState.equippedDiceSkin,
+                            diceItemOverride = uiState.diceStoreUiState.findDice(uiState.equippedDiceSkin),
+                            equippedFrameId = if (isRedHuman) uiState.equippedFrameId else "frame_royal_crest",
+                            powerupCountLeft = uiState.lightningCount
                         )
                     } else {
                         Spacer(modifier = Modifier.width(40.dp))
@@ -374,7 +380,10 @@ fun GameScreen(
                             onProfileClick = if (isGreenHuman) { { viewModel.navigateTo(AppScreen.PROFILE) } } else { {} },
                             floatingEmoji = if (uiState.activeFloatingEmoji?.first == greenPlayer.name) uiState.activeFloatingEmoji?.second else null,
                             alignRight = true,
-                            diceSkinId = uiState.equippedDiceSkin
+                            diceSkinId = uiState.equippedDiceSkin,
+                            diceItemOverride = uiState.diceStoreUiState.findDice(uiState.equippedDiceSkin),
+                            equippedFrameId = if (isGreenHuman) uiState.equippedFrameId else "frame_royal_crest",
+                            powerupCountLeft = uiState.lightningCount
                         )
                     }
                 }
@@ -446,15 +455,42 @@ fun GameScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     val equippedTokenSkin = BUILT_IN_TOKEN_SKINS.firstOrNull { it.id == uiState.equippedPawnSkin }
-                    val activeEmblem = equippedTokenSkin?.symbolEmoji ?: com.example.model.getPawnCrownEmoji(uiState.equippedPawnCrownAvatar)
-                    RoyalBoardView(
-                        players = uiState.players,
-                        onPawnClick = { pawn -> viewModel.onPawnClicked(pawn) },
-                        pawnCrownEmoji = activeEmblem,
-                        boardTheme = com.example.model.getBoardTheme(uiState.equippedBoardTheme),
-                        modifier = Modifier
-                            .fillMaxWidth(0.99f)
-                            .aspectRatio(1f)
+                    val invPawnSkin = ItemCatalog.findById(uiState.equippedPawnSkin)
+                    val activeEmblem = equippedTokenSkin?.symbolEmoji
+                        ?: invPawnSkin?.iconEmoji
+                        ?: com.example.model.getPawnCrownEmoji(uiState.equippedPawnCrownAvatar)
+                    if (uiState.equippedBoardTheme == "maharaja_palace") {
+                        MaharajaLudoBoardView(
+                            players = uiState.players,
+                            onPawnClick = { pawn -> viewModel.onPawnClicked(pawn) },
+                            pawnCrownEmoji = activeEmblem,
+                            pawnSkinId = uiState.equippedPawnSkin,
+                            isPawnTrailEnabled = uiState.isPawnTrailEnabled,
+                            modifier = Modifier
+                                .fillMaxWidth(0.99f)
+                                .aspectRatio(1f)
+                        )
+                    } else {
+                        RoyalBoardView(
+                            players = uiState.players,
+                            onPawnClick = { pawn -> viewModel.onPawnClicked(pawn) },
+                            pawnCrownEmoji = activeEmblem,
+                            boardTheme = com.example.model.getBoardTheme(uiState.equippedBoardTheme),
+                            pawnSkinId = uiState.equippedPawnSkin,
+                            isPawnTrailEnabled = uiState.isPawnTrailEnabled,
+                            modifier = Modifier
+                                .fillMaxWidth(0.99f)
+                                .aspectRatio(1f)
+                        )
+                    }
+
+                    com.example.ui.components.CenterCourt3DRollingOverlay(
+                        diceValue = uiState.currentDiceValue,
+                        isRolling = uiState.isRolling,
+                        playerColor = activeColor ?: LudoColor.YELLOW,
+                        diceSkinId = uiState.equippedDiceSkin,
+                        diceItemOverride = uiState.diceStoreUiState.findDice(uiState.equippedDiceSkin),
+                        modifier = Modifier.matchParentSize()
                     )
                 }
 
@@ -486,7 +522,10 @@ fun GameScreen(
                             onLightningClick = { viewModel.activatePowerUp("LIGHTNING") },
                             floatingEmoji = if (uiState.activeFloatingEmoji?.first == bottomUserPlayer.name) uiState.activeFloatingEmoji?.second else null,
                             alignRight = false,
-                            diceSkinId = uiState.equippedDiceSkin
+                            diceSkinId = uiState.equippedDiceSkin,
+                            diceItemOverride = uiState.diceStoreUiState.findDice(uiState.equippedDiceSkin),
+                            equippedFrameId = if (isBottomHuman) uiState.equippedFrameId else "frame_royal_crest",
+                            powerupCountLeft = uiState.lightningCount
                         )
                     }
 
@@ -506,7 +545,10 @@ fun GameScreen(
                             onProfileClick = if (isBlueHuman) { { viewModel.navigateTo(AppScreen.PROFILE) } } else { {} },
                             floatingEmoji = if (uiState.activeFloatingEmoji?.first == bluePlayer.name) uiState.activeFloatingEmoji?.second else null,
                             alignRight = true,
-                            diceSkinId = uiState.equippedDiceSkin
+                            diceSkinId = uiState.equippedDiceSkin,
+                            diceItemOverride = uiState.diceStoreUiState.findDice(uiState.equippedDiceSkin),
+                            equippedFrameId = if (isBlueHuman) uiState.equippedFrameId else "frame_royal_crest",
+                            powerupCountLeft = uiState.lightningCount
                         )
                     } else {
                         Spacer(modifier = Modifier.width(40.dp))
@@ -856,6 +898,7 @@ fun GameScreen(
                 onSendEmoji = { viewModel.sendRoyalEmoji(it) },
                 currentSenderName = currentSender?.name ?: "You",
                 currentSenderColor = currentSender?.color ?: com.example.model.LudoColor.RED,
+                emojiDeckItemIds = uiState.inventoryUiState.emojiDeckSlots,
                 onReportPlayerClick = {
                     val opponent = uiState.players.firstOrNull { it.id != humanPlayer?.id }
                     if (opponent != null) {

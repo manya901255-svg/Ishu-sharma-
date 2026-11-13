@@ -20,6 +20,10 @@ class SoundAndHaptics(context: Context) {
         soundEffectManager.playDiceRoll()
     }
 
+    fun playDiceRoll(soundEffect: com.example.model.DiceSoundEffect) {
+        soundEffectManager.playDiceRollForTheme(soundEffect)
+    }
+
     fun vibratePawnCapture() {
         soundEffectManager.playPawnCapture()
     }

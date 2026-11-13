@@ -10,9 +10,26 @@ import androidx.room.RoomDatabase
         MatchHistoryEntity::class,
         DailyRewardEntity::class,
         UserProfileEntity::class,
-        AchievementEntity::class
+        AchievementEntity::class,
+        PlayerWalletEntity::class,
+        OwnedItemEntity::class,
+        EquippedLoadoutEntity::class,
+        PurchaseTransactionEntity::class,
+        RewardTransactionEntity::class,
+        EmojiDeckSlotEntity::class,
+        ActivePowerupEntity::class,
+        EventProgressEntity::class,
+        DiceCatalogEntity::class,
+        DiceAssetEntity::class,
+        DiceBenefitEntity::class,
+        PlayerOwnedDiceEntity::class,
+        PlayerEquippedDiceEntity::class,
+        CoinTransactionEntity::class,
+        RealMoneyTransactionEntity::class,
+        DicePurchaseHistoryEntity::class,
+        DiceEventRewardEntity::class
     ],
-    version = 4,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -20,6 +37,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun dailyRewardDao(): DailyRewardDao
     abstract fun userProfileDao(): UserProfileDao
     abstract fun achievementDao(): AchievementDao
+    abstract fun inventoryDao(): InventoryDao
+    abstract fun diceStoreDao(): DiceStoreDao
 
     companion object {
         @Volatile

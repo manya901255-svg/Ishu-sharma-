@@ -41,6 +41,9 @@ class ProfilePreferences(private val context: Context) {
         private const val KEY_SAVED_FAVORITE_TRACKS = "pref_saved_favorite_tracks"
         private const val KEY_DICE_SKIN = "pref_equipped_dice_skin"
         private const val KEY_TOKEN_SKIN = "pref_equipped_token_skin"
+        private const val KEY_EQUIPPED_FRAME = "pref_equipped_frame"
+        private const val KEY_PAWN_TRAIL_ENABLED = "pref_pawn_trail_enabled"
+        private const val KEY_CURRENT_PLAYER_ID = "pref_current_player_id"
 
         const val DEFAULT_NICKNAME = "Ishu"
         const val DEFAULT_CROWN_AVATAR = "crown_imperial_gold"
@@ -54,7 +57,9 @@ class ProfilePreferences(private val context: Context) {
         const val DEFAULT_PAWN_CROWN_AVATAR = "crown_imperial_gold"
         const val DEFAULT_DICE_SKIN = "dice_imperial_gold"
         const val DEFAULT_TOKEN_SKIN = "crown_maharaja"
+        const val DEFAULT_EQUIPPED_FRAME = "frame_royal_crest"
         const val DEFAULT_BOARD_THEME = "imperial_navy"
+        const val DEFAULT_PLAYER_ID = "player_ishu_primary"
         const val DEFAULT_SFX_PRESET = "royal_court"
         const val DEFAULT_BGM_ENABLED = true
         const val DEFAULT_SFX_ENABLED = true
@@ -63,6 +68,15 @@ class ProfilePreferences(private val context: Context) {
         const val DEFAULT_SFX_VOLUME = 0.85f
         const val DEFAULT_REPEAT_MODE = "ALL"
     }
+
+    fun getCurrentPlayerId(): String = prefs.getString(KEY_CURRENT_PLAYER_ID, DEFAULT_PLAYER_ID) ?: DEFAULT_PLAYER_ID
+    fun setCurrentPlayerId(playerId: String) = prefs.edit().putString(KEY_CURRENT_PLAYER_ID, playerId).apply()
+
+    fun getEquippedFrameId(): String = prefs.getString(KEY_EQUIPPED_FRAME, DEFAULT_EQUIPPED_FRAME) ?: DEFAULT_EQUIPPED_FRAME
+    fun setEquippedFrameId(frameId: String) = prefs.edit().putString(KEY_EQUIPPED_FRAME, frameId).apply()
+
+    fun isPawnTrailEnabled(): Boolean = prefs.getBoolean(KEY_PAWN_TRAIL_ENABLED, true)
+    fun setPawnTrailEnabled(enabled: Boolean) = prefs.edit().putBoolean(KEY_PAWN_TRAIL_ENABLED, enabled).apply()
 
     fun getEquippedDiceSkin(): String = prefs.getString(KEY_DICE_SKIN, DEFAULT_DICE_SKIN) ?: DEFAULT_DICE_SKIN
     fun setEquippedDiceSkin(skinId: String) = prefs.edit().putString(KEY_DICE_SKIN, skinId).apply()
