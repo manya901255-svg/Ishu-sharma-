@@ -47,48 +47,101 @@ object LudoEngine {
     }
 
     /**
-     * Simulates the new state of a pawn after moving.
+     * Generates the exact cell-by-cell intermediate Pawn states for smooth animated movement.
+     * Each element represents a single tile hop along the track or home stretch.
      */
-    fun calculateMoveResult(pawn: Pawn, dice: Int): Pawn {
-        if (pawn.state == PawnState.IN_BASE && dice == 6) {
-            return pawn.copy(
-                state = PawnState.ON_BOARD,
-                trackPosition = pawn.color.startTrackPos,
-                homeStep = 0,
-                isMovable = false
+    fun buildStepPath(pawn: Pawn, dice: Int): List<Pawn> {
+        if (dice !in 1..6 || !canPawnMove(pawn, dice)) return emptyList()
+
+        if (pawn.state == PawnState.IN_BASE) {
+            return listOf(
+                pawn.copy(
+                    state = PawnState.ON_BOARD,
+                    trackPosition = pawn.color.startTrackPos,
+                    homeStep = 0,
+                    isMovable = false
+                )
             )
         }
 
-        if (pawn.state == PawnState.IN_HOME_STRETCH) {
-            val newStep = pawn.homeStep + dice
-            return if (newStep == 6) {
-                pawn.copy(state = PawnState.FINISHED, homeStep = 6, isMovable = false)
-            } else {
-                pawn.copy(homeStep = newStep, isMovable = false)
-            }
-        }
+        val steps = mutableListOf<Pawn>()
+        var current = pawn.copy(isMovable = false)
 
-        if (pawn.state == PawnState.ON_BOARD) {
-            val stepsToEntrance = distanceToHomeEntrance(pawn.color, pawn.trackPosition)
-            if (dice > stepsToEntrance) {
-                val excess = dice - stepsToEntrance
-                return if (excess == 6) {
-                    pawn.copy(state = PawnState.FINISHED, homeStep = 6, isMovable = false)
-                } else {
-                    pawn.copy(
-                        state = PawnState.IN_HOME_STRETCH,
-                        trackPosition = -1,
-                        homeStep = excess,
-                        isMovable = false
-                    )
+        repeat(dice) {
+            current = when (current.state) {
+                PawnState.ON_BOARD -> {
+                    if (current.trackPosition == current.color.homeEntranceTrackPos) {
+                        current.copy(
+                            state = PawnState.IN_HOME_STRETCH,
+                            trackPosition = -1,
+                            homeStep = 1,
+                            isMovable = false
+                        )
+                    } else {
+                        current.copy(
+                            state = PawnState.ON_BOARD,
+                            trackPosition = (current.trackPosition + 1) % 52,
+                            isMovable = false
+                        )
+                    }
                 }
-            } else {
-                val nextPos = (pawn.trackPosition + dice) % 52
-                return pawn.copy(trackPosition = nextPos, isMovable = false)
+                PawnState.IN_HOME_STRETCH -> {
+                    val nextStep = current.homeStep + 1
+                    if (nextStep >= 6) {
+                        current.copy(
+                            state = PawnState.FINISHED,
+                            trackPosition = -1,
+                            homeStep = 6,
+                            isMovable = false
+                        )
+                    } else {
+                        current.copy(
+                            state = PawnState.IN_HOME_STRETCH,
+                            trackPosition = -1,
+                            homeStep = nextStep,
+                            isMovable = false
+                        )
+                    }
+                }
+                else -> current
+            }
+            steps.add(current)
+        }
+        return steps
+    }
+
+    /**
+     * Simulates the new state of a pawn after moving.
+     */
+    fun calculateMoveResult(pawn: Pawn, dice: Int): Pawn {
+        val path = buildStepPath(pawn, dice)
+        return path.lastOrNull() ?: pawn
+    }
+
+    /**
+     * Computes a deterministic board state checksum across all players and pawns
+     * for multiplayer synchronization & anti-desync verification.
+     */
+    fun computeMatchStateHash(
+        players: List<Player>,
+        currentPlayerIndex: Int,
+        moveSequence: Long
+    ): String {
+        val payload = buildString {
+            append(currentPlayerIndex).append('|').append(moveSequence)
+            for (p in players) {
+                append('|').append(p.color.name).append(':')
+                for (pawn in p.pawns.sortedBy { it.id }) {
+                    append(pawn.id).append('=')
+                        .append(pawn.state.ordinal).append(',')
+                        .append(pawn.trackPosition).append(',')
+                        .append(pawn.homeStep).append(';')
+                }
             }
         }
-
-        return pawn
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(payload.toByteArray(Charsets.UTF_8))
+        return digest.take(8).joinToString("") { "%02x".format(it) }
     }
 
     /**

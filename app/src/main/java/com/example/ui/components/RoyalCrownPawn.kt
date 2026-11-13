@@ -204,27 +204,30 @@ fun RoyalCrownPawn(
             )
         }
 
-        // 8. Custom Crown Avatar / Token Crest Topper (when equipped)
-        val activeCrest = crownEmoji ?: when (pawnSkin) {
-            "token_lion_shield", "pawn_swatty" -> "🛡️"
-            "token_lotus_gem" -> "🪷"
-            "token_dragon_crest" -> "🐉"
-            "token_star_emperor" -> "⭐"
-            "pawn_roasty" -> "🔥"
-            "pawn_kicko" -> "⚡"
-            "pawn_mambo" -> "💃"
-            "pawn_oakor" -> "🌿"
-            "pawn_rolf" -> "🐺"
-            "pawn_jack" -> "🃏"
-            else -> com.example.model.ItemCatalog.findById(pawnSkin)?.iconEmoji ?: "👑"
+        // 8. Custom Crown Avatar / Token Crest Topper (shown only when custom skin/avatar is active so default classic 3D pin stays clean)
+        val isCustomSkin = pawnSkin != "crown_maharaja" || (crownEmoji != null && crownEmoji.isNotBlank() && crownEmoji != "👑" && crownEmoji != "★")
+        if (isCustomSkin) {
+            val activeCrest = crownEmoji ?: when (pawnSkin) {
+                "token_lion_shield", "pawn_swatty" -> "🛡️"
+                "token_lotus_gem" -> "🪷"
+                "token_dragon_crest" -> "🐉"
+                "token_star_emperor" -> "⭐"
+                "pawn_roasty" -> "🔥"
+                "pawn_kicko" -> "⚡"
+                "pawn_mambo" -> "💃"
+                "pawn_oakor" -> "🌿"
+                "pawn_rolf" -> "🐺"
+                "pawn_jack" -> "🃏"
+                else -> com.example.model.ItemCatalog.findById(pawnSkin)?.iconEmoji ?: "👑"
+            }
+            Text(
+                text = activeCrest,
+                fontSize = (size.value * 0.34f).sp,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = (-size * 0.10f) + (bounceOffset.dp * 0.5f))
+            )
         }
-        Text(
-            text = activeCrest,
-            fontSize = (size.value * 0.38f).sp,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = (-size * 0.14f) + (bounceOffset.dp * 0.5f))
-        )
 
         // 9. Floating 'X Left' Step Counter Badge (Authentic Ludo Club feature shown in video)
         if (pawn.isMovable && (pawn.state == com.example.model.PawnState.ON_BOARD || pawn.state == com.example.model.PawnState.IN_HOME_STRETCH)) {

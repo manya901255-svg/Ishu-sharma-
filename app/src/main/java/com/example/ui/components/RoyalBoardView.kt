@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.example.model.LudoColor
 import com.example.model.Pawn
 import com.example.model.PawnState
@@ -42,14 +43,14 @@ import kotlin.math.sin
 /**
  * Authentic Normal Classic Ludo Board View.
  * Matches traditional physical Indian and international Ludo boards:
- * - 4 Classic corner home quadrants (Top-Left: Blue, Top-Right: Red, Bottom-Left: Yellow, Bottom-Right: Green)
+ * - 4 Classic corner home quadrants (Top-Left: Red, Top-Right: Green, Bottom-Left: Yellow, Bottom-Right: Blue)
  * - Inner white cards with 4 solid circular token bases
- * - Colored Starting Tiles (Blue, Red, Green, Yellow) with crisp stars
+ * - Colored Starting Tiles (Red, Green, Yellow, Blue) with crisp stars
  * - 4 Colored Directional Entrance Arrows pointing into home runways
  * - 8 Safe Star positions clearly marked
  * - 4 Clean colored 5-step home stretch runways
- * - 4 Vibrant center finishing triangles (Blue, Red, Green, Yellow)
- * - Authentic 3D Ludo gotis (tokens) with multi-token stacking offsets & turn glow
+ * - 4 Vibrant center finishing triangles (Red, Green, Yellow, Blue)
+ * - Authentic 3D Ludo gotis (tokens) with multi-token stacking offsets, smooth movement animation & turn glow
  */
 @Composable
 fun RoyalBoardView(
@@ -75,7 +76,7 @@ fun RoyalBoardView(
                 shape = RoundedCornerShape(16.dp)
             )
             .testTag("royal_board_2d_view"),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.TopStart
     ) {
         val boardSize = maxWidth
         val cellSize = boardSize / 15f
@@ -363,10 +364,10 @@ fun RoyalBoardView(
             }
         }
 
-        // 2. Interactive Pawns Layer with Multi-Token Stacking
+        // 2. Interactive Pawns Layer with Multi-Token Stacking & Z-Ordering
         val allPawns = players.flatMap { it.pawns }
 
-        // Compute base grid coordinates
+        // Compute base grid coordinates (including colored finishing triangles for FINISHED tokens)
         val rawPawnPositions = remember(allPawns) {
             allPawns.map { pawn ->
                 val (gridX, gridY) = when (pawn.state) {
@@ -380,50 +381,78 @@ fun RoyalBoardView(
                         val pair = StandardLudoBoardLayout.getHomeStretchGridPosition(pawn.color, pawn.homeStep)
                         pair.first.toFloat() to pair.second.toFloat()
                     }
-                    PawnState.FINISHED -> 7.0f to 7.0f
+                    PawnState.FINISHED -> when (pawn.color) {
+                        LudoColor.RED -> 6.32f to 7.0f
+                        LudoColor.GREEN -> 7.0f to 6.32f
+                        LudoColor.BLUE -> 7.68f to 7.0f
+                        LudoColor.YELLOW -> 7.0f to 7.68f
+                    }
                 }
                 Triple(pawn, gridX, gridY)
             }
         }
 
-        // Apply slight visual offsets when multiple tokens occupy the exact same track cell
+        // Apply clean visual offsets when multiple tokens occupy the same track cell or finishing triangle
         val stackedPawns = remember(rawPawnPositions) {
             val cellGroups = rawPawnPositions.groupBy { (it.second * 10).toInt() to (it.third * 10).toInt() }
             rawPawnPositions.map { triple ->
+                val pawn = triple.first
                 val key = (triple.second * 10).toInt() to (triple.third * 10).toInt()
                 val group = cellGroups[key] ?: listOf(triple)
                 val indexInGroup = group.indexOf(triple)
-                val (offsetX, offsetY) = if (group.size > 1 && triple.first.state != PawnState.IN_BASE) {
-                    when (group.size) {
-                        2 -> if (indexInGroup == 0) -0.14f to -0.14f else 0.14f to 0.14f
-                        3 -> when (indexInGroup) {
-                            0 -> 0f to -0.16f
-                            1 -> -0.16f to 0.14f
-                            else -> 0.16f to 0.14f
+                val (offsetX, offsetY) = if (group.size > 1 && pawn.state != PawnState.IN_BASE) {
+                    if (pawn.state == PawnState.FINISHED) {
+                        val shift = (indexInGroup - (group.size - 1) / 2f) * 0.24f
+                        when (pawn.color) {
+                            LudoColor.RED, LudoColor.BLUE -> 0f to shift
+                            LudoColor.GREEN, LudoColor.YELLOW -> shift to 0f
                         }
-                        else -> when (indexInGroup) {
-                            0 -> -0.15f to -0.15f
-                            1 -> 0.15f to -0.15f
-                            2 -> -0.15f to 0.15f
-                            else -> 0.15f to 0.15f
+                    } else {
+                        when (group.size) {
+                            2 -> if (indexInGroup == 0) -0.14f to -0.14f else 0.14f to 0.14f
+                            3 -> when (indexInGroup) {
+                                0 -> 0f to -0.16f
+                                1 -> -0.16f to 0.14f
+                                else -> 0.16f to 0.14f
+                            }
+                            else -> when (indexInGroup) {
+                                0 -> -0.15f to -0.15f
+                                1 -> 0.15f to -0.15f
+                                2 -> -0.15f to 0.15f
+                                else -> 0.15f to 0.15f
+                            }
                         }
                     }
                 } else 0f to 0f
-                Triple(triple.first, triple.second + offsetX, triple.third + offsetY)
+                Triple(pawn, triple.second + offsetX, triple.third + offsetY)
             }
         }
 
-        stackedPawns.forEach { (pawn, colFloat, rowFloat) ->
-            ClassicLudoPawn(
-                pawn = pawn,
-                colFloat = colFloat,
-                rowFloat = rowFloat,
-                cellSize = cellSize,
-                pawnCrownEmoji = pawnCrownEmoji,
-                pawnSkinId = pawnSkinId,
-                isTrailEnabled = isPawnTrailEnabled,
-                onPawnClick = onPawnClick
-            )
+        // Sort rendering so movable and active tokens always appear on top cleanly
+        val orderedPawns = remember(stackedPawns) {
+            stackedPawns.sortedBy { (pawn, _, _) ->
+                when {
+                    pawn.isMovable -> 3
+                    pawn.state == PawnState.ON_BOARD || pawn.state == PawnState.IN_HOME_STRETCH -> 2
+                    pawn.state == PawnState.FINISHED -> 1
+                    else -> 0
+                }
+            }
+        }
+
+        orderedPawns.forEach { (pawn, colFloat, rowFloat) ->
+            key("${pawn.color.name}_${pawn.id}") {
+                ClassicLudoPawn(
+                    pawn = pawn,
+                    colFloat = colFloat,
+                    rowFloat = rowFloat,
+                    cellSize = cellSize,
+                    pawnCrownEmoji = pawnCrownEmoji,
+                    pawnSkinId = pawnSkinId,
+                    isTrailEnabled = isPawnTrailEnabled,
+                    onPawnClick = onPawnClick
+                )
+            }
         }
     }
 }
@@ -494,8 +523,8 @@ private fun DrawScope.drawClassicHomeQuadrant(
         cornerRadius = cornerRadius
     )
 
-    // 2. Inner White Card
-    val cardInset = cellPx * 0.70f
+    // 2. Inner White Card (positioned so pocket sockets sit symmetrically around token centers)
+    val cardInset = cellPx * 0.62f
     val cardWidth = size.width - (cardInset * 2f)
     val cardHeight = size.height - (cardInset * 2f)
     val cardTopLeft = Offset(topLeft.x + cardInset, topLeft.y + cardInset)
@@ -526,18 +555,13 @@ private fun DrawScope.drawClassicHomeQuadrant(
         style = Stroke(width = 1.2f)
     )
 
-    // 3. Four Classic Solid Circular Sockets
-    val socketRadius = cellPx * 0.72f
-    val colOffset1 = cardTopLeft.x + (cardWidth * 0.28f)
-    val colOffset2 = cardTopLeft.x + (cardWidth * 0.72f)
-    val rowOffset1 = cardTopLeft.y + (cardHeight * 0.28f)
-    val rowOffset2 = cardTopLeft.y + (cardHeight * 0.72f)
-
+    // 3. Four Classic Solid Circular Sockets aligned cleanly with getBasePocketFloatPosition (+0.5f cell center)
+    val socketRadius = cellPx * 0.68f
     val centers = listOf(
-        Offset(colOffset1, rowOffset1),
-        Offset(colOffset2, rowOffset1),
-        Offset(colOffset1, rowOffset2),
-        Offset(colOffset2, rowOffset2)
+        Offset(topLeft.x + cellPx * 2.25f, topLeft.y + cellPx * 2.25f),
+        Offset(topLeft.x + cellPx * 4.25f, topLeft.y + cellPx * 2.25f),
+        Offset(topLeft.x + cellPx * 2.25f, topLeft.y + cellPx * 4.25f),
+        Offset(topLeft.x + cellPx * 4.25f, topLeft.y + cellPx * 4.25f)
     )
 
     for (center in centers) {
@@ -651,7 +675,8 @@ private fun DrawScope.draw5PointedStar(
 
 /**
  * Classic Normal Ludo Gotis (Tokens).
- * Features authentic 3D wooden/plastic rounded head, flanged base, drop shadow, and active turn pulsing glow.
+ * Renders a glossy sculpted 3D pin goti with bevel base, smooth grid interpolation animation,
+ * proper z-ordering, and generous movable touch target.
  */
 @Composable
 private fun ClassicLudoPawn(
@@ -664,124 +689,48 @@ private fun ClassicLudoPawn(
     isTrailEnabled: Boolean = true,
     onPawnClick: (Pawn) -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pawnGlow")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (pawn.isMovable) 1.22f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pawnPulse"
+    val animatedCol by animateFloatAsState(
+        targetValue = colFloat,
+        animationSpec = tween(durationMillis = 95, easing = FastOutSlowInEasing),
+        label = "pawnCol"
+    )
+    val animatedRow by animateFloatAsState(
+        targetValue = rowFloat,
+        animationSpec = tween(durationMillis = 95, easing = FastOutSlowInEasing),
+        label = "pawnRow"
     )
 
-    val xOffset = cellSize * colFloat
-    val yOffset = cellSize * rowFloat
-    val pawnDiameter = cellSize * 0.90f
-    val catalogPawn = com.example.model.ItemCatalog.findById(pawnSkinId)
+    val pawnRenderSize = if (pawn.state == PawnState.IN_BASE) cellSize * 1.18f else cellSize * 1.02f
+    val centerX = cellSize * (animatedCol + 0.5f)
+    val centerY = cellSize * (animatedRow + 0.5f)
+    val xOffset = centerX - (pawnRenderSize / 2f)
+    val yOffset = centerY - (pawnRenderSize / 2f)
+
+    val pawnZIndex = when {
+        pawn.isMovable -> 10f
+        pawn.state == PawnState.ON_BOARD || pawn.state == PawnState.IN_HOME_STRETCH -> 5f
+        pawn.state == PawnState.FINISHED -> 3f
+        else -> 2f
+    }
 
     Box(
         modifier = Modifier
+            .zIndex(pawnZIndex)
             .offset(x = xOffset, y = yOffset)
-            .size(cellSize),
+            .size(pawnRenderSize)
+            .clickable(enabled = pawn.isMovable) {
+                onPawnClick(pawn)
+            }
+            .testTag("pawn_${pawn.color.name.lowercase()}_${pawn.id}"),
         contentAlignment = Alignment.Center
     ) {
-        // Movement Trail Glow on active board pawns when Trail is ON
-        if (isTrailEnabled && pawn.state != PawnState.IN_BASE) {
-            val trailTint = catalogPawn?.accentColor ?: pawn.color.light
-            Box(
-                modifier = Modifier
-                    .size(pawnDiameter * 1.12f)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            listOf(trailTint.copy(alpha = 0.55f), Color.Transparent)
-                        )
-                    )
-            )
-        }
-
-        // Movable Turn Halo Glow
-        if (pawn.isMovable) {
-            Box(
-                modifier = Modifier
-                    .size(pawnDiameter * pulseScale)
-                    .clip(CircleShape)
-                    .background(Color(0x77FFD700))
-                    .border(2.dp, Color(0xFFFFEB3B), CircleShape)
-            )
-        }
-
-        // Classic 3D Pawn Body
-        Box(
-            modifier = Modifier
-                .size(pawnDiameter * 0.86f)
-                .shadow(elevation = if (pawn.isMovable) 6.dp else 3.dp, shape = CircleShape)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        colors = when (pawn.color) {
-                            LudoColor.BLUE -> listOf(
-                                Color(0xFFBBDEFB),
-                                Color(0xFF2196F3),
-                                Color(0xFF1565C0),
-                                Color(0xFF0D47A1)
-                            )
-                            LudoColor.RED -> listOf(
-                                Color(0xFFFFCDD2),
-                                Color(0xFFF44336),
-                                Color(0xFFC62828),
-                                Color(0xFF8E0000)
-                            )
-                            LudoColor.YELLOW -> listOf(
-                                Color(0xFFFFF9C4),
-                                Color(0xFFFFEE58),
-                                Color(0xFFFBC02D),
-                                Color(0xFFF57F17)
-                            )
-                            LudoColor.GREEN -> listOf(
-                                Color(0xFFC8E6C9),
-                                Color(0xFF4CAF50),
-                                Color(0xFF2E7D32),
-                                Color(0xFF1B5E20)
-                            )
-                        }
-                    )
-                )
-                .border(
-                    width = 1.8.dp,
-                    color = catalogPawn?.accentColor?.copy(alpha = 0.9f) ?: Color.White.copy(alpha = 0.85f),
-                    shape = CircleShape
-                )
-                .clickable(enabled = pawn.isMovable) {
-                    onPawnClick(pawn)
-                }
-                .testTag("pawn_${pawn.color.name.lowercase()}_${pawn.id}"),
-            contentAlignment = Alignment.Center
-        ) {
-            // Specular 3D Highlight at Top
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 2.dp)
-                    .width(pawnDiameter * 0.40f)
-                    .height(pawnDiameter * 0.16f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White.copy(alpha = 0.70f))
-            )
-
-            // Inner Center Token Pin / Crown Emblem
-            val displayCrest = when {
-                catalogPawn != null && pawnSkinId != "crown_maharaja" -> catalogPawn.iconEmoji
-                pawnCrownEmoji.isNotBlank() && pawnCrownEmoji != "👑" -> pawnCrownEmoji
-                else -> "★"
-            }
-            Text(
-                text = displayCrest,
-                color = if (pawn.color == LudoColor.YELLOW) Color(0xFF5D4037) else Color.White,
-                fontSize = (cellSize.value * 0.42f).sp,
-                fontWeight = FontWeight.Black
-            )
-        }
+        RoyalCrownPawn(
+            pawn = pawn,
+            size = pawnRenderSize,
+            crownEmoji = pawnCrownEmoji,
+            pawnSkin = pawnSkinId,
+            isTrailEnabled = isTrailEnabled,
+            onClick = if (pawn.isMovable) { { onPawnClick(pawn) } } else null
+        )
     }
 }

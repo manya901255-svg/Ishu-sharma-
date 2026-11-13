@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.example.model.LudoColor
 import com.example.model.Pawn
 import com.example.model.PawnState
@@ -400,7 +401,12 @@ fun MaharajaLudoBoardView(
                         val pair = StandardLudoBoardLayout.getHomeStretchGridPosition(pawn.color, pawn.homeStep)
                         pair.first.toFloat() to pair.second.toFloat()
                     }
-                    PawnState.FINISHED -> 7.0f to 7.0f
+                    PawnState.FINISHED -> when (pawn.color) {
+                        LudoColor.RED -> 6.32f to 7.0f
+                        LudoColor.GREEN -> 7.0f to 6.32f
+                        LudoColor.BLUE -> 7.68f to 7.0f
+                        LudoColor.YELLOW -> 7.0f to 7.68f
+                    }
                 }
                 pawn to (gridX to gridY)
             }
@@ -412,62 +418,96 @@ fun MaharajaLudoBoardView(
                 .groupBy { "${"%.2f".format(it.second.first)}_${"%.2f".format(it.second.second)}" }
         }
 
-        rawPawnPositions.forEach { (pawn, basePos) ->
-            val (baseX, baseY) = basePos
+        val orderedPawns = remember(rawPawnPositions) {
+            rawPawnPositions.sortedBy { (pawn, _) ->
+                when {
+                    pawn.isMovable -> 3
+                    pawn.state == PawnState.ON_BOARD || pawn.state == PawnState.IN_HOME_STRETCH -> 2
+                    pawn.state == PawnState.FINISHED -> 1
+                    else -> 0
+                }
+            }
+        }
 
-            val (stackOffsetX, stackOffsetY) = if (pawn.state != PawnState.IN_BASE && pawn.state != PawnState.FINISHED) {
-                val key = "${"%.2f".format(baseX)}_${"%.2f".format(baseY)}"
-                val cellGroup = pawnsByCell[key] ?: emptyList()
-                val indexInCell = cellGroup.indexOfFirst { it.first.id == pawn.id && it.first.color == pawn.color }
-                val totalInCell = cellGroup.size
+        orderedPawns.forEach { (pawn, basePos) ->
+            key("${pawn.color.name}_${pawn.id}") {
+                val (baseX, baseY) = basePos
 
-                if (totalInCell > 1 && indexInCell >= 0) {
-                    when (totalInCell) {
-                        2 -> when (indexInCell) {
-                            0 -> -4.5.dp to -4.5.dp
-                            else -> 4.5.dp to 4.5.dp
+                val (stackOffsetX, stackOffsetY) = if (pawn.state != PawnState.IN_BASE && pawn.state != PawnState.FINISHED) {
+                    val keyStr = "${"%.2f".format(baseX)}_${"%.2f".format(baseY)}"
+                    val cellGroup = pawnsByCell[keyStr] ?: emptyList()
+                    val indexInCell = cellGroup.indexOfFirst { it.first.id == pawn.id && it.first.color == pawn.color }
+                    val totalInCell = cellGroup.size
+
+                    if (totalInCell > 1 && indexInCell >= 0) {
+                        when (totalInCell) {
+                            2 -> when (indexInCell) {
+                                0 -> -4.5.dp to -4.5.dp
+                                else -> 4.5.dp to 4.5.dp
+                            }
+                            3 -> when (indexInCell) {
+                                0 -> -5.dp to -5.dp
+                                1 -> 5.dp to -5.dp
+                                else -> 0.dp to 5.dp
+                            }
+                            else -> when (indexInCell) {
+                                0 -> -5.dp to -5.dp
+                                1 -> 5.dp to -5.dp
+                                2 -> -5.dp to 5.dp
+                                else -> 5.dp to 5.dp
+                            }
                         }
-                        3 -> when (indexInCell) {
-                            0 -> -5.dp to -5.dp
-                            1 -> 5.dp to -5.dp
-                            else -> 0.dp to 5.dp
-                        }
-                        else -> when (indexInCell) {
-                            0 -> -5.dp to -5.dp
-                            1 -> 5.dp to -5.dp
-                            2 -> -5.dp to 5.dp
-                            else -> 5.dp to 5.dp
-                        }
+                    } else 0.dp to 0.dp
+                } else if (pawn.state == PawnState.FINISHED) {
+                    val keyStr = "${"%.2f".format(baseX)}_${"%.2f".format(baseY)}"
+                    val cellGroup = pawnsByCell[keyStr] ?: emptyList()
+                    val idx = cellGroup.indexOfFirst { it.first.id == pawn.id && it.first.color == pawn.color }.coerceAtLeast(0)
+                    val shiftDp = ((idx - (cellGroup.size - 1) / 2f) * 5.5f).dp
+                    when (pawn.color) {
+                        LudoColor.RED, LudoColor.BLUE -> 0.dp to shiftDp
+                        LudoColor.GREEN, LudoColor.YELLOW -> shiftDp to 0.dp
                     }
                 } else 0.dp to 0.dp
-            } else if (pawn.state == PawnState.FINISHED) {
-                when (pawn.color) {
-                    LudoColor.RED -> (-7).dp to 0.dp
-                    LudoColor.GREEN -> 0.dp to (-7).dp
-                    LudoColor.BLUE -> 7.dp to 0.dp
-                    LudoColor.YELLOW -> 0.dp to 7.dp
-                }
-            } else 0.dp to 0.dp
 
-            val pawnCenterLeft = (cellSize * baseX) + (cellSize / 2f) + stackOffsetX
-            val pawnCenterTop = (cellSize * baseY) + (cellSize / 2f) + stackOffsetY
-            val pawnRenderSize = if (pawn.state == PawnState.IN_BASE) cellSize * 1.15f else cellSize * 0.98f
-
-            Box(
-                modifier = Modifier
-                    .offset(
-                        x = pawnCenterLeft - (pawnRenderSize / 2f),
-                        y = pawnCenterTop - (pawnRenderSize / 2f)
-                    )
-            ) {
-                RoyalCrownPawn(
-                    pawn = pawn,
-                    size = pawnRenderSize,
-                    crownEmoji = pawnCrownEmoji,
-                    pawnSkin = pawnSkinId,
-                    isTrailEnabled = isPawnTrailEnabled,
-                    onClick = if (pawn.isMovable) { { onPawnClick(pawn) } } else null
+                val animatedX by animateFloatAsState(
+                    targetValue = baseX,
+                    animationSpec = tween(durationMillis = 95, easing = FastOutSlowInEasing),
+                    label = "maharajaPawnX"
                 )
+                val animatedY by animateFloatAsState(
+                    targetValue = baseY,
+                    animationSpec = tween(durationMillis = 95, easing = FastOutSlowInEasing),
+                    label = "maharajaPawnY"
+                )
+
+                val pawnCenterLeft = (cellSize * animatedX) + (cellSize / 2f) + stackOffsetX
+                val pawnCenterTop = (cellSize * animatedY) + (cellSize / 2f) + stackOffsetY
+                val pawnRenderSize = if (pawn.state == PawnState.IN_BASE) cellSize * 1.15f else cellSize * 0.98f
+                val pawnZ = when {
+                    pawn.isMovable -> 10f
+                    pawn.state == PawnState.ON_BOARD || pawn.state == PawnState.IN_HOME_STRETCH -> 5f
+                    pawn.state == PawnState.FINISHED -> 3f
+                    else -> 2f
+                }
+
+                Box(
+                    modifier = Modifier
+                        .zIndex(pawnZ)
+                        .offset(
+                            x = pawnCenterLeft - (pawnRenderSize / 2f),
+                            y = pawnCenterTop - (pawnRenderSize / 2f)
+                        )
+                        .testTag("pawn_${pawn.color.name.lowercase()}_${pawn.id}")
+                ) {
+                    RoyalCrownPawn(
+                        pawn = pawn,
+                        size = pawnRenderSize,
+                        crownEmoji = pawnCrownEmoji,
+                        pawnSkin = pawnSkinId,
+                        isTrailEnabled = isPawnTrailEnabled,
+                        onClick = if (pawn.isMovable) { { onPawnClick(pawn) } } else null
+                    )
+                }
             }
         }
     }

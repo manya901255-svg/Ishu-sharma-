@@ -18,7 +18,7 @@ enum class LudoColor(
         dark = Color(0xFFC62828),
         light = Color(0xFFFFCDD2),
         startTrackPos = 1,
-        homeEntranceTrackPos = 50,
+        homeEntranceTrackPos = 51,
         safeStarPos = 1
     ),
     GREEN(
@@ -27,7 +27,7 @@ enum class LudoColor(
         dark = Color(0xFF2E7D32),
         light = Color(0xFFC8E6C9),
         startTrackPos = 14,
-        homeEntranceTrackPos = 11,
+        homeEntranceTrackPos = 12,
         safeStarPos = 14
     ),
     BLUE(
@@ -36,7 +36,7 @@ enum class LudoColor(
         dark = Color(0xFF0277BD),
         light = Color(0xFFE1F5FE),
         startTrackPos = 27,
-        homeEntranceTrackPos = 24,
+        homeEntranceTrackPos = 25,
         safeStarPos = 27
     ),
     YELLOW(
@@ -45,7 +45,7 @@ enum class LudoColor(
         dark = Color(0xFFF57F17),
         light = Color(0xFFFFF9C4),
         startTrackPos = 40,
-        homeEntranceTrackPos = 37,
+        homeEntranceTrackPos = 38,
         safeStarPos = 40
     )
 }

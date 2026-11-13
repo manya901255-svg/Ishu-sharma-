@@ -29,6 +29,12 @@ enum class AppScreen {
     TECH_BLUEPRINT
 }
 
+enum class MatchConnectionState {
+    CONNECTED,
+    RECONNECTING,
+    DISCONNECTED
+}
+
 data class DiceStoreUiState(
     val catalog: List<PremiumDiceItem> = PremiumDiceCatalog.buildDefaultSeedCatalog(),
     val ownedDiceIds: Set<String> = setOf("dice_imperial_gold"),
@@ -219,7 +225,11 @@ data class LudoUiState(
     val reportedTargetPlayer: Player? = null,
     val playerReports: List<PlayerReport> = emptyList(),
     val practiceHint: String? = null,
-    val canUndoPracticeMove: Boolean = false
+    val canUndoPracticeMove: Boolean = false,
+    // Token Synchronization, Deduplication & Reconnect Resilience
+    val moveSequenceNumber: Long = 0L,
+    val lastSyncedBoardChecksum: String = "",
+    val connectionState: MatchConnectionState = MatchConnectionState.CONNECTED
 )
 
 class LudoViewModel(application: Application) : AndroidViewModel(application) {
@@ -240,7 +250,11 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
 
     private var turnTimerJob: Job? = null
     private var aiTurnJob: Job? = null
+    private var moveJob: Job? = null
     private var musicSearchJob: Job? = null
+    @Volatile
+    private var isMoveInProgress: Boolean = false
+    private val processedMoveIds = mutableSetOf<String>()
 
     init {
         // Initial fair seeds
@@ -553,8 +567,11 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Prepare initial board state while keeping lobby as starting destination
-        startNewGame(mode = GameMode.VS_AI, playerCount = 4, isInitialSetup = true)
+        // Restore persisted active match tokens/state if present, otherwise initialize clean 4-player board
+        val restored = restoreSavedMatchIfPresent()
+        if (!restored) {
+            startNewGame(mode = GameMode.VS_AI, playerCount = 4, isInitialSetup = true)
+        }
         _uiState.update { it.copy(currentScreen = AppScreen.HOME) }
         soundAndHaptics.setGameActive(false)
     }
@@ -1298,6 +1315,9 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         soundAndHaptics.setGameActive(true)
         aiTurnJob?.cancel()
         turnTimerJob?.cancel()
+        moveJob?.cancel()
+        isMoveInProgress = false
+        processedMoveIds.clear()
 
         val effectiveCount = when (mode) {
             GameMode.TEAM_2VS2 -> 4
@@ -1391,6 +1411,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             else -> "Royal ${mode.title} begins! Wager: 🪙 ${com.example.ui.components.formatCompactCoins(wager)} • 2X Double Prize Active!"
         }
 
+        val initialChecksum = LudoEngine.computeMatchStateHash(players, 0, 0L)
         _uiState.update {
             it.copy(
                 currentScreen = AppScreen.GAME,
@@ -1410,6 +1431,9 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 practiceHint = null,
                 canUndoPracticeMove = false,
                 currentMatchReplayMoves = emptyList(),
+                moveSequenceNumber = 0L,
+                lastSyncedBoardChecksum = initialChecksum,
+                connectionState = MatchConnectionState.CONNECTED,
                 bannerNotice = modeBanner,
                 chatMessages = listOf(
                     ChatMessage(
@@ -1422,6 +1446,9 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
+        if (!isInitialSetup) {
+            persistActiveMatchSnapshot()
+        }
         voiceChatManager.startVoiceChat()
         startTurnTimer()
         checkAiTurn()
@@ -1465,13 +1492,13 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         if (state.turnPhase == TurnPhase.ROLL_DICE) {
             // Auto roll on timeout
             rollDice()
-        } else if (state.turnPhase == TurnPhase.SELECT_PAWN) {
+        } else if (state.turnPhase == TurnPhase.SELECT_PAWN && !isMoveInProgress) {
             // Auto select best pawn
             val movable = currentPlayer.pawns.filter { it.isMovable }
             if (movable.isNotEmpty()) {
-                val best = LudoEngine.pickBestAiMove(currentPlayer, movable, state.currentDiceValue, state.players)
+                val best = LudoEngine.pickBestAiMove(currentPlayer, movable, state.currentDiceValue, state.players, state.gameMode)
                     ?: movable.first()
-                onPawnClicked(best)
+                executePawnMove(best, isAutomatedTrigger = true)
             } else {
                 passToNextPlayer()
             }
@@ -1480,7 +1507,9 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun rollDice() {
         val state = _uiState.value
-        if (state.isRolling || state.turnPhase != TurnPhase.ROLL_DICE || state.winner != null) return
+        if (state.isRolling || state.turnPhase != TurnPhase.ROLL_DICE || state.winner != null || isMoveInProgress) return
+
+        turnTimerJob?.cancel()
 
         viewModelScope.launch {
             val (rawRollValue, proof) = FairDiceEngine.rollDice()
@@ -1501,14 +1530,19 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             // Intermediate bounce 1 impact haptics
-            delay(400)
+            delay(360)
             soundAndHaptics.playButtonClick()
 
             // Settle trajectory
-            delay(450)
+            delay(420)
 
-            val currentPlayer = state.players[state.currentPlayerIndex]
-            val newConsecutive = if (rollValue == 6) state.consecutiveSixes + 1 else 0
+            val latestState = _uiState.value
+            if (latestState.winner != null || latestState.currentPlayerIndex !in latestState.players.indices) {
+                _uiState.update { it.copy(isRolling = false) }
+                return@launch
+            }
+            val currentPlayer = latestState.players[latestState.currentPlayerIndex]
+            val newConsecutive = if (rollValue == 6) latestState.consecutiveSixes + 1 else 0
 
             // If three 6s in a row: forfeit turn!
             if (newConsecutive >= 3) {
@@ -1526,7 +1560,8 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                         bannerNotice = "3 Sixes in a row! Penalty: Turn forfeited!"
                     )
                 }
-                delay(1200)
+                persistActiveMatchSnapshot()
+                delay(1100)
                 passToNextPlayer()
                 return@launch
             }
@@ -1551,7 +1586,9 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
 
             _uiState.update { s ->
                 val newPlayers = s.players.toMutableList()
-                newPlayers[s.currentPlayerIndex] = currentPlayer.copy(pawns = updatedPawns, lastDiceValue = rollValue)
+                if (s.currentPlayerIndex in newPlayers.indices) {
+                    newPlayers[s.currentPlayerIndex] = currentPlayer.copy(pawns = updatedPawns, lastDiceValue = rollValue)
+                }
                 s.copy(
                     players = newPlayers,
                     currentDiceValue = rollValue,
@@ -1559,82 +1596,141 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                     fairDiceProof = proof,
                     consecutiveSixes = newConsecutive,
                     turnPhase = if (movableCount > 0) TurnPhase.SELECT_PAWN else TurnPhase.ROLL_DICE,
+                    lastSyncedBoardChecksum = LudoEngine.computeMatchStateHash(newPlayers, s.currentPlayerIndex, s.moveSequenceNumber),
                     bannerNotice = if (movableCount == 0) "${currentPlayer.name} rolled $rollValue with no valid moves." else "${currentPlayer.name} rolled $rollValue! Select pawn to move."
                 )
             }
+            persistActiveMatchSnapshot()
 
             if (movableCount == 0) {
-                delay(900)
+                delay(850)
                 passToNextPlayer()
             } else if (movableCount == 1 && !currentPlayer.isAi) {
-                // Auto-advance if only 1 move is possible
+                // Auto-advance only if user did not manually click during the brief pause
                 delay(400)
-                val onlyPawn = updatedPawns.first { it.isMovable }
-                onPawnClicked(onlyPawn)
-            } else if (currentPlayer.isAi) {
-                delay(600)
-                val aiBestPawn = LudoEngine.pickBestAiMove(
-                    player = currentPlayer,
-                    movablePawns = updatedPawns.filter { it.isMovable },
-                    dice = rollValue,
-                    allPlayers = _uiState.value.players
-                )
-                if (aiBestPawn != null) {
-                    onPawnClicked(aiBestPawn)
-                } else {
-                    passToNextPlayer()
+                val postDelayState = _uiState.value
+                if (postDelayState.turnPhase == TurnPhase.SELECT_PAWN && !isMoveInProgress) {
+                    val onlyPawn = postDelayState.players
+                        .getOrNull(postDelayState.currentPlayerIndex)
+                        ?.pawns
+                        ?.firstOrNull { it.isMovable }
+                    if (onlyPawn != null) {
+                        executePawnMove(onlyPawn, isAutomatedTrigger = true)
+                    }
                 }
+            } else if (currentPlayer.isAi) {
+                delay(550)
+                val postDelayState = _uiState.value
+                if (postDelayState.turnPhase == TurnPhase.SELECT_PAWN && !isMoveInProgress) {
+                    val aiPlayer = postDelayState.players.getOrNull(postDelayState.currentPlayerIndex) ?: return@launch
+                    val aiBestPawn = LudoEngine.pickBestAiMove(
+                        player = aiPlayer,
+                        movablePawns = aiPlayer.pawns.filter { it.isMovable },
+                        dice = rollValue,
+                        allPlayers = postDelayState.players,
+                        mode = postDelayState.gameMode
+                    )
+                    if (aiBestPawn != null) {
+                        executePawnMove(aiBestPawn, isAutomatedTrigger = true)
+                    } else {
+                        passToNextPlayer()
+                    }
+                }
+            } else {
+                // Multiple movable human tokens: restart turn timer cleanly for selection
+                startTurnTimer()
             }
         }
     }
 
+    /**
+     * Public UI entry point when a player taps a token on the board.
+     * Strictly rejects tapping another player's token or tapping during an AI turn.
+     */
     fun onPawnClicked(pawn: Pawn) {
         val state = _uiState.value
-        if (state.turnPhase != TurnPhase.SELECT_PAWN || state.winner != null) return
+        val currentPlayer = state.players.getOrNull(state.currentPlayerIndex) ?: return
+        if (currentPlayer.isAi) return
+        if (pawn.color != currentPlayer.color) return
+        executePawnMove(pawn, isAutomatedTrigger = false)
+    }
 
-        val currentPlayer = state.players[state.currentPlayerIndex]
-        if (pawn.color != currentPlayer.color || !pawn.isMovable) return
+    private fun executePawnMove(pawn: Pawn, isAutomatedTrigger: Boolean) {
+        val state = _uiState.value
+        if (state.turnPhase != TurnPhase.SELECT_PAWN || state.winner != null || isMoveInProgress) return
+
+        val currentPlayer = state.players.getOrNull(state.currentPlayerIndex) ?: return
+        if (pawn.color != currentPlayer.color) return
+
+        val canonicalPawn = currentPlayer.pawns.firstOrNull { it.id == pawn.id } ?: return
+        if (!canonicalPawn.isMovable || !LudoEngine.canPawnMove(canonicalPawn, state.currentDiceValue)) return
+
+        val moveDedupeId = "${state.roomCode}_seq${state.moveSequenceNumber}_c${canonicalPawn.color.name}_p${canonicalPawn.id}_d${state.currentDiceValue}"
+        if (!processedMoveIds.add(moveDedupeId)) return
 
         if (state.gameMode == GameMode.PRACTICE && !currentPlayer.isAi) {
             practiceLastState = state.players
             _uiState.update { it.copy(canUndoPracticeMove = true) }
         }
 
-        viewModelScope.launch {
-            _uiState.update { it.copy(turnPhase = TurnPhase.ANIMATING_MOVE) }
+        isMoveInProgress = true
+        turnTimerJob?.cancel()
+        aiTurnJob?.cancel()
 
-            val movedPawn = LudoEngine.calculateMoveResult(pawn, state.currentDiceValue)
-            val isHeadingHome = movedPawn.state == PawnState.IN_HOME_STRETCH
+        moveJob = viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(turnPhase = TurnPhase.ANIMATING_MOVE) }
 
-            // Trigger wooden pawn step movement sound with ascending acoustic step pitch
-            soundAndHaptics.playPawnMove(
-                stepIndex = state.currentDiceValue,
-                totalSteps = state.currentDiceValue,
-                isHomeStretch = isHeadingHome
-            )
+                val stepPath = LudoEngine.buildStepPath(canonicalPawn, state.currentDiceValue)
+                val movedPawn = stepPath.lastOrNull() ?: LudoEngine.calculateMoveResult(canonicalPawn, state.currentDiceValue)
 
-            var gaveExtraTurn = false
-            var bannerMsg: String? = null
-
-            // Check if captured enemy pawn(s) (respecting Team 2vs2 co-op protection)
-            val captures = LudoEngine.checkForCaptures(movedPawn, state.players, state.gameMode)
-            val updatedPlayers = state.players.map { player ->
-                if (player.color == currentPlayer.color) {
-                    val newPawns = player.pawns.map { if (it.id == pawn.id) movedPawn else it.copy(isMovable = false) }
-                    player.copy(pawns = newPawns)
-                } else {
-                    // Check if any pawn of this player was captured
-                    val capturedOfPlayer = captures.filter { it.first.color == player.color }.map { it.second.id }
-                    if (capturedOfPlayer.isNotEmpty()) {
-                        val resetPawns = player.pawns.map { p ->
-                            if (p.id in capturedOfPlayer) p.copy(state = PawnState.IN_BASE, trackPosition = -1, homeStep = 0) else p
+                // Step-by-step cell-by-cell animated token movement
+                if (stepPath.isNotEmpty()) {
+                    stepPath.forEachIndexed { idx, stepPawn ->
+                        soundAndHaptics.playPawnMove(
+                            stepIndex = idx + 1,
+                            totalSteps = stepPath.size,
+                            isHomeStretch = stepPawn.state == PawnState.IN_HOME_STRETCH
+                        )
+                        _uiState.update { s ->
+                            val stepPlayers = s.players.mapIndexed { pIdx, p ->
+                                if (pIdx == s.currentPlayerIndex) {
+                                    p.copy(pawns = p.pawns.map { existing ->
+                                        if (existing.id == canonicalPawn.id) stepPawn else existing.copy(isMovable = false)
+                                    })
+                                } else p
+                            }
+                            s.copy(players = stepPlayers)
                         }
-                        player.copy(pawns = resetPawns)
-                    } else {
-                        player
+                        if (stepPath.size > 1 && idx < stepPath.lastIndex) {
+                            delay(105L)
+                        }
                     }
                 }
-            }.toMutableList()
+
+                var gaveExtraTurn = false
+                var bannerMsg: String? = null
+
+                val preCaptureState = _uiState.value
+                // Check if captured enemy pawn(s) (respecting Team 2vs2 co-op protection & Safe Star zones)
+                val captures = LudoEngine.checkForCaptures(movedPawn, preCaptureState.players, preCaptureState.gameMode)
+                val updatedPlayers = preCaptureState.players.map { player ->
+                    if (player.color == currentPlayer.color) {
+                        val newPawns = player.pawns.map { if (it.id == canonicalPawn.id) movedPawn else it.copy(isMovable = false) }
+                        player.copy(pawns = newPawns)
+                    } else {
+                        // Check if any pawn of this player was captured
+                        val capturedOfPlayer = captures.filter { it.first.color == player.color }.map { it.second.id }
+                        if (capturedOfPlayer.isNotEmpty()) {
+                            val resetPawns = player.pawns.map { p ->
+                                if (p.id in capturedOfPlayer) p.copy(state = PawnState.IN_BASE, trackPosition = -1, homeStep = 0, isMovable = false) else p
+                            }
+                            player.copy(pawns = resetPawns)
+                        } else {
+                            player
+                        }
+                    }
+                }.toMutableList()
 
             // Record this move for Match Replay Theater
             val moveDescription = when {
@@ -1780,85 +1876,100 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 val xpGain = (if (isHumanWin) 120 else 35) * (if (activeXpBoost) 2 else 1)
                 val recoveredCoins = if (!isHumanWin && activeRecoverShield && matchWager > 0) matchWager / 2 else 0L
 
+                    val nextSeq = _uiState.value.moveSequenceNumber + 1L
+                    val nextChecksum = LudoEngine.computeMatchStateHash(updatedPlayers, state.currentPlayerIndex, nextSeq)
+                    _uiState.update { s ->
+                        val newCoins = when {
+                            isHumanWin -> s.userCoins + coinWinnings
+                            recoveredCoins > 0L -> s.userCoins + recoveredCoins
+                            else -> s.userCoins
+                        }
+                        if (isHumanWin || recoveredCoins > 0L) {
+                            profilePreferences.setUserCoins(newCoins)
+                        }
+                        s.copy(
+                            players = updatedPlayers,
+                            winner = updatedCurrentPlayer,
+                            turnPhase = TurnPhase.ROUND_OVER,
+                            moveSequenceNumber = nextSeq,
+                            lastSyncedBoardChecksum = nextChecksum,
+                            showResultsDialog = true,
+                            showSpecialOfferDialog = triggerSpecialOffer,
+                            onlineGamesPlayedCount = newOnlineCount,
+                            wonChestBoxName = wonChest,
+                            playerXp = s.playerXp + xpGain,
+                            totalWins = profilePreferences.getTotalWins(),
+                            totalGamesPlayed = profilePreferences.getGamesPlayed(),
+                            winStreak = profilePreferences.getWinStreak(),
+                            totalCaptures = profilePreferences.getTotalCaptures(),
+                            bannerNotice = when {
+                                isHumanWin -> "🏆 2X DOUBLE PRIZE! ${updatedCurrentPlayer.name} won +🪙 ${com.example.ui.components.formatCompactCoins(coinWinnings)} (+${xpGain} XP)!"
+                                recoveredCoins > 0L -> "🛡️ Recover Coins Shield activated! Recovered 🪙 ${com.example.ui.components.formatCompactCoins(recoveredCoins)}!"
+                                else -> "Match concluded. Earned +${xpGain} XP."
+                            },
+                            userCoins = newCoins,
+                            savedReplays = listOf(completedReplaySession) + s.savedReplays,
+                            currentMatchReplayMoves = emptyList()
+                        )
+                    }
+                    profilePreferences.saveActiveMatchSnapshotJson(null)
+                    viewModelScope.launch {
+                        val current = _uiState.value
+                        val snap = inventoryRepository.syncWalletBalance(goldCoins = current.userCoins, cashNotes = current.userGems)
+                        applyInventorySnapshot(snap)
+                        if (!isHumanWin || isHumanWin) {
+                            val (_, evSnap) = inventoryRepository.incrementEventItemProgress(itemId = "emoji_squall", delta = 1)
+                            applyInventorySnapshot(evSnap)
+                        }
+                    }
+                    turnTimerJob?.cancel()
+                    if (triggerSpecialOffer) {
+                        showPopUpNotice(
+                            title = "🔥 5 ONLINE GAMES OFFER UNLOCKED!",
+                            message = "Congratulations on playing 5 online games! You unlocked the exclusive 80% OFF Maharaja Deal!",
+                            icon = "🔥",
+                            type = "REWARD"
+                        )
+                    }
+                    return@launch
+                }
+
+                val nextSeq = _uiState.value.moveSequenceNumber + 1L
+                val nextChecksum = LudoEngine.computeMatchStateHash(updatedPlayers, state.currentPlayerIndex, nextSeq)
                 _uiState.update { s ->
-                    val newCoins = when {
-                        isHumanWin -> s.userCoins + coinWinnings
-                        recoveredCoins > 0L -> s.userCoins + recoveredCoins
-                        else -> s.userCoins
-                    }
-                    if (isHumanWin || recoveredCoins > 0L) {
-                        profilePreferences.setUserCoins(newCoins)
-                    }
                     s.copy(
                         players = updatedPlayers,
-                        winner = updatedCurrentPlayer,
-                        showResultsDialog = true,
-                        showSpecialOfferDialog = triggerSpecialOffer,
-                        onlineGamesPlayedCount = newOnlineCount,
-                        wonChestBoxName = wonChest,
-                        playerXp = s.playerXp + xpGain,
-                        totalWins = profilePreferences.getTotalWins(),
-                        totalGamesPlayed = profilePreferences.getGamesPlayed(),
-                        winStreak = profilePreferences.getWinStreak(),
-                        totalCaptures = profilePreferences.getTotalCaptures(),
-                        bannerNotice = when {
-                            isHumanWin -> "🏆 2X DOUBLE PRIZE! ${updatedCurrentPlayer.name} won +🪙 ${com.example.ui.components.formatCompactCoins(coinWinnings)} (+${xpGain} XP)!"
-                            recoveredCoins > 0L -> "🛡️ Recover Coins Shield activated! Recovered 🪙 ${com.example.ui.components.formatCompactCoins(recoveredCoins)}!"
-                            else -> "Match concluded. Earned +${xpGain} XP."
-                        },
-                        userCoins = newCoins,
-                        savedReplays = listOf(completedReplaySession) + s.savedReplays,
-                        currentMatchReplayMoves = emptyList()
+                        moveSequenceNumber = nextSeq,
+                        lastSyncedBoardChecksum = nextChecksum,
+                        currentMatchReplayMoves = updatedReplayMoves,
+                        bannerNotice = bannerMsg ?: s.bannerNotice
                     )
                 }
-                viewModelScope.launch {
-                    val current = _uiState.value
-                    val snap = inventoryRepository.syncWalletBalance(goldCoins = current.userCoins, cashNotes = current.userGems)
-                    applyInventorySnapshot(snap)
-                    if (!isHumanWin || isHumanWin) {
-                        val (_, evSnap) = inventoryRepository.incrementEventItemProgress(itemId = "emoji_squall", delta = 1)
-                        applyInventorySnapshot(evSnap)
+                persistActiveMatchSnapshot()
+
+                delay(320)
+
+                if (gaveExtraTurn) {
+                    _uiState.update {
+                        it.copy(
+                            turnPhase = TurnPhase.ROLL_DICE
+                        )
                     }
+                    persistActiveMatchSnapshot()
+                    startTurnTimer()
+                    checkAiTurn()
+                } else {
+                    passToNextPlayer()
                 }
-                turnTimerJob?.cancel()
-                if (triggerSpecialOffer) {
-                    showPopUpNotice(
-                        title = "🔥 5 ONLINE GAMES OFFER UNLOCKED!",
-                        message = "Congratulations on playing 5 online games! You unlocked the exclusive 80% OFF Maharaja Deal!",
-                        icon = "🔥",
-                        type = "REWARD"
-                    )
-                }
-                return@launch
-            }
-
-            _uiState.update { s ->
-                s.copy(
-                    players = updatedPlayers,
-                    currentMatchReplayMoves = updatedReplayMoves,
-                    bannerNotice = bannerMsg ?: s.bannerNotice
-                )
-            }
-
-            delay(400)
-
-            if (gaveExtraTurn) {
-                _uiState.update {
-                    it.copy(
-                        turnPhase = TurnPhase.ROLL_DICE
-                    )
-                }
-                startTurnTimer()
-                checkAiTurn()
-            } else {
-                passToNextPlayer()
+            } finally {
+                isMoveInProgress = false
             }
         }
     }
 
     private fun passToNextPlayer() {
         val state = _uiState.value
-        if (state.winner != null) return
+        if (state.winner != null || state.players.isEmpty()) return
 
         val nextIndex = (state.currentPlayerIndex + 1) % state.players.size
         val nextPlayer = state.players[nextIndex]
@@ -1867,6 +1978,8 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         val clearedPlayers = state.players.map { player ->
             player.copy(pawns = player.pawns.map { it.copy(isMovable = false) })
         }
+        val nextSeq = state.moveSequenceNumber + 1L
+        val nextChecksum = LudoEngine.computeMatchStateHash(clearedPlayers, nextIndex, nextSeq)
 
         _uiState.update {
             it.copy(
@@ -1874,13 +1987,206 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 currentPlayerIndex = nextIndex,
                 turnPhase = TurnPhase.ROLL_DICE,
                 consecutiveSixes = 0,
+                moveSequenceNumber = nextSeq,
+                lastSyncedBoardChecksum = nextChecksum,
                 bannerNotice = "Turn: ${nextPlayer.name} (${nextPlayer.color.title})"
             )
         }
+        persistActiveMatchSnapshot()
 
         startTurnTimer()
         voiceChatManager.onPlayerTurnStart(nextPlayer.id, nextPlayer.isAi)
         checkAiTurn()
+    }
+
+    /**
+     * Authoritative Multiplayer Move Synchronization:
+     * Validates turn ownership, sequence order, deduplication, and move legality
+     * so all connected clients stay identically synchronized and duplicate/spoofed moves are blocked.
+     */
+    fun syncRemoteMoveIfAuthorized(
+        senderColor: LudoColor,
+        pawnId: Int,
+        diceRoll: Int,
+        expectedSequenceNumber: Long
+    ): Boolean {
+        val state = _uiState.value
+        if (state.winner != null || isMoveInProgress) return false
+        if (expectedSequenceNumber != state.moveSequenceNumber) return false
+
+        val activePlayer = state.players.getOrNull(state.currentPlayerIndex) ?: return false
+        if (activePlayer.color != senderColor) return false
+
+        val pawn = activePlayer.pawns.firstOrNull { it.id == pawnId } ?: return false
+        if (diceRoll !in 1..6 || !LudoEngine.canPawnMove(pawn, diceRoll)) return false
+
+        val updatedActivePawns = activePlayer.pawns.map {
+            if (it.id == pawnId) it.copy(isMovable = true) else it.copy(isMovable = false)
+        }
+        _uiState.update { s ->
+            val updatedPlayers = s.players.mapIndexed { idx, p ->
+                if (idx == s.currentPlayerIndex) p.copy(pawns = updatedActivePawns, lastDiceValue = diceRoll) else p
+            }
+            s.copy(
+                players = updatedPlayers,
+                currentDiceValue = diceRoll,
+                isRolling = false,
+                turnPhase = TurnPhase.SELECT_PAWN
+            )
+        }
+        executePawnMove(pawn.copy(isMovable = true), isAutomatedTrigger = true)
+        return true
+    }
+
+    fun simulateNetworkDisconnect() {
+        _uiState.update {
+            it.copy(
+                connectionState = MatchConnectionState.DISCONNECTED,
+                bannerNotice = "Connection interrupted. Preserving token positions for reconnect..."
+            )
+        }
+        persistActiveMatchSnapshot()
+    }
+
+    fun reconnectActiveMatch(): Boolean {
+        _uiState.update {
+            it.copy(
+                connectionState = MatchConnectionState.RECONNECTING,
+                bannerNotice = "Reconnecting to match server & syncing token positions..."
+            )
+        }
+        val restored = restoreSavedMatchIfPresent()
+        val state = _uiState.value
+        val verifiedChecksum = if (state.players.isNotEmpty()) {
+            LudoEngine.computeMatchStateHash(state.players, state.currentPlayerIndex, state.moveSequenceNumber)
+        } else ""
+        _uiState.update {
+            it.copy(
+                connectionState = MatchConnectionState.CONNECTED,
+                lastSyncedBoardChecksum = verifiedChecksum,
+                bannerNotice = if (restored) "Reconnected! All ${it.players.sumOf { p -> p.pawns.size }} tokens synchronized." else "Connected and synchronized."
+            )
+        }
+        return restored
+    }
+
+    private fun persistActiveMatchSnapshot() {
+        val s = _uiState.value
+        if (s.players.isEmpty() || s.winner != null) return
+        try {
+            val root = org.json.JSONObject().apply {
+                put("gameMode", s.gameMode.name)
+                put("roomCode", s.roomCode)
+                put("currentWager", s.currentWager)
+                put("userChosenColor", s.userChosenColor.name)
+                put("currentPlayerIndex", s.currentPlayerIndex)
+                put("turnPhase", s.turnPhase.name)
+                put("currentDiceValue", s.currentDiceValue)
+                put("consecutiveSixes", s.consecutiveSixes)
+                put("moveSequenceNumber", s.moveSequenceNumber)
+                put("lastSyncedBoardChecksum", s.lastSyncedBoardChecksum)
+                val playersArray = org.json.JSONArray()
+                for (player in s.players) {
+                    val pObj = org.json.JSONObject().apply {
+                        put("id", player.id)
+                        put("name", player.name)
+                        put("color", player.color.name)
+                        put("isAi", player.isAi)
+                        put("isOnline", player.isOnline)
+                        put("countryFlag", player.countryFlag)
+                        put("avatar", player.avatar)
+                        put("level", player.level)
+                        put("coins", player.coins)
+                        put("lastDiceValue", player.lastDiceValue)
+                        val pawnsArray = org.json.JSONArray()
+                        for (pawn in player.pawns) {
+                            pawnsArray.put(org.json.JSONObject().apply {
+                                put("id", pawn.id)
+                                put("color", pawn.color.name)
+                                put("state", pawn.state.name)
+                                put("trackPosition", pawn.trackPosition)
+                                put("homeStep", pawn.homeStep)
+                                put("isMovable", pawn.isMovable)
+                            })
+                        }
+                        put("pawns", pawnsArray)
+                    }
+                    playersArray.put(pObj)
+                }
+                put("players", playersArray)
+            }
+            profilePreferences.saveActiveMatchSnapshotJson(root.toString())
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun restoreSavedMatchIfPresent(): Boolean {
+        val raw = profilePreferences.getActiveMatchSnapshotJson() ?: return false
+        return try {
+            val root = org.json.JSONObject(raw)
+            val playersArray = root.getJSONArray("players")
+            if (playersArray.length() == 0) return false
+            val restoredPlayers = mutableListOf<Player>()
+            for (i in 0 until playersArray.length()) {
+                val pObj = playersArray.getJSONObject(i)
+                val pColor = LudoColor.valueOf(pObj.getString("color"))
+                val pawnsArray = pObj.getJSONArray("pawns")
+                val pawns = mutableListOf<Pawn>()
+                for (j in 0 until pawnsArray.length()) {
+                    val pn = pawnsArray.getJSONObject(j)
+                    pawns.add(
+                        Pawn(
+                            id = pn.getInt("id"),
+                            color = LudoColor.valueOf(pn.getString("color")),
+                            state = PawnState.valueOf(pn.getString("state")),
+                            trackPosition = pn.getInt("trackPosition"),
+                            homeStep = pn.getInt("homeStep"),
+                            isMovable = pn.optBoolean("isMovable", false)
+                        )
+                    )
+                }
+                restoredPlayers.add(
+                    Player(
+                        id = pObj.getString("id"),
+                        name = pObj.getString("name"),
+                        color = pColor,
+                        isAi = pObj.optBoolean("isAi", false),
+                        isOnline = pObj.optBoolean("isOnline", false),
+                        countryFlag = pObj.optString("countryFlag", "🇮🇳"),
+                        avatar = pObj.optString("avatar", "crown_imperial_gold"),
+                        level = pObj.optInt("level", 12),
+                        coins = pObj.optLong("coins", 15000L),
+                        pawns = pawns,
+                        lastDiceValue = pObj.optInt("lastDiceValue", 1)
+                    )
+                )
+            }
+            val playerIdx = root.getInt("currentPlayerIndex").coerceIn(0, restoredPlayers.lastIndex)
+            val moveSeq = root.optLong("moveSequenceNumber", 0L)
+            val rawPhase = TurnPhase.valueOf(root.getString("turnPhase"))
+            val safePhase = if (rawPhase == TurnPhase.ANIMATING_MOVE) TurnPhase.ROLL_DICE else rawPhase
+            val checksum = LudoEngine.computeMatchStateHash(restoredPlayers, playerIdx, moveSeq)
+            _uiState.update {
+                it.copy(
+                    gameMode = GameMode.valueOf(root.getString("gameMode")),
+                    roomCode = root.getString("roomCode"),
+                    currentWager = root.getLong("currentWager"),
+                    userChosenColor = LudoColor.valueOf(root.getString("userChosenColor")),
+                    players = restoredPlayers,
+                    currentPlayerIndex = playerIdx,
+                    turnPhase = safePhase,
+                    currentDiceValue = root.getInt("currentDiceValue").coerceIn(1, 6),
+                    consecutiveSixes = root.optInt("consecutiveSixes", 0),
+                    moveSequenceNumber = moveSeq,
+                    lastSyncedBoardChecksum = checksum,
+                    isRolling = false,
+                    winner = null
+                )
+            }
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun checkAiTurn() {
@@ -2703,6 +3009,10 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         soundAndHaptics.vibrateClick()
         aiTurnJob?.cancel()
         turnTimerJob?.cancel()
+        moveJob?.cancel()
+        isMoveInProgress = false
+        processedMoveIds.clear()
+        profilePreferences.saveActiveMatchSnapshotJson(null)
         voiceChatManager.stopVoiceChat()
         soundAndHaptics.setGameActive(false)
         val wager = _uiState.value.currentWager

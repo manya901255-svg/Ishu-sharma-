@@ -441,5 +441,21 @@ class ProfilePreferences(private val context: Context) {
     fun isItemOwned(itemId: String): Boolean {
         return getOwnedItems().contains(itemId)
     }
+
+    // ==========================================
+    // ACTIVE MATCH TOKEN & TURN STATE SNAPSHOT
+    // ==========================================
+
+    fun getActiveMatchSnapshotJson(): String? {
+        return prefs.getString("pref_active_match_snapshot", null)
+    }
+
+    fun saveActiveMatchSnapshotJson(json: String?) {
+        if (json == null) {
+            prefs.edit().remove("pref_active_match_snapshot").apply()
+        } else {
+            prefs.edit().putString("pref_active_match_snapshot", json).apply()
+        }
+    }
 }
 
