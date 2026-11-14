@@ -229,12 +229,18 @@ fun Realistic3DDice(
                     brush = Brush.linearGradient(colors = borderColors),
                     shape = RoundedCornerShape(cornerRadiusDp)
                 )
-                .clickable(
-                    enabled = isTurnActive && !isRolling,
-                    interactionSource = interactionSource,
-                    indication = null
-                ) {
-                    onRollClick()
+                .let { baseModifier ->
+                    if (isTurnActive) {
+                        baseModifier.clickable(
+                            enabled = !isRolling,
+                            interactionSource = interactionSource,
+                            indication = null
+                        ) {
+                            onRollClick()
+                        }
+                    } else {
+                        baseModifier
+                    }
                 }
                 .testTag("realistic_dice_clickable"),
             contentAlignment = Alignment.Center

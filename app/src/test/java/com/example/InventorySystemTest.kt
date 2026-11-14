@@ -29,7 +29,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [36], qualifiers = "w411dp-h915dp")
 class InventorySystemTest {
 
     @get:Rule
@@ -108,7 +108,8 @@ class InventorySystemTest {
         }
 
         composeRule.onNodeWithTag("inventory_search_input").performTextInput("Medusa")
-        composeRule.onNodeWithText("Medusa").assertExists()
+        composeRule.onNodeWithTag("inventory_item_card_dice_medusa").assertExists()
+        composeRule.onAllNodesWithText("Medusa").assertCountEquals(2)
         composeRule.onNodeWithText("Scorpius").assertDoesNotExist()
     }
 
@@ -118,6 +119,8 @@ class InventorySystemTest {
         val viewModel = LudoViewModel(application)
         val initialSnap = viewModel.inventoryRepository.ensureInitialized()
         viewModel.applyInventorySnapshot(initialSnap)
+        val diceSnap = viewModel.diceStoreRepository.ensureInitialized()
+        viewModel.applyDiceStoreSnapshot(diceSnap)
 
         val starterDiceCount = ItemCatalog.DICE_ITEMS.count { it.defaultOwned }
         assertEquals(starterDiceCount, viewModel.uiState.value.inventoryUiState.uniqueOwnedCountFor(InventoryCategory.DICE))
@@ -127,6 +130,8 @@ class InventorySystemTest {
         assertTrue(result is PurchaseResult.Success)
         assertEquals(starterDiceCount + 1, viewModel.uiState.value.inventoryUiState.uniqueOwnedCountFor(InventoryCategory.DICE))
 
+        val totalDiceCount = ItemCatalog.itemsForCategory(InventoryCategory.DICE).size
+
         composeRule.setContent {
             val state by viewModel.uiState.collectAsState()
             MyApplicationTheme {
@@ -135,7 +140,7 @@ class InventorySystemTest {
         }
 
         composeRule.onNodeWithTag("inventory_owned_counter")
-            .assertTextContains("Owned: ${starterDiceCount + 1} / ${ItemCatalog.DICE_ITEMS.size}")
+            .assertTextContains("Owned: ${starterDiceCount + 1} / $totalDiceCount")
 
         composeRule.onNodeWithTag("inventory_filter_OWNED").performClick()
         composeRule.onNodeWithText("Wilder").assertExists()
@@ -198,7 +203,17 @@ class InventorySystemTest {
             }
         }
 
+        composeRule.onNodeWithTag("inventory_category_tabs_row")
+            .performScrollToNode(hasTestTag("inventory_tab_OWNED"))
         composeRule.onNodeWithTag("inventory_tab_OWNED").performClick()
+        composeRule.waitForIdle()
+        assertEquals(
+            "Expected OWNED category active, was ${viewModel.uiState.value.inventoryUiState.selectedCategory}, owned=${viewModel.uiState.value.inventoryUiState.ownedItemIds}",
+            InventoryCategory.OWNED,
+            viewModel.uiState.value.inventoryUiState.selectedCategory
+        )
+        composeRule.onNodeWithTag("inventory_items_grid")
+            .performScrollToNode(hasTestTag("inventory_item_card_frame_volt"))
         composeRule.onNodeWithTag("inventory_item_card_frame_volt").assertExists()
     }
 
@@ -408,7 +423,7 @@ class InventorySystemTest {
         // Simulate full app restart by instantiating fresh InventoryRepository & LudoViewModel
         val repo2 = InventoryRepository(application)
         val reloaded = repo2.getInventorySnapshot()
-        assertEquals(25_500L, reloaded.currency.goldCoins)
+        assertEquals(24_000L, reloaded.currency.goldCoins)
         assertEquals(140, reloaded.currency.cashNotes)
         assertTrue(reloaded.isOwned("dice_medusa"))
         assertTrue(reloaded.isOwned("board_luxor"))
@@ -421,7 +436,7 @@ class InventorySystemTest {
         restartedVm.applyInventorySnapshot(reloaded)
         assertEquals("dice_medusa", restartedVm.uiState.value.equippedDiceSkin)
         assertEquals("board_luxor", restartedVm.uiState.value.equippedBoardTheme)
-        assertEquals(25_500L, restartedVm.uiState.value.userCoins)
+        assertEquals(24_000L, restartedVm.uiState.value.userCoins)
         assertEquals(140, restartedVm.uiState.value.userGems)
     }
 

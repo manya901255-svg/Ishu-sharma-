@@ -156,7 +156,7 @@ class LudoTokenSystemTest {
             }
         }
 
-        val boardBounds = composeRule.onNodeWithTag("maharaja_board_view")
+        val boardBounds = composeRule.onNodeWithTag("maharaja_ludo_board_view")
             .assertIsDisplayed()
             .fetchSemanticsNode()
             .boundsInRoot
@@ -265,6 +265,17 @@ class LudoTokenSystemTest {
         assertTrue("Team 2v2 teammates must never capture each other", coopCaptures.isEmpty())
     }
 
+    private fun pumpMainLooperUntilMoveDone(viewModel: LudoViewModel) {
+        val mainShadow = org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper())
+        repeat(40) {
+            mainShadow.idleFor(java.time.Duration.ofMillis(100))
+            if (viewModel.uiState.value.turnPhase != TurnPhase.ANIMATING_MOVE) {
+                mainShadow.idleFor(java.time.Duration.ofMillis(50))
+                return
+            }
+        }
+    }
+
     @Test
     fun `05 clicking movable token executes smooth step move, rejects opponent tokens, and prevents duplicate moves`() {
         val viewModel = LudoViewModel(application)
@@ -300,18 +311,15 @@ class LudoTokenSystemTest {
         )
         assertFalse("Duplicate move for same turn sequence must be rejected", acceptedDuplicate)
 
-        // Wait for move animation coroutine to settle
-        val deadline = System.currentTimeMillis() + 2000L
-        while (viewModel.uiState.value.turnPhase == TurnPhase.ANIMATING_MOVE && System.currentTimeMillis() < deadline) {
-            Thread.sleep(30)
-        }
+        // Pump Robolectric main looper so step animation & finally release complete cleanly
+        pumpMainLooperUntilMoveDone(viewModel)
 
         val movedRedPawn = viewModel.uiState.value.players.first { it.color == LudoColor.RED }.pawns.first { it.id == 0 }
         assertEquals(PawnState.ON_BOARD, movedRedPawn.state)
         assertEquals(LudoColor.RED.startTrackPos, movedRedPawn.trackPosition)
         assertEquals(seqBefore + 1L, viewModel.uiState.value.moveSequenceNumber)
 
-        // Subsequent advance by 4 steps moves Red pawn from 1 -> 5
+        // Subsequent advance by 4 steps moves Red pawn cell-by-cell from 1 -> 5
         val seqSecond = viewModel.uiState.value.moveSequenceNumber
         val advanceAccepted = viewModel.syncRemoteMoveIfAuthorized(
             senderColor = LudoColor.RED,
@@ -321,14 +329,12 @@ class LudoTokenSystemTest {
         )
         assertTrue("Second move by 4 steps must be accepted", advanceAccepted)
 
-        val deadline2 = System.currentTimeMillis() + 3000L
-        while (viewModel.uiState.value.turnPhase == TurnPhase.ANIMATING_MOVE && System.currentTimeMillis() < deadline2) {
-            Thread.sleep(30)
-        }
+        pumpMainLooperUntilMoveDone(viewModel)
 
         val finalRedPawn = viewModel.uiState.value.players.first { it.color == LudoColor.RED }.pawns.first { it.id == 0 }
         assertEquals(PawnState.ON_BOARD, finalRedPawn.state)
         assertEquals(LudoColor.RED.startTrackPos + 4, finalRedPawn.trackPosition)
+        viewModel.leaveCurrentGame()
     }
 
     @Test
@@ -344,15 +350,10 @@ class LudoTokenSystemTest {
 
         // Move Yellow pawn #0 out onto start square (40), then advance 5 steps -> square 45
         assertTrue(viewModel1.syncRemoteMoveIfAuthorized(LudoColor.YELLOW, 0, 6, viewModel1.uiState.value.moveSequenceNumber))
-        val dl1 = System.currentTimeMillis() + 2000L
-        while (viewModel1.uiState.value.turnPhase == TurnPhase.ANIMATING_MOVE && System.currentTimeMillis() < dl1) {
-            Thread.sleep(25)
-        }
+        pumpMainLooperUntilMoveDone(viewModel1)
+
         assertTrue(viewModel1.syncRemoteMoveIfAuthorized(LudoColor.YELLOW, 0, 5, viewModel1.uiState.value.moveSequenceNumber))
-        val dl2 = System.currentTimeMillis() + 3000L
-        while (viewModel1.uiState.value.turnPhase == TurnPhase.ANIMATING_MOVE && System.currentTimeMillis() < dl2) {
-            Thread.sleep(25)
-        }
+        pumpMainLooperUntilMoveDone(viewModel1)
 
         val expectedChecksum = viewModel1.uiState.value.lastSyncedBoardChecksum
         assertTrue(expectedChecksum.isNotBlank())
@@ -399,5 +400,7 @@ class LudoTokenSystemTest {
         val restartedPawns = recreatedVm.uiState.value.players.flatMap { it.pawns }
         assertEquals(16, restartedPawns.size)
         assertTrue("After match restart, all 16 tokens must be IN_BASE", restartedPawns.all { it.state == PawnState.IN_BASE })
+        recreatedVm.leaveCurrentGame()
+        viewModel1.leaveCurrentGame()
     }
 }

@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -617,7 +618,9 @@ private fun InventoryCategoryTabsRow(
     LazyRow(
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("inventory_category_tabs_row")
     ) {
         items(InventoryCategory.entries) { category ->
             val selected = category == selectedCategory
@@ -648,9 +651,9 @@ private fun InventoryCategoryTabsRow(
                         color = borderColor,
                         shape = RoundedCornerShape(14.dp)
                     )
+                    .testTag("inventory_tab_${category.name}")
                     .clickable { onSelectCategory(category) }
-                    .padding(horizontal = 14.dp)
-                    .testTag("inventory_tab_${category.name}"),
+                    .padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Row(
@@ -707,22 +710,29 @@ private fun InventorySearchAndFiltersSection(
                 text = "${category.icon} ${category.title}",
                 color = Color.White,
                 fontSize = 16.sp,
-                fontWeight = FontWeight.Black
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp)
             )
 
             Box(
                 modifier = Modifier
+                    .semantics(mergeDescendants = true) {}
+                    .testTag("inventory_owned_counter")
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0x5500E5FF))
                     .border(1.dp, Color(0xFF00E5FF), RoundedCornerShape(12.dp))
                     .padding(horizontal = 10.dp, vertical = 4.dp)
-                    .testTag("inventory_owned_counter")
             ) {
                 Text(
                     text = "Owned: $ownedCount / $totalCount",
                     color = Color.White,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1
                 )
             }
         }

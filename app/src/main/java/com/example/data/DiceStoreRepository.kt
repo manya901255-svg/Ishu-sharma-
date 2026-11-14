@@ -3,11 +3,13 @@ package com.example.data
 import android.content.Context
 import com.example.model.*
 import com.example.util.ProfilePreferences
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 /**
@@ -40,8 +42,10 @@ class DiceStoreRepository(
     private fun key(playerId: String, diceId: String) = "${playerId}_$diceId"
 
     suspend fun ensureInitialized(playerId: String = prefs.getCurrentPlayerId()): DiceStoreSnapshot =
-        mutex.withLock {
-            ensureInitializedLocked(playerId)
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                ensureInitializedLocked(playerId)
+            }
         }
 
     private suspend fun ensureInitializedLocked(playerId: String): DiceStoreSnapshot {
@@ -117,8 +121,10 @@ class DiceStoreRepository(
     }
 
     suspend fun getSnapshot(playerId: String = prefs.getCurrentPlayerId()): DiceStoreSnapshot =
-        mutex.withLock {
-            ensureInitializedLocked(playerId)
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                ensureInitializedLocked(playerId)
+            }
         }
 
     private suspend fun assembleCatalogLocked(): List<PremiumDiceItem> {
@@ -219,8 +225,9 @@ class DiceStoreRepository(
         playerId: String = prefs.getCurrentPlayerId(),
         diceId: String,
         nowMillis: Long = System.currentTimeMillis()
-    ): Pair<DiceCoinPurchaseResult, DiceStoreSnapshot> = mutex.withLock {
-        ensureInitializedLocked(playerId)
+    ): Pair<DiceCoinPurchaseResult, DiceStoreSnapshot> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureInitializedLocked(playerId)
         val dice = assembleCatalogLocked().firstOrNull { it.id == diceId }
             ?: return@withLock DiceCoinPurchaseResult.Unavailable("Dice '$diceId' not found") to loadSnapshotLocked(playerId)
 
@@ -309,6 +316,7 @@ class DiceStoreRepository(
 
         val snap = loadSnapshotLocked(playerId)
         return@withLock DiceCoinPurchaseResult.Success(dice, txId, newCoins) to snap
+        }
     }
 
     // =========================================================================
@@ -328,8 +336,9 @@ class DiceStoreRepository(
     suspend fun verifyAndProcessBillingPurchase(
         playerId: String = prefs.getCurrentPlayerId(),
         payload: BillingVerificationPayload
-    ): Pair<DiceBillingResult, DiceStoreSnapshot> = mutex.withLock {
-        ensureInitializedLocked(playerId)
+    ): Pair<DiceBillingResult, DiceStoreSnapshot> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureInitializedLocked(playerId)
 
         if (payload.purchaseToken.isBlank()) {
             return@withLock DiceBillingResult.Failed("Invalid or empty purchase token") to loadSnapshotLocked(playerId)
@@ -482,6 +491,7 @@ class DiceStoreRepository(
                 return@withLock DiceBillingResult.VerifiedGranted(dice, txId, payload.purchaseToken) to loadSnapshotLocked(playerId)
             }
         }
+        }
     }
 
     /**
@@ -490,8 +500,9 @@ class DiceStoreRepository(
     suspend fun restorePurchases(
         playerId: String = prefs.getCurrentPlayerId(),
         playPurchases: List<BillingVerificationPayload>
-    ): Pair<Int, DiceStoreSnapshot> = mutex.withLock {
-        ensureInitializedLocked(playerId)
+    ): Pair<Int, DiceStoreSnapshot> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureInitializedLocked(playerId)
         val catalog = assembleCatalogLocked()
         var restoredCount = 0
 
@@ -537,6 +548,7 @@ class DiceStoreRepository(
             }
 
         return@withLock restoredCount to loadSnapshotLocked(playerId)
+        }
     }
 
     private suspend fun grantDiceOwnershipLocked(
@@ -599,43 +611,48 @@ class DiceStoreRepository(
     suspend fun equipDice(
         playerId: String = prefs.getCurrentPlayerId(),
         diceId: String
-    ): Pair<Boolean, DiceStoreSnapshot> = mutex.withLock {
-        ensureInitializedLocked(playerId)
-        val owned = dao.getOwnedDiceByComposite(key(playerId, diceId))
-        val invOwned = invDao.getOwnedItem(key(playerId, diceId))
-        val isOwned = (owned != null && !owned.isRevoked) || (invOwned != null && invOwned.quantity > 0)
-        if (!isOwned) {
-            return@withLock false to loadSnapshotLocked(playerId)
-        }
+    ): Pair<Boolean, DiceStoreSnapshot> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureInitializedLocked(playerId)
+            val owned = dao.getOwnedDiceByComposite(key(playerId, diceId))
+            val invOwned = invDao.getOwnedItem(key(playerId, diceId))
+            val isOwned = (owned != null && !owned.isRevoked) || (invOwned != null && invOwned.quantity > 0)
+            if (!isOwned) {
+                return@withLock false to loadSnapshotLocked(playerId)
+            }
 
-        dao.upsertEquippedDice(PlayerEquippedDiceEntity(playerId, diceId, System.currentTimeMillis()))
-        val invLoadout = invDao.getEquippedLoadout(playerId) ?: EquippedLoadoutEntity(playerId)
-        invDao.upsertEquippedLoadout(invLoadout.copy(diceId = diceId, updatedAt = System.currentTimeMillis()))
-        if (playerId == prefs.getCurrentPlayerId()) {
-            prefs.setEquippedDiceSkin(diceId)
+            dao.upsertEquippedDice(PlayerEquippedDiceEntity(playerId, diceId, System.currentTimeMillis()))
+            val invLoadout = invDao.getEquippedLoadout(playerId) ?: EquippedLoadoutEntity(playerId)
+            invDao.upsertEquippedLoadout(invLoadout.copy(diceId = diceId, updatedAt = System.currentTimeMillis()))
+            if (playerId == prefs.getCurrentPlayerId()) {
+                prefs.setEquippedDiceSkin(diceId)
+            }
+            return@withLock true to loadSnapshotLocked(playerId)
         }
-        return@withLock true to loadSnapshotLocked(playerId)
     }
 
     suspend fun unequipDice(
         playerId: String = prefs.getCurrentPlayerId()
-    ): DiceStoreSnapshot = mutex.withLock {
-        ensureInitializedLocked(playerId)
-        dao.upsertEquippedDice(PlayerEquippedDiceEntity(playerId, "dice_imperial_gold", System.currentTimeMillis()))
-        val invLoadout = invDao.getEquippedLoadout(playerId) ?: EquippedLoadoutEntity(playerId)
-        invDao.upsertEquippedLoadout(invLoadout.copy(diceId = "dice_imperial_gold", updatedAt = System.currentTimeMillis()))
-        if (playerId == prefs.getCurrentPlayerId()) {
-            prefs.setEquippedDiceSkin("dice_imperial_gold")
+    ): DiceStoreSnapshot = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureInitializedLocked(playerId)
+            dao.upsertEquippedDice(PlayerEquippedDiceEntity(playerId, "dice_imperial_gold", System.currentTimeMillis()))
+            val invLoadout = invDao.getEquippedLoadout(playerId) ?: EquippedLoadoutEntity(playerId)
+            invDao.upsertEquippedLoadout(invLoadout.copy(diceId = "dice_imperial_gold", updatedAt = System.currentTimeMillis()))
+            if (playerId == prefs.getCurrentPlayerId()) {
+                prefs.setEquippedDiceSkin("dice_imperial_gold")
+            }
+            loadSnapshotLocked(playerId)
         }
-        loadSnapshotLocked(playerId)
     }
 
     suspend fun incrementChallengeProgress(
         playerId: String = prefs.getCurrentPlayerId(),
         delta: Int = 1,
         nowMillis: Long = System.currentTimeMillis()
-    ): Pair<List<PremiumDiceItem>, DiceStoreSnapshot> = mutex.withLock {
-        ensureInitializedLocked(playerId)
+    ): Pair<List<PremiumDiceItem>, DiceStoreSnapshot> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureInitializedLocked(playerId)
         val catalog = assembleCatalogLocked()
         val unlockedNow = mutableListOf<PremiumDiceItem>()
 
@@ -662,14 +679,16 @@ class DiceStoreRepository(
             }
         }
         return@withLock unlockedNow to loadSnapshotLocked(playerId)
+        }
     }
 
     suspend fun claimEventOrChallengeDice(
         playerId: String = prefs.getCurrentPlayerId(),
         diceId: String,
         nowMillis: Long = System.currentTimeMillis()
-    ): Pair<Boolean, DiceStoreSnapshot> = mutex.withLock {
-        ensureInitializedLocked(playerId)
+    ): Pair<Boolean, DiceStoreSnapshot> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureInitializedLocked(playerId)
         val dice = assembleCatalogLocked().firstOrNull { it.id == diceId }
             ?: return@withLock false to loadSnapshotLocked(playerId)
 
@@ -698,6 +717,7 @@ class DiceStoreRepository(
             )
         )
         return@withLock true to loadSnapshotLocked(playerId)
+        }
     }
 
     // =========================================================================
@@ -707,26 +727,30 @@ class DiceStoreRepository(
     suspend fun adminSaveOrUpdateDice(
         dice: PremiumDiceItem,
         playerId: String = prefs.getCurrentPlayerId()
-    ): DiceStoreSnapshot = mutex.withLock {
-        ensureInitializedLocked(playerId)
-        val updated = dice.copy(updatedAt = System.currentTimeMillis())
-        dao.upsertDiceCatalog(updated.toCatalogEntity())
-        dao.upsertDiceAsset(updated.toAssetEntity())
-        dao.upsertDiceBenefit(updated.toBenefitEntity())
-        loadSnapshotLocked(playerId)
+    ): DiceStoreSnapshot = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureInitializedLocked(playerId)
+            val updated = dice.copy(updatedAt = System.currentTimeMillis())
+            dao.upsertDiceCatalog(updated.toCatalogEntity())
+            dao.upsertDiceAsset(updated.toAssetEntity())
+            dao.upsertDiceBenefit(updated.toBenefitEntity())
+            loadSnapshotLocked(playerId)
+        }
     }
 
     suspend fun adminDeleteDice(
         diceId: String,
         playerId: String = prefs.getCurrentPlayerId()
-    ): DiceStoreSnapshot = mutex.withLock {
-        ensureInitializedLocked(playerId)
-        if (diceId != "dice_imperial_gold") {
-            dao.deleteDiceCatalog(diceId)
-            dao.deleteDiceAsset(diceId)
-            dao.deleteDiceBenefit(diceId)
+    ): DiceStoreSnapshot = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            ensureInitializedLocked(playerId)
+            if (diceId != "dice_imperial_gold") {
+                dao.deleteDiceCatalog(diceId)
+                dao.deleteDiceAsset(diceId)
+                dao.deleteDiceBenefit(diceId)
+            }
+            loadSnapshotLocked(playerId)
         }
-        loadSnapshotLocked(playerId)
     }
 
     // =========================================================================

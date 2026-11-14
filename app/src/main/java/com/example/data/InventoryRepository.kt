@@ -3,8 +3,10 @@ package com.example.data
 import android.content.Context
 import com.example.model.*
 import com.example.util.ProfilePreferences
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 /**
@@ -37,8 +39,10 @@ class InventoryRepository(context: Context) {
         playerId: String = prefs.getCurrentPlayerId(),
         initialCoins: Long = prefs.getUserCoins(),
         initialCash: Int = prefs.getUserGems()
-    ): PlayerInventory = txMutex.withLock {
-        ensureInitializedLocked(playerId, initialCoins, initialCash)
+    ): PlayerInventory = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, initialCoins, initialCash)
+        }
     }
 
     private suspend fun ensureInitializedLocked(
@@ -144,8 +148,10 @@ class InventoryRepository(context: Context) {
     }
 
     suspend fun getInventorySnapshot(playerId: String = prefs.getCurrentPlayerId()): PlayerInventory =
-        txMutex.withLock {
-            ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+        withContext(Dispatchers.IO) {
+            txMutex.withLock {
+                ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+            }
         }
 
     private suspend fun loadInventorySnapshotLocked(playerId: String): PlayerInventory {
@@ -211,17 +217,19 @@ class InventoryRepository(context: Context) {
         playerId: String = prefs.getCurrentPlayerId(),
         goldCoins: Long,
         cashNotes: Int
-    ): PlayerInventory = txMutex.withLock {
-        ensureInitializedLocked(playerId, goldCoins, cashNotes)
-        dao.upsertWallet(
-            PlayerWalletEntity(
-                playerId = playerId,
-                goldCoins = goldCoins.coerceAtLeast(0L),
-                cashNotes = cashNotes.coerceAtLeast(0),
-                updatedAt = System.currentTimeMillis()
+    ): PlayerInventory = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, goldCoins, cashNotes)
+            dao.upsertWallet(
+                PlayerWalletEntity(
+                    playerId = playerId,
+                    goldCoins = goldCoins.coerceAtLeast(0L),
+                    cashNotes = cashNotes.coerceAtLeast(0),
+                    updatedAt = System.currentTimeMillis()
+                )
             )
-        )
-        loadInventorySnapshotLocked(playerId)
+            loadInventorySnapshotLocked(playerId)
+        }
     }
 
     /**
@@ -231,19 +239,21 @@ class InventoryRepository(context: Context) {
         playerId: String = prefs.getCurrentPlayerId(),
         coinsDelta: Long = 0L,
         cashDelta: Int = 0
-    ): PlayerCurrency = txMutex.withLock {
-        ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
-        val wallet = dao.getWallet(playerId)!!
-        val nextCoins = (wallet.goldCoins + coinsDelta).coerceAtLeast(0L)
-        val nextCash = (wallet.cashNotes + cashDelta).coerceAtLeast(0)
-        dao.upsertWallet(
-            wallet.copy(goldCoins = nextCoins, cashNotes = nextCash, updatedAt = System.currentTimeMillis())
-        )
-        if (playerId == prefs.getCurrentPlayerId()) {
-            prefs.setUserCoins(nextCoins)
-            prefs.setUserGems(nextCash)
+    ): PlayerCurrency = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+            val wallet = dao.getWallet(playerId)!!
+            val nextCoins = (wallet.goldCoins + coinsDelta).coerceAtLeast(0L)
+            val nextCash = (wallet.cashNotes + cashDelta).coerceAtLeast(0)
+            dao.upsertWallet(
+                wallet.copy(goldCoins = nextCoins, cashNotes = nextCash, updatedAt = System.currentTimeMillis())
+            )
+            if (playerId == prefs.getCurrentPlayerId()) {
+                prefs.setUserCoins(nextCoins)
+                prefs.setUserGems(nextCash)
+            }
+            PlayerCurrency(playerId, nextCoins, nextCash)
         }
-        PlayerCurrency(playerId, nextCoins, nextCash)
     }
 
     /**
@@ -254,8 +264,9 @@ class InventoryRepository(context: Context) {
         playerId: String = prefs.getCurrentPlayerId(),
         itemId: String,
         nowMillis: Long = System.currentTimeMillis()
-    ): Pair<PurchaseResult, PlayerInventory> = txMutex.withLock {
-        ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+    ): Pair<PurchaseResult, PlayerInventory> = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
         val item = ItemCatalog.findById(itemId)
         if (item == null) {
             return@withLock PurchaseResult.NotFound(itemId) to loadInventorySnapshotLocked(playerId)
@@ -377,6 +388,7 @@ class InventoryRepository(context: Context) {
             timestamp = nowMillis
         )
         return@withLock PurchaseResult.Success(item, resultTx) to loadInventorySnapshotLocked(playerId)
+        }
     }
 
     /**
@@ -387,8 +399,9 @@ class InventoryRepository(context: Context) {
         itemId: String,
         quantityToAdd: Int = 1,
         source: String = "CHEST"
-    ): PlayerInventory = txMutex.withLock {
-        ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+    ): PlayerInventory = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
         val item = ItemCatalog.findById(itemId) ?: return@withLock loadInventorySnapshotLocked(playerId)
         val existing = dao.getOwnedItem(key(playerId, itemId))
         val nextQty = if (item.isConsumable) (existing?.quantity ?: 0) + quantityToAdd else 1
@@ -422,6 +435,7 @@ class InventoryRepository(context: Context) {
             prefs.addOwnedItem(itemId)
         }
         loadInventorySnapshotLocked(playerId)
+        }
     }
 
     /**
@@ -438,8 +452,9 @@ class InventoryRepository(context: Context) {
         cashReward: Int = 0,
         targetProgressItemId: String? = "emoji_guy_crying",
         nowMillis: Long = System.currentTimeMillis()
-    ): Pair<AdVerificationResult, PlayerInventory> = txMutex.withLock {
-        ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+    ): Pair<AdVerificationResult, PlayerInventory> = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
         if (!verified) {
             return@withLock AdVerificationResult.NotVerified("Ad skipped or failed verification") to loadInventorySnapshotLocked(playerId)
         }
@@ -520,6 +535,7 @@ class InventoryRepository(context: Context) {
             cashGranted = cashReward,
             unlockedItemIds = unlockedIds
         ) to loadInventorySnapshotLocked(playerId)
+        }
     }
 
     /**
@@ -532,8 +548,9 @@ class InventoryRepository(context: Context) {
         delta: Int = 1,
         expiresAtMillis: Long = Long.MAX_VALUE,
         nowMillis: Long = System.currentTimeMillis()
-    ): Pair<Boolean, PlayerInventory> = txMutex.withLock {
-        ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+    ): Pair<Boolean, PlayerInventory> = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
         val item = ItemCatalog.findById(itemId) ?: return@withLock false to loadInventorySnapshotLocked(playerId)
         val progKey = key(playerId, itemId)
         val existing = dao.getEventProgress(progKey)
@@ -573,6 +590,7 @@ class InventoryRepository(context: Context) {
             }
         }
         return@withLock completed to loadInventorySnapshotLocked(playerId)
+        }
     }
 
     /**
@@ -581,8 +599,9 @@ class InventoryRepository(context: Context) {
     suspend fun equipItem(
         playerId: String = prefs.getCurrentPlayerId(),
         itemId: String
-    ): Pair<Boolean, PlayerInventory> = txMutex.withLock {
-        ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+    ): Pair<Boolean, PlayerInventory> = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
         val item = ItemCatalog.findById(itemId) ?: return@withLock false to loadInventorySnapshotLocked(playerId)
         val owned = dao.getOwnedItem(key(playerId, itemId))
         if (owned == null || owned.quantity <= 0) {
@@ -609,6 +628,7 @@ class InventoryRepository(context: Context) {
             }
         }
         return@withLock true to loadInventorySnapshotLocked(playerId)
+        }
     }
 
     /**
@@ -617,8 +637,9 @@ class InventoryRepository(context: Context) {
     suspend fun unequipCategory(
         playerId: String = prefs.getCurrentPlayerId(),
         category: InventoryCategory
-    ): PlayerInventory = txMutex.withLock {
-        ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+    ): PlayerInventory = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
         val currentLoadout = dao.getEquippedLoadout(playerId) ?: EquippedLoadoutEntity(playerId)
         val updated = when (category) {
             InventoryCategory.DICE -> currentLoadout.copy(diceId = ProfilePreferences.DEFAULT_DICE_SKIN)
@@ -635,19 +656,22 @@ class InventoryRepository(context: Context) {
             prefs.setEquippedTokenSkin(updated.pawnId)
         }
         loadInventorySnapshotLocked(playerId)
+        }
     }
 
     suspend fun setPawnTrailEnabled(
         playerId: String = prefs.getCurrentPlayerId(),
         enabled: Boolean
-    ): PlayerInventory = txMutex.withLock {
-        ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
-        val currentLoadout = dao.getEquippedLoadout(playerId) ?: EquippedLoadoutEntity(playerId)
-        dao.upsertEquippedLoadout(currentLoadout.copy(pawnTrailEnabled = enabled, updatedAt = System.currentTimeMillis()))
-        if (playerId == prefs.getCurrentPlayerId()) {
-            prefs.setPawnTrailEnabled(enabled)
+    ): PlayerInventory = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+            val currentLoadout = dao.getEquippedLoadout(playerId) ?: EquippedLoadoutEntity(playerId)
+            dao.upsertEquippedLoadout(currentLoadout.copy(pawnTrailEnabled = enabled, updatedAt = System.currentTimeMillis()))
+            if (playerId == prefs.getCurrentPlayerId()) {
+                prefs.setPawnTrailEnabled(enabled)
+            }
+            loadInventorySnapshotLocked(playerId)
         }
-        loadInventorySnapshotLocked(playerId)
     }
 
     // ======================================================
@@ -658,8 +682,9 @@ class InventoryRepository(context: Context) {
         playerId: String = prefs.getCurrentPlayerId(),
         slotIndex: Int,
         emojiItemId: String
-    ): Pair<Boolean, PlayerInventory> = txMutex.withLock {
-        ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+    ): Pair<Boolean, PlayerInventory> = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
         if (slotIndex !in 0 until EmojiDeck.MAX_SLOTS) {
             return@withLock false to loadInventorySnapshotLocked(playerId)
         }
@@ -685,40 +710,45 @@ class InventoryRepository(context: Context) {
             )
         )
         return@withLock true to loadInventorySnapshotLocked(playerId)
+        }
     }
 
     suspend fun removeEmojiFromDeckSlot(
         playerId: String = prefs.getCurrentPlayerId(),
         slotIndex: Int
-    ): PlayerInventory = txMutex.withLock {
-        ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
-        if (slotIndex in 0 until EmojiDeck.MAX_SLOTS) {
-            dao.upsertEmojiDeckSlot(
-                EmojiDeckSlotEntity(
-                    compositeId = slotKey(playerId, slotIndex),
-                    playerId = playerId,
-                    slotIndex = slotIndex,
-                    emojiItemId = null
+    ): PlayerInventory = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+            if (slotIndex in 0 until EmojiDeck.MAX_SLOTS) {
+                dao.upsertEmojiDeckSlot(
+                    EmojiDeckSlotEntity(
+                        compositeId = slotKey(playerId, slotIndex),
+                        playerId = playerId,
+                        slotIndex = slotIndex,
+                        emojiItemId = null
+                    )
                 )
-            )
+            }
+            loadInventorySnapshotLocked(playerId)
         }
-        loadInventorySnapshotLocked(playerId)
     }
 
     suspend fun swapEmojiDeckSlots(
         playerId: String = prefs.getCurrentPlayerId(),
         fromSlot: Int,
         toSlot: Int
-    ): PlayerInventory = txMutex.withLock {
-        ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
-        if (fromSlot in 0 until EmojiDeck.MAX_SLOTS && toSlot in 0 until EmojiDeck.MAX_SLOTS && fromSlot != toSlot) {
-            val allSlots = dao.getEmojiDeckSlots(playerId).associateBy { it.slotIndex }
-            val fromId = allSlots[fromSlot]?.emojiItemId
-            val toId = allSlots[toSlot]?.emojiItemId
-            dao.upsertEmojiDeckSlot(EmojiDeckSlotEntity(slotKey(playerId, fromSlot), playerId, fromSlot, toId))
-            dao.upsertEmojiDeckSlot(EmojiDeckSlotEntity(slotKey(playerId, toSlot), playerId, toSlot, fromId))
+    ): PlayerInventory = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+            if (fromSlot in 0 until EmojiDeck.MAX_SLOTS && toSlot in 0 until EmojiDeck.MAX_SLOTS && fromSlot != toSlot) {
+                val allSlots = dao.getEmojiDeckSlots(playerId).associateBy { it.slotIndex }
+                val fromId = allSlots[fromSlot]?.emojiItemId
+                val toId = allSlots[toSlot]?.emojiItemId
+                dao.upsertEmojiDeckSlot(EmojiDeckSlotEntity(slotKey(playerId, fromSlot), playerId, fromSlot, toId))
+                dao.upsertEmojiDeckSlot(EmojiDeckSlotEntity(slotKey(playerId, toSlot), playerId, toSlot, fromId))
+            }
+            loadInventorySnapshotLocked(playerId)
         }
-        loadInventorySnapshotLocked(playerId)
     }
 
     // ======================================================
@@ -729,8 +759,9 @@ class InventoryRepository(context: Context) {
         playerId: String = prefs.getCurrentPlayerId(),
         itemId: String,
         nowMillis: Long = System.currentTimeMillis()
-    ): Pair<PowerupActivationResult, PlayerInventory> = txMutex.withLock {
-        ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
+    ): Pair<PowerupActivationResult, PlayerInventory> = withContext(Dispatchers.IO) {
+        txMutex.withLock {
+            ensureInitializedLocked(playerId, prefs.getUserCoins(), prefs.getUserGems())
         val item = ItemCatalog.findById(itemId)
         if (item == null || item.category != InventoryCategory.POWERUP) {
             return@withLock PowerupActivationResult.Error("Invalid powerup") to loadInventorySnapshotLocked(playerId)
@@ -785,8 +816,11 @@ class InventoryRepository(context: Context) {
             dailyResetDay = updatedEntity.dailyResetDay
         )
         return@withLock PowerupActivationResult.Activated(item, resultModel) to loadInventorySnapshotLocked(playerId)
+        }
     }
 
     suspend fun getPurchaseHistory(playerId: String = prefs.getCurrentPlayerId()): List<PurchaseTransactionEntity> =
-        dao.getPurchaseTransactions(playerId)
+        withContext(Dispatchers.IO) {
+            dao.getPurchaseTransactions(playerId)
+        }
 }

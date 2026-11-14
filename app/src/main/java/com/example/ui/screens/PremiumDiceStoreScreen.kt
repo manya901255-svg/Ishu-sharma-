@@ -1099,7 +1099,7 @@ private fun DiceDetailPopupDialog(
                         diceValue = previewDiceValue,
                         isRolling = isPreviewRolling,
                         playerColor = LudoColor.YELLOW,
-                        isTurnActive = false,
+                        isTurnActive = !isPreviewRolling,
                         diceSize = 96.dp,
                         diceSkinId = dice.id,
                         diceItemOverride = dice,

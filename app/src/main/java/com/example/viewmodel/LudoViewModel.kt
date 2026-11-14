@@ -254,6 +254,8 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     private var musicSearchJob: Job? = null
     @Volatile
     private var isMoveInProgress: Boolean = false
+    @Volatile
+    private var hasInventoryMutation: Boolean = false
     private val processedMoveIds = mutableSetOf<String>()
 
     init {
@@ -395,7 +397,12 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 initialCoins = savedCoins,
                 initialCash = savedGems
             )
-            applyInventorySnapshot(invSnapshot)
+            val currentInvSnapshot = if (hasInventoryMutation) {
+                inventoryRepository.getInventorySnapshot(profilePreferences.getCurrentPlayerId())
+            } else {
+                invSnapshot
+            }
+            applyInventorySnapshot(currentInvSnapshot)
 
             val diceSnap = diceStoreRepository.ensureInitialized(profilePreferences.getCurrentPlayerId())
             applyDiceStoreSnapshot(diceSnap)
@@ -3218,6 +3225,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     suspend fun purchaseInventoryItemSync(itemId: String): PurchaseResult {
+        hasInventoryMutation = true
         _uiState.update {
             it.copy(inventoryUiState = it.inventoryUiState.copy(isProcessingTransaction = true, errorMessage = null))
         }

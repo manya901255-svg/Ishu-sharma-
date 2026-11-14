@@ -2,6 +2,7 @@ package com.example
 
 import android.app.Application
 import android.content.Context
+import android.os.Looper
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.*
@@ -26,10 +27,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [36], qualifiers = "w411dp-h915dp")
 class PremiumDiceStoreTest {
 
     @get:Rule
@@ -122,7 +124,10 @@ class PremiumDiceStoreTest {
         composeRule.onNodeWithTag("dice_card_dice_panda").performClick()
         composeRule.onNodeWithTag("dice_detail_dialog").assertExists()
         composeRule.onNodeWithTag("dice_try_preview_button").performClick()
-        composeRule.onNodeWithText("Bamboo Wood Tap", substring = true).assertExists()
+        composeRule.onNode(
+            hasText("Bamboo Wood Tap", substring = true) and
+                hasAnyAncestor(hasTestTag("dice_detail_dialog"))
+        ).assertExists()
     }
 
     @Test
@@ -137,25 +142,29 @@ class PremiumDiceStoreTest {
 
         // 1. Purchase Royal Blue Dice (5,000 coins out of 25,000) via UI confirmation flow
         composeRule.onNodeWithTag("dice_card_dice_royal_blue").performClick()
-        composeRule.onNodeWithTag("buy_dice_coins_button").performClick()
+        composeRule.onNodeWithTag("buy_dice_coins_button").performScrollTo().performClick()
         composeRule.onNodeWithTag("confirm_coin_purchase_dialog").assertExists()
         composeRule.onNodeWithTag("confirm_coin_purchase_accept").performClick()
+        composeRule.onNodeWithTag("confirm_coin_purchase_dialog").assertDoesNotExist()
 
-        composeRule.waitUntil(timeoutMillis = 3000L) {
-            viewModel.uiState.value.diceStoreUiState.isOwned("dice_royal_blue")
+        composeRule.waitUntil(timeoutMillis = 5000L) {
+            shadowOf(Looper.getMainLooper()).idle()
+            viewModel.uiState.value.diceStoreUiState.isOwned("dice_royal_blue") &&
+                viewModel.uiState.value.equippedDiceSkin == "dice_royal_blue"
         }
         assertEquals(20_000L, viewModel.uiState.value.userCoins)
         assertEquals("dice_royal_blue", viewModel.uiState.value.equippedDiceSkin)
-        composeRule.onNodeWithTag("equipped_dice_indicator").assertExists()
+        composeRule.onNodeWithTag("equipped_dice_indicator").performScrollTo().assertExists()
         composeRule.onNodeWithTag("dice_detail_close_button").performClick()
 
         // 2. Attempt Golden Leaf VIP (150,000 coins > 20,000 coins) -> shows insufficient coins modal
         composeRule.onNodeWithTag("dice_group_tab_VIP").performClick()
         composeRule.onNodeWithTag("dice_card_dice_golden_leaf_vip").performClick()
-        composeRule.onNodeWithTag("buy_dice_coins_button").performClick()
+        composeRule.onNodeWithTag("buy_dice_coins_button").performScrollTo().performClick()
         composeRule.onNodeWithTag("confirm_coin_purchase_accept").performClick()
 
-        composeRule.waitUntil(timeoutMillis = 3000L) {
+        composeRule.waitUntil(timeoutMillis = 5000L) {
+            shadowOf(Looper.getMainLooper()).idle()
             viewModel.uiState.value.diceStoreUiState.insufficientCoinsDialogDice != null
         }
         composeRule.onNodeWithTag("insufficient_coins_dialog").assertExists()
