@@ -1,0 +1,501 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated player wallet, progression, streak, and settings profile (owner/admin only).",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "avatarEmoji": { "type": "string" },
+        "goldCoins": { "type": "integer" },
+        "cashNotes": { "type": "integer" },
+        "xp": { "type": "integer" },
+        "level": { "type": "integer" },
+        "matchesPlayed": { "type": "integer" },
+        "matchesWon": { "type": "integer" },
+        "winStreak": { "type": "integer" },
+        "bestWinStreak": { "type": "integer" },
+        "totalDiceRolls": { "type": "integer" },
+        "totalCaptures": { "type": "integer" },
+        "totalEarnings": { "type": "integer" },
+        "loginStreak": { "type": "integer" },
+        "lastLoginDayKey": { "type": "string" },
+        "dailySpinDayKey": { "type": "string" },
+        "referralCode": { "type": "string" },
+        "referredByUid": { "type": "string" },
+        "verifiedInvitesCount": { "type": "integer" },
+        "activeClubId": { "type": "string" },
+        "themeMode": { "type": "string", "enum": ["DARK", "LIGHT"] },
+        "notificationPrefs": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "goldCoins", "cashNotes", "xp", "level", "referralCode", "createdAt", "updatedAt"]
+    },
+    "PublicProfile": {
+      "title": "PublicProfile",
+      "description": "Non-PII public player card used for Global/Club leaderboards, friend discovery, and recent players.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "avatarEmoji": { "type": "string" },
+        "level": { "type": "integer" },
+        "xp": { "type": "integer" },
+        "matchesPlayed": { "type": "integer" },
+        "matchesWon": { "type": "integer" },
+        "winStreak": { "type": "integer" },
+        "totalEarnings": { "type": "integer" },
+        "referralCode": { "type": "string" },
+        "activeClubId": { "type": "string" },
+        "clubName": { "type": "string" },
+        "isOnline": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "level", "xp", "matchesPlayed", "matchesWon", "totalEarnings", "updatedAt"]
+    },
+    "TaskProgress": {
+      "title": "TaskProgress",
+      "description": "Verified daily, weekly, event, streak, tournament, club, and level task progress and claim state.",
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string" },
+        "userId": { "type": "string" },
+        "category": { "type": "string", "enum": ["DAILY", "WEEKLY", "CHALLENGE", "LOGIN_STREAK", "WIN_STREAK", "CLUB", "TOURNAMENT", "LEVEL", "EVENT"] },
+        "title": { "type": "string" },
+        "progress": { "type": "integer" },
+        "target": { "type": "integer" },
+        "rewardCoins": { "type": "integer" },
+        "rewardCash": { "type": "integer" },
+        "rewardXp": { "type": "integer" },
+        "status": { "type": "string", "enum": ["IN_PROGRESS", "COMPLETED", "CLAIMED"] },
+        "periodKey": { "type": "string" },
+        "verifiedEventIds": { "type": "array" },
+        "rewardTxId": { "type": "string" },
+        "claimedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["taskId", "userId", "category", "title", "progress", "target", "rewardCoins", "rewardCash", "status", "periodKey", "updatedAt"]
+    },
+    "RewardHistoryEntry": {
+      "title": "RewardHistoryEntry",
+      "description": "Append-only reward transaction ledger keyed by unique txId to prevent duplicate reward claims.",
+      "type": "object",
+      "properties": {
+        "txId": { "type": "string" },
+        "userId": { "type": "string" },
+        "sourceType": { "type": "string" },
+        "sourceId": { "type": "string" },
+        "periodKey": { "type": "string" },
+        "coinsDelta": { "type": "integer" },
+        "cashDelta": { "type": "integer" },
+        "xpDelta": { "type": "integer" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["txId", "userId", "sourceType", "sourceId", "periodKey", "coinsDelta", "cashDelta", "description", "createdAt"]
+    },
+    "DailyActivityStats": {
+      "title": "DailyActivityStats",
+      "description": "Per-day gameplay activity log.",
+      "type": "object",
+      "properties": {
+        "dayKey": { "type": "string" },
+        "userId": { "type": "string" },
+        "matchesPlayed": { "type": "integer" },
+        "matchesWon": { "type": "integer" },
+        "diceRolls": { "type": "integer" },
+        "captures": { "type": "integer" },
+        "minutesPlayed": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["dayKey", "userId", "matchesPlayed", "matchesWon", "diceRolls", "captures", "updatedAt"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "In-app and push notification record scoped to a user.",
+      "type": "object",
+      "properties": {
+        "notifId": { "type": "string" },
+        "recipientUid": { "type": "string" },
+        "senderId": { "type": "string" },
+        "category": { "type": "string", "enum": ["FRIEND_REQUEST", "CLUB_INVITE", "CLUB_MESSAGE", "MATCH_INVITE", "TASK_COMPLETE", "REWARD_AVAILABLE", "ACHIEVEMENT"] },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "targetId": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["notifId", "recipientUid", "senderId", "category", "title", "body", "isRead", "createdAt"]
+    },
+    "FriendRequest": {
+      "title": "FriendRequest",
+      "description": "Incoming/outgoing friend request between two players.",
+      "type": "object",
+      "properties": {
+        "requestId": { "type": "string" },
+        "fromUid": { "type": "string" },
+        "toUid": { "type": "string" },
+        "fromName": { "type": "string" },
+        "toName": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "ACCEPTED", "DECLINED"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["requestId", "fromUid", "toUid", "fromName", "toName", "status", "createdAt", "updatedAt"]
+    },
+    "Friendship": {
+      "title": "Friendship",
+      "description": "Mutual friendship edge connecting two UIDs.",
+      "type": "object",
+      "properties": {
+        "friendshipId": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "userAUid": { "type": "string" },
+        "userBUid": { "type": "string" },
+        "userAName": { "type": "string" },
+        "userBName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["friendshipId", "memberUids", "userAUid", "userBUid", "userAName", "userBName", "createdAt"]
+    },
+    "FollowRelation": {
+      "title": "FollowRelation",
+      "description": "One-way follow link for favorite players.",
+      "type": "object",
+      "properties": {
+        "followId": { "type": "string" },
+        "followerUid": { "type": "string" },
+        "followedUid": { "type": "string" },
+        "followedName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["followId", "followerUid", "followedUid", "followedName", "createdAt"]
+    },
+    "PrivateChatThread": {
+      "title": "PrivateChatThread",
+      "description": "1:1 private conversation metadata between two players.",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "lastMessage": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["chatId", "memberUids", "lastMessage", "updatedAt"]
+    },
+    "PrivateChatMessage": {
+      "title": "PrivateChatMessage",
+      "description": "Message inside a 1:1 private chat thread.",
+      "type": "object",
+      "properties": {
+        "messageId": { "type": "string" },
+        "chatId": { "type": "string" },
+        "senderUid": { "type": "string" },
+        "senderName": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["messageId", "chatId", "senderUid", "senderName", "memberUids", "text", "createdAt"]
+    },
+    "ReferralClaim": {
+      "title": "ReferralClaim",
+      "description": "Verified friend invitation record keyed by inviteeUid.",
+      "type": "object",
+      "properties": {
+        "inviteeUid": { "type": "string" },
+        "inviteeName": { "type": "string" },
+        "referrerUid": { "type": "string" },
+        "referralCode": { "type": "string" },
+        "status": { "type": "string", "enum": ["VERIFIED"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["inviteeUid", "inviteeName", "referrerUid", "referralCode", "status", "createdAt"]
+    },
+    "VoiceClub": {
+      "title": "VoiceClub",
+      "description": "Social Voice Club with owner, public/private visibility, announcements, and bounded member list.",
+      "type": "object",
+      "properties": {
+        "clubId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "avatarEmoji": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "isPrivate": { "type": "boolean" },
+        "inviteCode": { "type": "string" },
+        "announcement": { "type": "string" },
+        "memberCount": { "type": "integer" },
+        "clubXp": { "type": "integer" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clubId", "name", "description", "avatarEmoji", "ownerId", "ownerName", "isPrivate", "memberCount", "clubXp", "memberUids", "createdAt", "updatedAt"]
+    },
+    "VoiceClubMember": {
+      "title": "VoiceClubMember",
+      "description": "Member role and online status inside a Voice Club.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "clubId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["OWNER", "ADMIN", "MODERATOR", "MEMBER"] },
+        "isOnline": { "type": "boolean" },
+        "isMutedByMod": { "type": "boolean" },
+        "joinedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "clubId", "displayName", "role", "isOnline", "isMutedByMod", "joinedAt", "updatedAt"]
+    },
+    "VoiceClubBannedUser": {
+      "title": "VoiceClubBannedUser",
+      "description": "Blocked/kicked user record preventing club reentry.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "clubId": { "type": "string" },
+        "bannedByUid": { "type": "string" },
+        "reason": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "clubId", "bannedByUid", "reason", "createdAt"]
+    },
+    "ClubChatMessage": {
+      "title": "ClubChatMessage",
+      "description": "Text/emoji chat or announcement inside a Voice Club.",
+      "type": "object",
+      "properties": {
+        "messageId": { "type": "string" },
+        "clubId": { "type": "string" },
+        "senderUid": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "isAnnouncement": { "type": "boolean" },
+        "isPublicClub": { "type": "boolean" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["messageId", "clubId", "senderUid", "senderName", "text", "isAnnouncement", "isPublicClub", "memberUids", "createdAt"]
+    },
+    "ClubInvitation": {
+      "title": "ClubInvitation",
+      "description": "Invitation for a player to join a Voice Club.",
+      "type": "object",
+      "properties": {
+        "inviteId": { "type": "string" },
+        "clubId": { "type": "string" },
+        "clubName": { "type": "string" },
+        "fromUid": { "type": "string" },
+        "fromName": { "type": "string" },
+        "toUid": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "ACCEPTED", "DECLINED"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["inviteId", "clubId", "clubName", "fromUid", "fromName", "toUid", "status", "createdAt"]
+    },
+    "ClubVoiceRoom": {
+      "title": "ClubVoiceRoom",
+      "description": "Live voice room hosted within a Voice Club.",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string" },
+        "clubId": { "type": "string" },
+        "title": { "type": "string" },
+        "hostUid": { "type": "string" },
+        "isPublic": { "type": "boolean" },
+        "allowedUids": { "type": "array" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["roomId", "clubId", "title", "hostUid", "isPublic", "allowedUids", "isActive", "createdAt"]
+    },
+    "VoiceParticipant": {
+      "title": "VoiceParticipant",
+      "description": "Active speaker/listener state in a Club or Match voice session.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "teamId": { "type": "integer" },
+        "voiceChannel": { "type": "string", "enum": ["ROOM", "TEAM", "PRIVATE"] },
+        "isMicMuted": { "type": "boolean" },
+        "isSpeakerMuted": { "type": "boolean" },
+        "isSpeaking": { "type": "boolean" },
+        "voiceLevel": { "type": "number" },
+        "roomMemberUids": { "type": "array" },
+        "isPublic": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "isMicMuted", "isSpeakerMuted", "isSpeaking", "voiceLevel", "roomMemberUids", "isPublic", "updatedAt"]
+    },
+    "VoiceSignalPacket": {
+      "title": "VoiceSignalPacket",
+      "description": "WebRTC SDP/ICE or low-latency PCM relay packet for cross-platform live voice.",
+      "type": "object",
+      "properties": {
+        "signalId": { "type": "string" },
+        "senderUid": { "type": "string" },
+        "recipientUid": { "type": "string" },
+        "channelMode": { "type": "string", "enum": ["ROOM", "TEAM", "PRIVATE"] },
+        "signalType": { "type": "string", "enum": ["OFFER", "ANSWER", "ICE", "AUDIO_FRAME"] },
+        "payload": { "type": "string" },
+        "sequence": { "type": "integer" },
+        "roomMemberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["signalId", "senderUid", "recipientUid", "channelMode", "signalType", "payload", "sequence", "roomMemberUids", "createdAt"]
+    },
+    "MatchRoom": {
+      "title": "MatchRoom",
+      "description": "Authoritative multiplayer / private Ludo room with turn validation and reconnect state.",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string" },
+        "roomCode": { "type": "string" },
+        "attemptedRoomCode": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "isPrivate": { "type": "boolean" },
+        "allowedUids": { "type": "array" },
+        "invitedUids": { "type": "array" },
+        "playerUids": { "type": "array" },
+        "maxPlayers": { "type": "integer" },
+        "gameMode": { "type": "string" },
+        "wagerCoins": { "type": "integer" },
+        "status": { "type": "string", "enum": ["WAITING", "ACTIVE", "FINISHED"] },
+        "currentTurnUid": { "type": "string" },
+        "moveSequence": { "type": "integer" },
+        "stateHash": { "type": "string" },
+        "boardState": { "type": "object" },
+        "winnerUid": { "type": "string" },
+        "turnDeadlineMillis": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["roomId", "roomCode", "ownerId", "isPrivate", "allowedUids", "invitedUids", "playerUids", "maxPlayers", "gameMode", "wagerCoins", "status", "currentTurnUid", "moveSequence", "boardState", "createdAt", "updatedAt"]
+    },
+    "ModerationReport": {
+      "title": "ModerationReport",
+      "description": "Abuse report submitted against a player in Voice Club, Match Voice, or Chat.",
+      "type": "object",
+      "properties": {
+        "reportId": { "type": "string" },
+        "reporterUid": { "type": "string" },
+        "targetUid": { "type": "string" },
+        "contextType": { "type": "string", "enum": ["VOICE_CLUB", "MATCH_VOICE", "PRIVATE_CHAT"] },
+        "contextId": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["OPEN", "REVIEWED"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["reportId", "reporterUid", "targetUid", "contextType", "contextId", "reason", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user account profile, wallet, stats, and preferences."
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/TaskProgress" },
+      "description": "User daily/weekly/challenge/event tasks and server-verified claim states."
+    },
+    "/users/{userId}/achievements/{achId}": {
+      "schema": { "$ref": "#/entities/TaskProgress" },
+      "description": "User achievement progression and claim records."
+    },
+    "/users/{userId}/reward_history/{txId}": {
+      "schema": { "$ref": "#/entities/RewardHistoryEntry" },
+      "description": "Append-only deduplicated reward ledger."
+    },
+    "/users/{userId}/activity/{dayKey}": {
+      "schema": { "$ref": "#/entities/DailyActivityStats" },
+      "description": "Daily user activity metrics."
+    },
+    "/users/{userId}/notifications/{notifId}": {
+      "schema": { "$ref": "#/entities/AppNotification" },
+      "description": "Per-user inbox notifications."
+    },
+    "/public_profiles/{userId}": {
+      "schema": { "$ref": "#/entities/PublicProfile" },
+      "description": "Public non-PII player profile for leaderboards and social discovery."
+    },
+    "/friend_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/FriendRequest" },
+      "description": "Friend request invitations."
+    },
+    "/friendships/{friendshipId}": {
+      "schema": { "$ref": "#/entities/Friendship" },
+      "description": "Confirmed bidirectional friendships."
+    },
+    "/follows/{followId}": {
+      "schema": { "$ref": "#/entities/FollowRelation" },
+      "description": "Follower-followed player edges."
+    },
+    "/private_chats/{chatId}": {
+      "schema": { "$ref": "#/entities/PrivateChatThread" },
+      "description": "1:1 private chat thread."
+    },
+    "/private_chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/PrivateChatMessage" },
+      "description": "1:1 private chat messages."
+    },
+    "/referrals/{referralId}": {
+      "schema": { "$ref": "#/entities/ReferralClaim" },
+      "description": "Verified friend invitation signup records keyed by invitee UID."
+    },
+    "/voice_clubs/{clubId}": {
+      "schema": { "$ref": "#/entities/VoiceClub" },
+      "description": "Voice Club social spaces."
+    },
+    "/voice_clubs/{clubId}/members/{memberUid}": {
+      "schema": { "$ref": "#/entities/VoiceClubMember" },
+      "description": "Voice Club members and roles."
+    },
+    "/voice_clubs/{clubId}/banned/{bannedUid}": {
+      "schema": { "$ref": "#/entities/VoiceClubBannedUser" },
+      "description": "Voice Club banned/blocked users."
+    },
+    "/voice_clubs/{clubId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ClubChatMessage" },
+      "description": "Voice Club messages and announcements."
+    },
+    "/voice_clubs/{clubId}/invitations/{inviteId}": {
+      "schema": { "$ref": "#/entities/ClubInvitation" },
+      "description": "Voice Club member invitations."
+    },
+    "/voice_clubs/{clubId}/voice_rooms/{roomId}": {
+      "schema": { "$ref": "#/entities/ClubVoiceRoom" },
+      "description": "Live voice rooms in a Voice Club."
+    },
+    "/voice_clubs/{clubId}/voice_rooms/{roomId}/participants/{uid}": {
+      "schema": { "$ref": "#/entities/VoiceParticipant" },
+      "description": "Active participants in a club voice room."
+    },
+    "/voice_clubs/{clubId}/voice_rooms/{roomId}/signals/{signalId}": {
+      "schema": { "$ref": "#/entities/VoiceSignalPacket" },
+      "description": "WebRTC SDP/ICE and audio packets for a club voice room."
+    },
+    "/match_rooms/{roomId}": {
+      "schema": { "$ref": "#/entities/MatchRoom" },
+      "description": "Multiplayer and private Ludo match rooms."
+    },
+    "/match_rooms/{roomId}/voice_participants/{uid}": {
+      "schema": { "$ref": "#/entities/VoiceParticipant" },
+      "description": "Live voice chat participants in a Ludo match."
+    },
+    "/match_rooms/{roomId}/voice_signals/{signalId}": {
+      "schema": { "$ref": "#/entities/VoiceSignalPacket" },
+      "description": "WebRTC SDP/ICE and audio signaling in a Ludo match."
+    },
+    "/moderation_reports/{reportId}": {
+      "schema": { "$ref": "#/entities/ModerationReport" },
+      "description": "Abuse and moderation reports."
+    }
+  }
+}

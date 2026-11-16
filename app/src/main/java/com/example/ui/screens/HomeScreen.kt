@@ -78,17 +78,20 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // A. Top Header Bar (Avatar, Name, Online Status, Level, Wallets, Bell, Settings)
+            // A. Top Header Bar (Avatar, Name, Online Status, Level, Wallets, Notifications, Music, Settings)
             LudoClubTopHeader(
                 playerName = uiState.playerNickname,
                 crownAvatarId = uiState.playerCrownAvatar,
                 customPhotoUri = uiState.customProfilePhotoUri,
                 equippedFrameId = uiState.equippedFrameId,
                 level = uiState.playerLevel,
+                xpProgress = (uiState.playerXp % 250) / 250f,
+                unreadNotificationsCount = uiState.notifications.count { !it.isRead },
                 coins = uiState.userCoins,
                 gems = uiState.userGems,
                 isMusicPlaying = uiState.isMusicPlaying,
                 onProfileClick = { viewModel.navigateTo(AppScreen.PROFILE) },
+                onNotificationsClick = { viewModel.toggleNotificationsDialog(true) },
                 onMusicClick = { viewModel.toggleMusicPlayerDialog(true) },
                 onWallpaperClick = { viewModel.toggleWallpaperCustomizer(true, com.example.model.WallpaperTarget.HOME) },
                 onSettingsClick = { viewModel.toggleSoundSettings(true) },
@@ -106,6 +109,7 @@ fun HomeScreen(
 
             // B. Top 4 Action Cards (Ranking, Leaderboard, Tournaments, Golden Key)
             LudoClubTopEventPills(
+                keysCount = uiState.keysReceivedCount,
                 onRankingClick = { viewModel.navigateTo(AppScreen.LEADERBOARD) },
                 onLeaderboardClick = { viewModel.navigateTo(AppScreen.LEADERBOARD) },
                 onTournamentsClick = { showEventsDialog = true },
@@ -167,7 +171,12 @@ fun HomeScreen(
                         label = "Like",
                         badge = null
                     ) {
-                        viewModel.claimDailySpinReward(500, 2)
+                        viewModel.showPopUpNotice(
+                            title = "Thank You! 👍",
+                            message = "Thanks for supporting MG Ludo! Play matches and complete Daily Tasks to earn verified rewards.",
+                            icon = "👍",
+                            type = "INFO"
+                        )
                     }
 
                     LudoClubActionBadge(
@@ -191,9 +200,10 @@ fun HomeScreen(
                     LudoClubActionBadge(
                         icon = "📜",
                         label = "Quests",
-                        badge = null
+                        badge = uiState.verifiedTasks.count { it.status == com.example.model.TaskStatus.COMPLETED }.takeIf { it > 0 }?.toString(),
+                        badgeColor = Color(0xFF00E676)
                     ) {
-                        viewModel.toggleDailyMissionsDialog(true)
+                        viewModel.toggleVerifiedTasksDialog(true)
                     }
 
                     LudoClubActionBadge(
@@ -375,19 +385,20 @@ fun HomeScreen(
                         viewModel.toggleMatchHistoryDialog(true)
                     }
 
+                    val claimableTasksCount = uiState.verifiedTasks.count { it.status == com.example.model.TaskStatus.COMPLETED }
                     LudoClubActionBadge(
                         icon = "📋",
                         label = "Tasks",
-                        badge = "DAILY",
+                        badge = if (claimableTasksCount > 0) claimableTasksCount.toString() else "DAILY",
                         badgeColor = Color(0xFF00E676)
                     ) {
-                        viewModel.toggleDailyMissionsDialog(true)
+                        viewModel.toggleVerifiedTasksDialog(true)
                     }
 
                     LudoClubActionBadge(
                         icon = "✉️",
                         label = "Mail",
-                        badge = "1",
+                        badge = if ("welcome_mail_v1" !in uiState.claimedBonusIds) "1" else null,
                         badgeColor = Color(0xFFFF1744)
                     ) {
                         showMailDialog = true
@@ -544,50 +555,36 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // E. 4 Chest Slots + 1 Season Pass Slot Row (Screenshot 1)
+            // E. 4 Match-Earned Chest Slots + 1 Season Pass Slot Row
+            val todayChestDayKey = com.example.util.LudoPeriodKeys.currentDayKey()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Slot 0: Ready!
-                ChestSlotCard(
-                    icon = "📦",
-                    label = "Ready!",
-                    isReady = true,
-                    modifier = Modifier.weight(1f),
-                    onClick = { showChestDialog = 0 }
-                )
+                (0..3).forEach { slotIndex ->
+                    val alreadyClaimed = "chest_slot_${slotIndex}_$todayChestDayKey" in uiState.claimedBonusIds
+                    val isUnlocked = uiState.todayActivity.matchesPlayed > slotIndex
+                    val isReady = isUnlocked && !alreadyClaimed
+                    ChestSlotCard(
+                        icon = when {
+                            alreadyClaimed -> "✅"
+                            isReady -> "📦"
+                            else -> "🔒"
+                        },
+                        label = when {
+                            alreadyClaimed -> "Opened"
+                            isReady -> "Ready!"
+                            else -> "Play ${slotIndex + 1}"
+                        },
+                        isReady = isReady,
+                        modifier = Modifier.weight(1f),
+                        onClick = { showChestDialog = slotIndex }
+                    )
+                }
 
-                // Slot 1: Chest Slot
-                ChestSlotCard(
-                    icon = "📬",
-                    label = "Chest\nSlot",
-                    isReady = false,
-                    modifier = Modifier.weight(1f),
-                    onClick = { showChestDialog = 1 }
-                )
-
-                // Slot 2: Chest Slot
-                ChestSlotCard(
-                    icon = "📬",
-                    label = "Chest\nSlot",
-                    isReady = false,
-                    modifier = Modifier.weight(1f),
-                    onClick = { showChestDialog = 2 }
-                )
-
-                // Slot 3: Chest Slot
-                ChestSlotCard(
-                    icon = "📬",
-                    label = "Chest\nSlot",
-                    isReady = false,
-                    modifier = Modifier.weight(1f),
-                    onClick = { showChestDialog = 3 }
-                )
-
-                // Slot 4: Season Pass Locked Slot
+                // Slot 4: Season Pass Slot
                 SeasonPassSlotCard(
                     modifier = Modifier.weight(1.15f),
                     onClick = { viewModel.toggleSeasonPassDialog(true) }
@@ -597,13 +594,14 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // 3. 5-Tab Authentic Glossy Blue Bottom Dock (Screenshot 1)
+        // 3. 5-Tab Authentic Glossy Blue Bottom Dock -> Voice Club Screen
         LudoClubBottomDock(
             currentScreen = uiState.currentScreen,
+            friendsBadgeCount = uiState.friendRequests.size + uiState.clubInvitations.size,
             onScreenSelected = { viewModel.navigateTo(it) },
             onInventoryClick = { viewModel.navigateTo(AppScreen.INVENTORY) },
             onFriendsClick = { viewModel.toggleFriendsDialog(true) },
-            onClubClick = { showEventsDialog = true },
+            onClubClick = { viewModel.navigateTo(AppScreen.VOICE_CLUB) },
             modifier = Modifier.align(Alignment.BottomCenter)
         )
 
@@ -734,11 +732,13 @@ fun HomeScreen(
             )
         }
 
-        // Invite Friends via WhatsApp / Instagram / Facebook Dialog
+        // Invite Friends via WhatsApp / Instagram / Facebook & Verified Referral Dialog
         if (uiState.showInviteDialog) {
             InviteFriendsDialog(
                 roomCode = uiState.roomCode,
-                onRewardEarned = { coins, gems -> viewModel.claimDailySpinReward(coins, gems) },
+                referralCode = uiState.referralCode,
+                verifiedReferralsCount = uiState.verifiedReferralsCount,
+                onRedeemReferralCode = { code -> viewModel.redeemReferralCode(code) },
                 onDismiss = { viewModel.toggleInviteDialog(false) }
             )
         }
@@ -869,15 +869,27 @@ fun HomeScreen(
             )
         }
 
-        // Royal Friend List Dialog (Online Players & Avatars & Key Exchange)
+        // Royal Friend List Dialog (Live Firestore Friends, Requests, Discover, 1:1 Private Chat & Key Exchange)
         if (uiState.showFriendsDialog) {
             FriendListDialog(
                 userNickname = uiState.playerNickname,
                 userCrownAvatar = uiState.playerCrownAvatar,
-                userCustomPhotoUri = uiState.customProfilePhotoUri,
                 userTitle = uiState.playerTitle,
+                userCustomPhotoUri = uiState.customProfilePhotoUri,
                 keysSentCount = uiState.keysSentCount,
                 keysReceivedCount = uiState.keysReceivedCount,
+                cloudFriends = uiState.friends,
+                friendRequests = uiState.friendRequests,
+                discoverPlayers = uiState.publicLeaderboard,
+                followedIds = uiState.followedPlayerIds,
+                activeChatFriend = uiState.activePrivateChatFriend,
+                privateChatMessages = uiState.privateChatMessages,
+                onSendFriendRequest = { profile -> viewModel.sendFriendRequest(profile) },
+                onRespondFriendRequest = { req, accept -> viewModel.respondToFriendRequest(req, accept) },
+                onToggleFollow = { uid, name -> viewModel.toggleFollowPlayer(uid, name) },
+                onOpenPrivateChat = { friend -> viewModel.openPrivateChatWithFriend(friend) },
+                onClosePrivateChat = { viewModel.closePrivateChat() },
+                onSendPrivateMessage = { text -> viewModel.sendPrivateChatMessage(text) },
                 onInviteToMatch = { friend -> viewModel.inviteFriendToMatch(friend) },
                 onSendKey = { friend -> viewModel.sendKeyToFriend(friend.id, friend.name) },
                 onClaimReceivedKey = { fromFriend -> viewModel.claimReceivedKey(fromFriend) },
@@ -897,10 +909,20 @@ fun HomeScreen(
                 onClaimEventReward = { coins, gems, eventName ->
                     viewModel.claimEventReward(coins, gems, eventName)
                 },
+                onClaimEventWithKey = { coins, gems, eventName, dedupKey ->
+                    viewModel.claimEventReward(coins, gems, eventName, dedupKey)
+                },
+                onClaimVerifiedTask = { taskId ->
+                    viewModel.claimVerifiedTaskReward(taskId)
+                },
                 onJoinTournament = { mode, players ->
                     showEventsDialog = false
                     viewModel.startNewGame(mode, players)
                     viewModel.navigateTo(AppScreen.GAME)
+                },
+                onOpenLeaderboard = {
+                    showEventsDialog = false
+                    viewModel.navigateTo(AppScreen.LEADERBOARD)
                 },
                 onClaimMission = { mission ->
                     viewModel.claimDailyMission(mission)
@@ -922,10 +944,15 @@ fun HomeScreen(
             )
         }
 
-        // Daily Regal Missions Dialog
+        // Daily Regal Missions Dialog -> routes cleanly to Verified Tasks when populated
         if (uiState.showDailyMissionsDialog) {
             DailyMissionsDialog(
                 missions = uiState.dailyMissions,
+                verifiedTasks = uiState.verifiedTasks,
+                verifiedAchievements = uiState.verifiedAchievements,
+                rewardHistory = uiState.rewardHistory,
+                loginStreak = uiState.loginStreak,
+                onClaimVerifiedTask = { taskId -> viewModel.claimVerifiedTaskReward(taskId) },
                 onClaimMission = { mission ->
                     viewModel.claimDailyMission(mission)
                 },
@@ -985,6 +1012,7 @@ fun HomeScreen(
             GoldenVaultKeyDialog(
                 keysReceivedCount = uiState.keysReceivedCount,
                 keysSentCount = uiState.keysSentCount,
+                friends = uiState.friends,
                 onSendKeyToFriend = { friendName ->
                     viewModel.sendKeyToFriend("f_$friendName", friendName)
                 },
@@ -1000,13 +1028,18 @@ fun HomeScreen(
             )
         }
 
-        // Royal Challenges Dialog (Screenshot 3: Tier 1 Rewards, Star 10/75, Daily Challenges)
+        // Royal Challenges Dialog (Verified task & gameplay progression only)
         if (showChallengesDialog) {
+            val dayKey = com.example.util.LudoPeriodKeys.currentDayKey()
             RoyalChallengesDialog(
                 userCoins = uiState.userCoins,
                 userCash = uiState.userGems,
+                verifiedTasks = uiState.verifiedTasks,
+                onClaimVerifiedTask = { taskId ->
+                    viewModel.claimVerifiedTaskReward(taskId)
+                },
                 onClaimChallenge = { coins, gems ->
-                    viewModel.claimDailySpinReward(coins, gems)
+                    viewModel.claimEventReward(coins, gems, "Royal Trial", "royal_trial_$dayKey")
                 },
                 onPlayChallenge = {
                     showChallengesDialog = false
@@ -1017,11 +1050,14 @@ fun HomeScreen(
             )
         }
 
-        // Free Gift Dialog
+        // Free Gift Dialog (Deduplicated per day)
         if (showGiftDialog) {
+            val dayKey = com.example.util.LudoPeriodKeys.currentDayKey()
+            val giftDedupKey = "free_gift_$dayKey"
             FreeGiftDialog(
+                alreadyClaimed = giftDedupKey in uiState.claimedBonusIds,
                 onClaim = { coins, gems ->
-                    viewModel.claimDailySpinReward(coins, gems)
+                    viewModel.claimEventReward(coins, gems, "Daily Free Bounty", giftDedupKey)
                     showGiftDialog = false
                 },
                 onDismiss = { showGiftDialog = false }
@@ -1032,6 +1068,11 @@ fun HomeScreen(
         if (showTasksDialog) {
             com.example.ui.components.DailyMissionsDialog(
                 missions = uiState.dailyMissions,
+                verifiedTasks = uiState.verifiedTasks,
+                verifiedAchievements = uiState.verifiedAchievements,
+                rewardHistory = uiState.rewardHistory,
+                loginStreak = uiState.loginStreak,
+                onClaimVerifiedTask = { taskId -> viewModel.claimVerifiedTaskReward(taskId) },
                 onClaimMission = { mission ->
                     viewModel.claimDailyMission(mission)
                 },
@@ -1039,19 +1080,23 @@ fun HomeScreen(
             )
         }
 
-        // Mailbox Dialog
+        // Mailbox Dialog (Single persisted welcome claim)
         if (showMailDialog) {
+            val welcomeClaimed = "welcome_mail_v1" in uiState.claimedBonusIds
             MailboxDialog(
+                alreadyClaimed = welcomeClaimed,
                 onClaimMail = { coins, gems ->
-                    viewModel.claimDailySpinReward(coins, gems)
+                    viewModel.claimEventReward(coins, gems, "MG Ludo Welcome Gift", "welcome_mail_v1")
                 },
                 onDismiss = { showMailDialog = false }
             )
         }
 
-        // Special VIP Offer Dialog (Tapped via button or automatically triggered after playing 5 online games)
+        // Special VIP Offer Dialog (Requires 5 online games per milestone, deduplicated)
         if (showOfferDialog || uiState.showSpecialOfferDialog) {
             SpecialOfferDialog(
+                onlineGamesPlayed = uiState.onlineGamesPlayedCount,
+                claimedBonusIds = uiState.claimedBonusIds,
                 onClaim = { coins, gems ->
                     viewModel.claimSpecialOfferDeal(coins, gems)
                     showOfferDialog = false
@@ -1063,22 +1108,32 @@ fun HomeScreen(
             )
         }
 
-        // Chest Slot Opening Dialog
+        // Chest Slot Opening Dialog (Requires matchesPlayedToday > slotIndex & single claim per day)
         if (showChestDialog != null) {
+            val slotIdx = showChestDialog!!
+            val dayKey = com.example.util.LudoPeriodKeys.currentDayKey()
+            val chestKey = "chest_slot_${slotIdx}_$dayKey"
             ChestSlotDialog(
-                slotIndex = showChestDialog!!,
+                slotIndex = slotIdx,
+                isUnlocked = uiState.todayActivity.matchesPlayed > slotIdx,
+                alreadyClaimed = chestKey in uiState.claimedBonusIds,
+                matchesPlayedToday = uiState.todayActivity.matchesPlayed,
                 onOpen = { coins, gems ->
-                    viewModel.claimDailySpinReward(coins, gems)
+                    viewModel.claimEventReward(coins, gems, "Match Chest #${slotIdx + 1}", chestKey)
                     showChestDialog = null
                 },
                 onDismiss = { showChestDialog = null }
             )
         }
 
-        // Royal Season Pass Dialog
+        // Royal Season Pass Dialog (Persisted per-tier & bulk claims)
         if (uiState.showSeasonPassDialog) {
             RoyalSeasonPassDialog(
                 playerLevel = uiState.playerLevel,
+                claimedBonusIds = uiState.claimedBonusIds,
+                onClaimTierReward = { level, coins, gems ->
+                    viewModel.claimSeasonPassRewards(coins, gems, "season_pass_t$level")
+                },
                 onClaimAll = { coins, gems ->
                     viewModel.claimSeasonPassRewards(coins, gems)
                 },
@@ -1106,10 +1161,13 @@ private fun LudoClubTopHeader(
     customPhotoUri: String? = null,
     equippedFrameId: String = "frame_royal_crest",
     level: Int,
+    xpProgress: Float = 0f,
+    unreadNotificationsCount: Int = 0,
     coins: Long,
     gems: Int,
     isMusicPlaying: Boolean = false,
     onProfileClick: () -> Unit,
+    onNotificationsClick: () -> Unit = {},
     onMenuClick: () -> Unit = {},
     onMusicClick: () -> Unit = {},
     onWallpaperClick: () -> Unit = {},
@@ -1207,7 +1265,7 @@ private fun LudoClubTopHeader(
 
                         Spacer(modifier = Modifier.width(4.dp))
 
-                        // XP Progress Bar
+                        // Dynamic XP Progress Bar
                         Box(
                             modifier = Modifier
                                 .width(40.dp)
@@ -1218,21 +1276,18 @@ private fun LudoClubTopHeader(
                             Box(
                                 modifier = Modifier
                                     .fillMaxHeight()
-                                    .fillMaxWidth(0.68f)
+                                    .fillMaxWidth(xpProgress.coerceIn(0f, 1f))
                                     .background(Brush.horizontalGradient(listOf(RoyalGoldLight, RoyalGold)))
                             )
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("🚀", fontSize = 18.sp)
             }
 
-            // Center / Right: Currency Wallets + Settings Cog
+            // Center / Right: Currency Wallets + Bell + Music + Wallpaper + Settings
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 // Coin Balance Pill with Green +
                 Box(
@@ -1253,7 +1308,6 @@ private fun LudoClubTopHeader(
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        // Green +
                         Box(
                             modifier = Modifier
                                 .size(16.dp)
@@ -1297,39 +1351,66 @@ private fun LudoClubTopHeader(
                     }
                 }
 
+                // Notifications Center Bell Button
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clickable { onNotificationsClick() }
+                        .testTag("home_notifications_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("🔔", fontSize = 18.sp)
+                    if (unreadNotificationsCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .size(14.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFFF1744)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (unreadNotificationsCount > 9) "9+" else unreadNotificationsCount.toString(),
+                                color = Color.White,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
 
                 // Royal Music Jukebox Button (44 Bollywood & Royal tracks)
                 IconButton(
                     onClick = onMusicClick,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(30.dp)
                 ) {
                     Text(
                         text = if (isMusicPlaying) "🎶" else "🎵",
-                        fontSize = 20.sp
+                        fontSize = 18.sp
                     )
                 }
 
                 // Wallpaper Studio Quick Button
                 IconButton(
                     onClick = onWallpaperClick,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(30.dp)
                 ) {
                     Text(
                         text = "🎨",
-                        fontSize = 19.sp
+                        fontSize = 18.sp
                     )
                 }
 
                 // Golden Settings Cog
                 IconButton(
                     onClick = onSettingsClick,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(30.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings",
                         tint = RoyalGold,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -1338,11 +1419,11 @@ private fun LudoClubTopHeader(
 }
 
 /**
- * Top Event Pills matching the screenshot:
- * Ranking (medal 38, 5d 20h), Leaderboard (podium 1-2-3, 6d 7h), Tournaments (trophy), Golden Key with badge 1.
+ * Top Event Pills with dynamic key count and real labels
  */
 @Composable
 private fun LudoClubTopEventPills(
+    keysCount: Int = 0,
     onRankingClick: () -> Unit,
     onLeaderboardClick: () -> Unit,
     onTournamentsClick: () -> Unit,
@@ -1358,9 +1439,9 @@ private fun LudoClubTopEventPills(
         // 1. Ranking Pill
         EventPillButton(
             title = "Ranking",
-            timer = "5d 20h",
+            timer = "Global",
             badgeIcon = "🏅",
-            badgeNumber = "38",
+            badgeNumber = null,
             modifier = Modifier.weight(1f),
             onClick = onRankingClick
         )
@@ -1368,7 +1449,7 @@ private fun LudoClubTopEventPills(
         // 2. Leaderboard Pill
         EventPillButton(
             title = "Leaderboard",
-            timer = "6d 7h",
+            timer = "Live",
             badgeIcon = "📊",
             badgeNumber = null,
             modifier = Modifier.weight(1f),
@@ -1385,7 +1466,7 @@ private fun LudoClubTopEventPills(
             onClick = onTournamentsClick
         )
 
-        // 4. Golden Key / Vault Icon with notification badge 1
+        // 4. Golden Key / Vault Icon with real keysCount badge
         Box(
             modifier = Modifier
                 .size(42.dp)
@@ -1401,16 +1482,18 @@ private fun LudoClubTopEventPills(
         ) {
             Text("🗝️", fontSize = 22.sp)
 
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 4.dp, y = (-4).dp)
-                    .size(16.dp)
-                    .clip(CircleShape)
-                    .background(LudoClubRedBadge),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("1", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            if (keysCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 4.dp, y = (-4).dp)
+                        .size(16.dp)
+                        .clip(CircleShape)
+                        .background(LudoClubRedBadge),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(keysCount.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -1859,6 +1942,7 @@ private fun LudoClubProceduralCard(
 @Composable
 private fun LudoClubBottomDock(
     currentScreen: AppScreen,
+    friendsBadgeCount: Int = 0,
     onScreenSelected: (AppScreen) -> Unit,
     onInventoryClick: () -> Unit,
     onClubClick: () -> Unit,
@@ -1868,6 +1952,7 @@ private fun LudoClubBottomDock(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .navigationBarsPadding()
             .height(68.dp)
             .shadow(16.dp),
         color = Color(0xFF081C44),
@@ -1883,7 +1968,8 @@ private fun LudoClubBottomDock(
                 icon = "🏪",
                 label = "STORE",
                 isSelected = currentScreen == AppScreen.SHOP,
-                hasBadge = true
+                hasBadge = false,
+                testTag = "dock_tab_store"
             ) {
                 onScreenSelected(AppScreen.SHOP)
             }
@@ -1893,7 +1979,8 @@ private fun LudoClubBottomDock(
                 icon = "🎲",
                 label = "INVENTORY",
                 isSelected = currentScreen == AppScreen.INVENTORY,
-                hasBadge = true
+                hasBadge = false,
+                testTag = "dock_tab_inventory"
             ) {
                 onInventoryClick()
             }
@@ -1911,7 +1998,8 @@ private fun LudoClubBottomDock(
                         )
                     )
                     .border(2.dp, RoyalGoldLight, RoundedCornerShape(18.dp))
-                    .clickable { onScreenSelected(AppScreen.HOME) },
+                    .clickable { onScreenSelected(AppScreen.HOME) }
+                    .testTag("dock_tab_home"),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1920,22 +2008,24 @@ private fun LudoClubBottomDock(
                 }
             }
 
-            // Tab 4: FRIENDS (Invite Friends via WhatsApp, Instagram, Facebook)
+            // Tab 4: FRIENDS
             DockTabButton(
                 icon = "👥",
                 label = "FRIENDS",
                 isSelected = false,
-                hasBadge = true
+                hasBadge = friendsBadgeCount > 0,
+                testTag = "dock_tab_friends"
             ) {
                 onFriendsClick()
             }
 
-            // Tab 5: CLUB
+            // Tab 5: VOICE CLUB
             DockTabButton(
-                icon = "🎶",
+                icon = "🎙️",
                 label = "CLUB",
-                isSelected = false,
-                hasBadge = true
+                isSelected = currentScreen == AppScreen.VOICE_CLUB,
+                hasBadge = false,
+                testTag = "dock_tab_club"
             ) {
                 onClubClick()
             }
@@ -1949,12 +2039,15 @@ private fun DockTabButton(
     label: String,
     isSelected: Boolean,
     hasBadge: Boolean,
+    testTag: String = "dock_tab_${label.lowercase()}",
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
+            .minimumInteractiveComponentSize()
             .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .testTag(testTag),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1971,8 +2064,9 @@ private fun DockTabButton(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .size(10.dp)
+                    .size(8.dp)
                     .clip(CircleShape)
+                    .background(Color(0xFFFF1744))
             )
         }
     }
@@ -2156,10 +2250,11 @@ private fun DailyTasksDialog(
  */
 @Composable
 private fun MailboxDialog(
+    alreadyClaimed: Boolean = false,
     onClaimMail: (Long, Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var claimed by remember { mutableStateOf(false) }
+    var claimedLocal by remember(alreadyClaimed) { mutableStateOf(alreadyClaimed) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -2184,23 +2279,23 @@ private fun MailboxDialog(
                         Text("Welcome Maharaja! 👑", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "Thank you for playing MG Ludo! Here is your royal welcome reward of 5,000 Coins and 15 Diamonds.",
+                            "Thank you for playing MG Ludo! Here is your one-time royal welcome reward of 5,000 Coins and 15 Cash.",
                             color = TextMuted,
                             fontSize = 11.sp
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Button(
                             onClick = {
-                                if (!claimed) {
-                                    claimed = true
+                                if (!claimedLocal) {
+                                    claimedLocal = true
                                     onClaimMail(5000, 15)
                                 }
                             },
-                            enabled = !claimed,
+                            enabled = !claimedLocal,
                             colors = ButtonDefaults.buttonColors(containerColor = LudoClubPlusGreen),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text(if (claimed) "COLLECTED" else "COLLECT ALL", fontWeight = FontWeight.Bold)
+                            Text(if (claimedLocal) "COLLECTED" else "COLLECT WELCOME GIFT", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -2214,13 +2309,19 @@ private fun MailboxDialog(
 }
 
 /**
- * VIP Special Deal Offer Dialog
+ * VIP Special Deal Offer Dialog (Requires 5 online games per milestone)
  */
 @Composable
 private fun SpecialOfferDialog(
+    onlineGamesPlayed: Int = 0,
+    claimedBonusIds: Set<String> = emptySet(),
     onClaim: (Long, Int) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val milestoneIdx = (onlineGamesPlayed / 5).coerceAtLeast(1)
+    val offerKey = "special_offer_milestone_$milestoneIdx"
+    val isUnlocked = onlineGamesPlayed >= 5 && offerKey !in claimedBonusIds
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -2241,24 +2342,38 @@ private fun SpecialOfferDialog(
                 ) {
                     Column {
                         Text("🔥 SPECIAL MAHARAJA OFFER", color = RoyalGold, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
-                        Text("80% OFF • 5 ONLINE GAMES MILESTONE DEAL", color = Color(0xFFFF5722), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("80% OFF • 5 ONLINE GAMES MILESTONE ($onlineGamesPlayed/5)", color = Color(0xFFFF5722), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                     }
                 }
                 Spacer(modifier = Modifier.height(14.dp))
                 Text("👑 100,000 Gold Coins", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text("💎 250 Kohinoor Diamonds", color = SapphireBlueLight, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text("🎲 Ruby Crystal Dice Skin", color = RoyalAmber, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(18.dp))
+                Text("💵 250 Kohinoor Cash", color = SapphireBlueLight, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(10.dp))
+                LinearProgressIndicator(
+                    progress = { (onlineGamesPlayed.coerceAtMost(5) / 5f) },
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = { onClaim(100000, 250) },
+                    enabled = isUnlocked,
                     colors = ButtonDefaults.buttonColors(containerColor = RoyalGold),
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("CLAIM 5-GAME DEAL NOW 🎉", color = Color(0xFF1A1A1A), fontWeight = FontWeight.ExtraBold)
+                    Text(
+                        text = when {
+                            offerKey in claimedBonusIds && onlineGamesPlayed >= 5 -> "CLAIMED ✓"
+                            onlineGamesPlayed < 5 -> "PLAY ${5 - onlineGamesPlayed} MORE MATCHES TO UNLOCK"
+                            else -> "CLAIM 5-GAME DEAL NOW 🎉"
+                        },
+                        color = Color(0xFF1A1A1A),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }
@@ -2269,7 +2384,11 @@ private fun SpecialOfferDialog(
  * Free Gift Dialog
  */
 @Composable
-private fun FreeGiftDialog(onClaim: (Long, Int) -> Unit, onDismiss: () -> Unit) {
+private fun FreeGiftDialog(
+    alreadyClaimed: Boolean = false,
+    onClaim: (Long, Int) -> Unit,
+    onDismiss: () -> Unit
+) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -2285,13 +2404,14 @@ private fun FreeGiftDialog(onClaim: (Long, Int) -> Unit, onDismiss: () -> Unit) 
             ) {
                 Text("🎁 FREE DAILY BOUNTY", color = RoyalGold, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(10.dp))
-                Text("You received +2,000 Coins and +5 Diamonds!", color = Color.White, fontSize = 13.sp)
+                Text("Claim +2,000 Coins and +5 Cash once per day!", color = Color.White, fontSize = 13.sp)
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = { onClaim(2000, 5) },
+                    enabled = !alreadyClaimed,
                     colors = ButtonDefaults.buttonColors(containerColor = RoyalGold)
                 ) {
-                    Text("CLAIM GIFT", color = Color(0xFF1A1A1A), fontWeight = FontWeight.Bold)
+                    Text(if (alreadyClaimed) "CLAIMED TODAY ✓" else "CLAIM GIFT", color = Color(0xFF1A1A1A), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -2299,17 +2419,21 @@ private fun FreeGiftDialog(onClaim: (Long, Int) -> Unit, onDismiss: () -> Unit) 
 }
 
 /**
- * Chest Slot Dialog
+ * Chest Slot Dialog (Unlocks strictly after completing slotIndex + 1 real matches today)
  */
 @Composable
 private fun ChestSlotDialog(
     slotIndex: Int,
+    isUnlocked: Boolean = false,
+    alreadyClaimed: Boolean = false,
+    matchesPlayedToday: Int = 0,
     onOpen: (Long, Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     var chestState by remember { mutableStateOf("CLOSED") } // "CLOSED", "OPENING", "OPENED"
     val rewardCoins = 1500L + (slotIndex * 500L)
     val rewardGems = 3 + slotIndex
+    val requiredMatches = slotIndex + 1
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -2333,10 +2457,39 @@ private fun ChestSlotDialog(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
 
-                when (chestState) {
-                    "CLOSED" -> {
+                when {
+                    alreadyClaimed -> {
                         Text(
-                            text = "First open the chest box to reveal your hidden treasure!",
+                            text = "You already opened Chest #${slotIndex + 1} today! Come back tomorrow.",
+                            color = Color(0xFF00E676),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                            Text("CLOSE")
+                        }
+                    }
+                    !isUnlocked -> {
+                        Text(
+                            text = "Play $requiredMatches match(es) today to unlock Chest #${slotIndex + 1} ($matchesPlayedToday/$requiredMatches).",
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        LinearProgressIndicator(
+                            progress = { (matchesPlayedToday.toFloat() / requiredMatches).coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                            Text("PLAY MATCHES TO UNLOCK")
+                        }
+                    }
+                    chestState == "CLOSED" -> {
+                        Text(
+                            text = "Chest unlocked! Open the chest box to claim your earned treasure:",
                             color = Color.White.copy(alpha = 0.8f),
                             fontSize = 11.sp,
                             textAlign = TextAlign.Center
@@ -2365,9 +2518,9 @@ private fun ChestSlotDialog(
                             Text("OPEN CHEST BOX 🔓", color = RoyalNavyDark, fontWeight = FontWeight.Black, fontSize = 12.sp)
                         }
                     }
-                    "OPENING" -> {
+                    chestState == "OPENING" -> {
                         LaunchedEffect(Unit) {
-                            kotlinx.coroutines.delay(850)
+                            kotlinx.coroutines.delay(650)
                             chestState = "OPENED"
                         }
                         Spacer(modifier = Modifier.height(14.dp))
@@ -2381,7 +2534,7 @@ private fun ChestSlotDialog(
                         )
                         Spacer(modifier = Modifier.height(14.dp))
                     }
-                    "OPENED" -> {
+                    else -> {
                         Text(
                             text = "Chest Box Opened! Treasures Unlocked:",
                             color = Color(0xFF00E676),
@@ -2395,7 +2548,7 @@ private fun ChestSlotDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("🪙 +$rewardCoins Coins", color = RoyalGoldLight, fontSize = 14.sp, fontWeight = FontWeight.Black)
-                            Text("💎 +$rewardGems Gems", color = SapphireBlueLight, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                            Text("💵 +$rewardGems Cash", color = SapphireBlueLight, fontSize = 14.sp, fontWeight = FontWeight.Black)
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(

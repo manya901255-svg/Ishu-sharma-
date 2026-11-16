@@ -31,8 +31,11 @@ val LudoClubPlusGreen = Color(0xFF00E676)
 val RoyalGold = Color(0xFFFFD700)
 val RoyalGoldLight = Color(0xFFFFE57F)
 val RoyalGoldWarm = Color(0xFFE5B83B)
+val RoyalGoldBorder = RoyalGoldWarm
 val RoyalGoldDark = Color(0xFFB8860B)
 val RoyalAmber = Color(0xFFFF9800)
+val RoyalBluePrimary = RoyalBlueAccent
+val RoyalRedAccent = Color(0xFFE53935)
 
 // Warm Marble Texture & Ivory Tones
 val RoyalMarbleBase = Color(0xFFFBF8F1)
@@ -64,3 +67,16 @@ val WinGold = Color(0xFFFFD700)
 val TextLight = Color(0xFFFFFFFF)
 val TextMuted = Color(0xFFCBD5E1)
 val TextDark = Color(0xFF1A1A1A)
+
+// Royal Light Mode (Warm Marble & Ivory Palace Palette)
+val RoyalLightBackground = Color(0xFFF6F2E9)
+val RoyalLightSurface = Color(0xFFFFFFFF)
+val RoyalLightSurfaceVariant = Color(0xFFEDE4D3)
+val RoyalLightCard = Color(0xFFFDFBF7)
+val RoyalLightPrimary = Color(0xFF1442A3)
+val RoyalLightPrimaryContainer = Color(0xFFDCE7FF)
+val RoyalLightSecondary = Color(0xFF9A6700)
+val RoyalLightTextPrimary = Color(0xFF111827)
+val RoyalLightTextMuted = Color(0xFF4B5563)
+val RoyalLightBorder = Color(0xFFD2C3A3)
+

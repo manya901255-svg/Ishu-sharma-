@@ -103,20 +103,28 @@ fun GameScreen(
                     )
                 }
 
-                // 2. Trophy & Coin Pill [🏆 🪙 30 K ℹ️]
+                // 2. Dynamic Wager Pot Pill
+                val totalPot = uiState.currentWager * uiState.players.size.coerceAtLeast(2)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFF0F3A7D))
                         .border(1.2.dp, Color(0xFF29B6F6), RoundedCornerShape(16.dp))
-                        .clickable { viewModel.showPopUpNotice("Trophy Wager", "30K Pot Active! Win to double coins!", "🏆", "INFO") }
+                        .clickable {
+                            viewModel.showPopUpNotice(
+                                "Trophy Wager",
+                                "${formatCompactCoins(totalPot)} Pot Active! Win to double coins!",
+                                "🏆",
+                                "INFO"
+                            )
+                        }
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     Text("🏆", fontSize = 11.sp)
                     Text("🪙", fontSize = 10.sp)
-                    Text("30 K", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    Text(formatCompactCoins(totalPot), color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
                     Box(
                         modifier = Modifier
                             .size(13.dp)
@@ -563,6 +571,74 @@ fun GameScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    var showVoiceMixerDialog by remember { mutableStateOf(false) }
+
+                    // Live Voice Activity & Channel Status Pill (Non-blocking above controls)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF081836))
+                            .border(1.dp, Color(0xFF29B6F6).copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                            .clickable { showVoiceMixerDialog = true }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .testTag("game_voice_status_bar"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = when (uiState.voiceConnectionState) {
+                                    com.example.util.VoiceConnectionState.CONNECTED -> "🟢"
+                                    com.example.util.VoiceConnectionState.CONNECTING,
+                                    com.example.util.VoiceConnectionState.RECONNECTING -> "🟡"
+                                    com.example.util.VoiceConnectionState.DISCONNECTED -> "⚪"
+                                },
+                                fontSize = 10.sp
+                            )
+                            val speakerName = uiState.voiceParticipants.values.firstOrNull { it.uid == uiState.activeSpeakerId }?.displayName
+                            Text(
+                                text = if (speakerName != null) {
+                                    "🎙️ Speaking: $speakerName • ${uiState.voiceChannelMode.label}"
+                                } else {
+                                    "🎧 ${uiState.voiceChannelMode.label} • ${uiState.voiceConnectionState.label}"
+                                },
+                                color = Color(0xFFE0F7FA),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Text(
+                            text = "MIXER ⚙️",
+                            color = Color(0xFF81D4FA),
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.testTag("voice_mixer_open_label")
+                        )
+                    }
+
+                    if (showVoiceMixerDialog) {
+                        InGameVoiceMixerDialog(
+                            uiState = uiState,
+                            onToggleVoiceEnabled = { viewModel.toggleVoiceChat() },
+                            onSelectChannel = { viewModel.setVoiceChannelMode(it) },
+                            onToggleMuteAll = { viewModel.muteAllVoicePeers() },
+                            onReconnect = { viewModel.reconnectVoiceChat() },
+                            onSetPeerVolume = { uid, vol -> viewModel.setPeerVoiceVolume(uid, vol) },
+                            onBlockPeer = { uid, name -> viewModel.blockVoicePeer(uid, name) },
+                            onReportPeer = { uid, name ->
+                                viewModel.submitAbuseReport(uid, "MATCH_VOICE", uiState.roomCode, "Abusive voice chat by $name")
+                            },
+                            onDismiss = { showVoiceMixerDialog = false }
+                        )
+                    }
+
                     // Match Status Notice Bar
                     Row(
                         modifier = Modifier
@@ -694,7 +770,7 @@ fun GameScreen(
                             }
                         }
 
-                        // [ 🎙️ / 🔇 ] Voice Chat Mic Toggle Button
+                        // [ 🎙️ / 🔇 ] Voice Chat Mic Toggle Button (asks RECORD_AUDIO only when unmuting)
                         Box(
                             modifier = Modifier
                                 .weight(0.9f)
@@ -704,12 +780,13 @@ fun GameScreen(
                                 .background(if (uiState.isMicMuted) Color(0xFF37474F) else Color(0xFF00897B))
                                 .border(1.dp, if (uiState.isMicMuted) Color.Gray else Color(0xFF80CBC4), RoundedCornerShape(8.dp))
                                 .clickable {
-                                    if (viewModel.voiceChatManager.hasRecordPermission()) {
+                                    if (!uiState.isMicMuted || viewModel.voiceChatManager.hasRecordPermission()) {
                                         viewModel.toggleMic()
                                     } else {
                                         micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
                                     }
-                                },
+                                }
+                                .testTag("voice_mic_button"),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -732,7 +809,8 @@ fun GameScreen(
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(if (uiState.isSpeakerMuted) Color(0xFF37474F) else Color(0xFF0277BD))
                                 .border(1.dp, if (uiState.isSpeakerMuted) Color.Gray else Color(0xFF81D4FA), RoundedCornerShape(8.dp))
-                                .clickable { viewModel.toggleSpeaker() },
+                                .clickable { viewModel.toggleSpeaker() }
+                                .testTag("voice_speaker_button"),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(if (uiState.isSpeakerMuted) "🔈" else "🔊", fontSize = 14.sp)
@@ -868,11 +946,13 @@ fun GameScreen(
             )
         }
 
-        // Invite Friends Dialog (WhatsApp, Instagram, Facebook)
+        // Invite Friends Dialog (WhatsApp, Instagram, Facebook + Verified Referral)
         if (uiState.showInviteDialog) {
             InviteFriendsDialog(
                 roomCode = uiState.roomCode,
-                onRewardEarned = { coins, gems -> viewModel.claimDailySpinReward(coins, gems) },
+                referralCode = uiState.referralCode,
+                verifiedReferralsCount = uiState.verifiedReferralsCount,
+                onRedeemReferralCode = { code -> viewModel.redeemReferralCode(code) },
                 onDismiss = { viewModel.toggleInviteDialog(false) }
             )
         }
@@ -1080,13 +1160,30 @@ fun GameScreen(
             )
         }
 
-        // Real-time Game Pop-Up Notice (Friend Online with Green Tick, Key, Chest, or Season Pass)
+        // Real-time Game Pop-Up Notice
         GamePopUpNoticeDialog(
             notice = uiState.activePopUpNotice,
             onActionClick = {
                 val notice = uiState.activePopUpNotice
                 if (notice?.type == "FRIEND_ONLINE") {
-                    viewModel.inviteFriendToMatch(com.example.model.MOCK_ROYAL_FRIENDS.first())
+                    val onlineFriend = uiState.friends.firstOrNull { it.isOnline } ?: uiState.friends.firstOrNull()
+                    if (onlineFriend != null) {
+                        viewModel.inviteFriendToMatch(
+                            com.example.model.RoyalFriend(
+                                id = onlineFriend.friendUid,
+                                name = onlineFriend.friendName,
+                                title = "Royal Friend",
+                                crownAvatarId = "crown_imperial_gold",
+                                isOnline = onlineFriend.isOnline,
+                                statusText = if (onlineFriend.isOnline) "Online" else "Offline",
+                                level = onlineFriend.level,
+                                coins = 0L,
+                                wins = 0
+                            )
+                        )
+                    } else {
+                        viewModel.toggleFriendsDialog(true)
+                    }
                 } else if (notice?.type == "KEY") {
                     viewModel.navigateTo(AppScreen.HOME)
                 } else if (notice?.type == "SEASON_PASS") {
@@ -1095,6 +1192,165 @@ fun GameScreen(
             },
             onDismiss = { viewModel.dismissPopUpNotice() }
         )
+    }
+}
+
+@Composable
+private fun InGameVoiceMixerDialog(
+    uiState: com.example.viewmodel.LudoUiState,
+    onToggleVoiceEnabled: () -> Unit,
+    onSelectChannel: (com.example.model.VoiceChannelMode) -> Unit,
+    onToggleMuteAll: () -> Unit,
+    onReconnect: () -> Unit,
+    onSetPeerVolume: (String, Float) -> Unit,
+    onBlockPeer: (String, String) -> Unit,
+    onReportPeer: (String, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF00E5FF)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 520.dp)
+                .testTag("in_game_voice_mixer_dialog")
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "🎙️ Live Match Voice Mixer",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) {
+                        Icon(Icons.Default.Close, contentDescription = "Close Voice Mixer")
+                    }
+                }
+
+                // Enable / Disable + Reconnect
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Voice Room: ${uiState.voiceConnectionState.label}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedButton(
+                            onClick = onReconnect,
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .testTag("voice_reconnect_button")
+                        ) {
+                            Text("Reconnect", fontSize = 11.sp)
+                        }
+                        Button(
+                            onClick = onToggleVoiceEnabled,
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .testTag("voice_toggle_enable_button")
+                        ) {
+                            Text(if (uiState.isVoiceActive) "Leave" else "Join", fontSize = 11.sp)
+                        }
+                    }
+                }
+
+                // Channel Mode Selector (Room / Team / Private)
+                Text("Voice Channel Mode", color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    com.example.model.VoiceChannelMode.entries.forEach { mode ->
+                        val selected = uiState.voiceChannelMode == mode
+                        FilterChip(
+                            selected = selected,
+                            onClick = { onSelectChannel(mode) },
+                            label = { Text(mode.label, fontSize = 10.sp, maxLines = 1) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("voice_channel_${mode.wire.lowercase()}")
+                        )
+                    }
+                }
+
+                // Mute All toggle
+                OutlinedButton(
+                    onClick = onToggleMuteAll,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .minimumInteractiveComponentSize()
+                        .testTag("voice_mute_all_button")
+                ) {
+                    Text("🔇 Toggle Quick Mute-All", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+
+                // Participants + Per-player volume sliders + Block / Report
+                if (uiState.voiceParticipants.isEmpty()) {
+                    Text(
+                        text = "No remote speakers active right now.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                } else {
+                    uiState.voiceParticipants.values.forEach { peer ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .padding(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${if (peer.isSpeaking) "🟢" else "🎙️"} ${peer.displayName}",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    TextButton(
+                                        onClick = { onBlockPeer(peer.uid, peer.displayName) },
+                                        modifier = Modifier.minimumInteractiveComponentSize()
+                                    ) {
+                                        Text(if (peer.isBlockedLocally) "Blocked" else "Block", fontSize = 10.sp)
+                                    }
+                                    TextButton(
+                                        onClick = { onReportPeer(peer.uid, peer.displayName) },
+                                        modifier = Modifier.minimumInteractiveComponentSize()
+                                    ) {
+                                        Text("Report", color = Color(0xFFE53935), fontSize = 10.sp)
+                                    }
+                                }
+                            }
+                            Slider(
+                                value = peer.localVolume,
+                                onValueChange = { vol -> onSetPeerVolume(peer.uid, vol) },
+                                valueRange = 0f..1f,
+                                modifier = Modifier.testTag("voice_volume_slider_${peer.uid}")
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

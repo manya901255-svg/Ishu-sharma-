@@ -36,19 +36,23 @@ import com.example.ui.theme.*
  */
 @Composable
 fun RoyalSeasonPassDialog(
-    playerLevel: Int = 18,
+    playerLevel: Int = 1,
+    claimedBonusIds: Set<String> = emptySet(),
+    onClaimTierReward: (level: Int, coins: Long, gems: Int) -> Unit = { _, _, _ -> },
     onClaimAll: (totalCoins: Long, totalGems: Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var tiers by remember { mutableStateOf(DEFAULT_SEASON_PASS_TIERS) }
-    var isAllClaimed by remember { mutableStateOf(false) }
-
-    val totalCoins = remember(tiers) {
-        tiers.sumOf { it.freeRewardCoins + it.vipRewardCoins }
+    val tiers = DEFAULT_SEASON_PASS_TIERS
+    val unlockedUnclaimedTiers = remember(tiers, playerLevel, claimedBonusIds) {
+        tiers.filter { tier ->
+            val key = "season_pass_t${tier.level}"
+            playerLevel >= tier.level && key !in claimedBonusIds
+        }
     }
-    val totalGems = remember(tiers) {
-        tiers.sumOf { it.freeRewardGems + it.vipRewardGems }
-    }
+    val unlockedCoins = unlockedUnclaimedTiers.sumOf { it.freeRewardCoins + it.vipRewardCoins }
+    val unlockedGems = unlockedUnclaimedTiers.sumOf { it.freeRewardGems + it.vipRewardGems }
+    val unlockedCount = tiers.count { playerLevel >= it.level }
+    val canClaimAnyUnlocked = unlockedUnclaimedTiers.isNotEmpty()
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -69,13 +73,12 @@ fun RoyalSeasonPassDialog(
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                         Text("👑", fontSize = 24.sp)
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
@@ -86,7 +89,7 @@ fun RoyalSeasonPassDialog(
                                 fontWeight = FontWeight.Black
                             )
                             Text(
-                                text = "Season 1: Throne of Kings • All Rewards Active",
+                                text = "Level $playerLevel • $unlockedCount/${tiers.size} Tiers Unlocked",
                                 color = Color(0xFF00E676),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
@@ -97,7 +100,7 @@ fun RoyalSeasonPassDialog(
                     IconButton(
                         onClick = onDismiss,
                         modifier = Modifier
-                            .size(32.dp)
+                            .minimumInteractiveComponentSize()
                             .testTag("close_season_pass_button")
                     ) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.White)
@@ -106,7 +109,6 @@ fun RoyalSeasonPassDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Summary Card with "Claim Everything Inside"
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
@@ -123,21 +125,26 @@ fun RoyalSeasonPassDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text("TOTAL REWARDS INSIDE", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Text("READY TO CLAIM", color = TextMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("🪙 +${formatCompactCoins(totalCoins)}", color = RoyalGoldLight, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                                    Text("🪙 +${formatCompactCoins(unlockedCoins)}", color = RoyalGoldLight, fontSize = 14.sp, fontWeight = FontWeight.Black)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("💎 +$totalGems", color = SapphireBlueLight, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                                    Text("💎 +$unlockedGems", color = SapphireBlueLight, fontSize = 14.sp, fontWeight = FontWeight.Black)
                                 }
                             }
 
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFF2E7D32))
+                                    .background(if (unlockedCount > 0) Color(0xFF2E7D32) else Color(0xFF37474F))
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
-                                Text("VIP UNLOCKED ✓", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                                Text(
+                                    text = "LVL $playerLevel PASS",
+                                    color = Color.White,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Black
+                                )
                             }
                         }
 
@@ -145,26 +152,35 @@ fun RoyalSeasonPassDialog(
 
                         Button(
                             onClick = {
-                                isAllClaimed = true
-                                tiers = tiers.map { it.copy(isClaimed = true) }
-                                onClaimAll(totalCoins, totalGems)
+                                if (canClaimAnyUnlocked) {
+                                    unlockedUnclaimedTiers.forEach { t ->
+                                        onClaimTierReward(t.level, t.freeRewardCoins + t.vipRewardCoins, t.freeRewardGems + t.vipRewardGems)
+                                    }
+                                    if (unlockedUnclaimedTiers.isEmpty()) {
+                                        onClaimAll(unlockedCoins, unlockedGems)
+                                    }
+                                }
                             },
-                            enabled = !isAllClaimed,
+                            enabled = canClaimAnyUnlocked,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(44.dp)
+                                .heightIn(min = 48.dp)
                                 .testTag("claim_all_season_pass_button"),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isAllClaimed) Color(0xFF1B3D2F) else Color(0xFFFFB300),
+                                containerColor = Color(0xFFFFB300),
                                 disabledContainerColor = Color(0xFF1B3D2F)
                             ),
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
-                                text = if (isAllClaimed) "ALL REWARDS CLAIMED ✓" else "🎁 CLAIM EVERYTHING INSIDE (+${formatCompactCoins(totalCoins)} COINS)",
-                                color = if (isAllClaimed) Color(0xFF00E676) else RoyalNavyDark,
+                                text = if (canClaimAnyUnlocked) {
+                                    "🎁 CLAIM UNLOCKED (+${formatCompactCoins(unlockedCoins)} COINS)"
+                                } else {
+                                    "PLAY MATCHES TO LEVEL UP & UNLOCK TIERS"
+                                },
+                                color = if (canClaimAnyUnlocked) RoyalNavyDark else Color(0xFF90CAF9),
                                 fontWeight = FontWeight.Black,
-                                fontSize = 12.sp
+                                fontSize = 11.sp
                             )
                         }
                     }
@@ -173,7 +189,7 @@ fun RoyalSeasonPassDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Season 1 Tier Progression",
+                    text = "Season 1 Tier Progression (Play matches for XP)",
                     color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
@@ -181,7 +197,6 @@ fun RoyalSeasonPassDialog(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Tier Items List
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -189,14 +204,18 @@ fun RoyalSeasonPassDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(tiers, key = { it.level }) { tier ->
+                        val isUnlocked = playerLevel >= tier.level
+                        val isClaimed = "season_pass_t${tier.level}" in claimedBonusIds
                         SeasonPassTierRow(
                             tier = tier,
-                            isAllClaimed = isAllClaimed,
+                            isUnlocked = isUnlocked,
+                            isClaimed = isClaimed,
                             onClaimTier = {
-                                tiers = tiers.map {
-                                    if (it.level == tier.level) it.copy(isClaimed = true) else it
-                                }
-                                onClaimAll(tier.freeRewardCoins + tier.vipRewardCoins, tier.freeRewardGems + tier.vipRewardGems)
+                                onClaimTierReward(
+                                    tier.level,
+                                    tier.freeRewardCoins + tier.vipRewardCoins,
+                                    tier.freeRewardGems + tier.vipRewardGems
+                                )
                             }
                         )
                     }
@@ -209,10 +228,10 @@ fun RoyalSeasonPassDialog(
 @Composable
 private fun SeasonPassTierRow(
     tier: SeasonPassTier,
-    isAllClaimed: Boolean,
+    isUnlocked: Boolean,
+    isClaimed: Boolean,
     onClaimTier: () -> Unit
 ) {
-    val claimed = tier.isClaimed || isAllClaimed
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -221,7 +240,11 @@ private fun SeasonPassTierRow(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF091B3D)),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (claimed) Color(0xFF00E676) else Color(0xFF1E3A6E)
+            when {
+                isClaimed -> Color(0xFF00E676)
+                isUnlocked -> RoyalGold
+                else -> Color(0xFF1E3A6E)
+            }
         )
     ) {
         Row(
@@ -235,13 +258,18 @@ private fun SeasonPassTierRow(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                // Tier Level Badge
                 Box(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(if (claimed) Color(0xFF1B5E20) else RoyalGoldDark)
-                        .border(1.5.dp, if (claimed) Color(0xFF00E676) else RoyalGold, CircleShape),
+                        .background(
+                            when {
+                                isClaimed -> Color(0xFF1B5E20)
+                                isUnlocked -> RoyalGoldDark
+                                else -> Color(0xFF1C2C4D)
+                            }
+                        )
+                        .border(1.5.dp, if (isClaimed) Color(0xFF00E676) else RoyalGold, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("T${tier.level}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black)
@@ -265,26 +293,42 @@ private fun SeasonPassTierRow(
                 }
             }
 
-            if (claimed) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xFF1B3D2F))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text("CLAIMED ✓", color = Color(0xFF00E676), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            when {
+                isClaimed -> {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF1B3D2F))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("CLAIMED ✓", color = Color(0xFF00E676), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
-            } else {
-                Button(
-                    onClick = onClaimTier,
-                    modifier = Modifier
-                        .height(32.dp)
-                        .testTag("claim_tier_${tier.level}_button"),
-                    colors = ButtonDefaults.buttonColors(containerColor = RoyalGold),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp)
-                ) {
-                    Text("CLAIM", color = RoyalNavyDark, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                isUnlocked -> {
+                    Button(
+                        onClick = onClaimTier,
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("claim_tier_${tier.level}_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = RoyalGold),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Text("CLAIM", color = RoyalNavyDark, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+                else -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF14244D))
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = "Locked", tint = TextMuted, modifier = Modifier.size(12.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Lvl ${tier.level}", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

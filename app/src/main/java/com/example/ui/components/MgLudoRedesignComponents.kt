@@ -42,6 +42,8 @@ fun MgLudoTopHeader(
     crownAvatarId: String,
     customPhotoUri: String? = null,
     level: Int,
+    xpProgress: Float = 0f,
+    unreadNotificationsCount: Int = 0,
     coins: Long,
     gems: Int,
     isMusicPlaying: Boolean = false,
@@ -172,7 +174,7 @@ fun MgLudoTopHeader(
                         Box(
                             modifier = Modifier
                                 .fillMaxHeight()
-                                .fillMaxWidth(0.70f)
+                                .fillMaxWidth(xpProgress.coerceIn(0f, 1f))
                                 .background(Brush.horizontalGradient(listOf(RoyalGoldLight, RoyalGold)))
                         )
                     }
@@ -260,7 +262,7 @@ fun MgLudoTopHeader(
                 Text(if (isMusicPlaying) "🎵" else "🔇", fontSize = 16.sp)
             }
 
-            // Notification Bell with Red Badge "3"
+            // Notification Bell with dynamic unread badge
             Box(
                 modifier = Modifier
                     .size(32.dp)
@@ -271,16 +273,23 @@ fun MgLudoTopHeader(
             ) {
                 Text("🔔", fontSize = 16.sp)
 
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = 2.dp, y = (-2).dp)
-                        .size(14.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFFF1744)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("3", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                if (unreadNotificationsCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 2.dp, y = (-2).dp)
+                            .size(14.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFF1744)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (unreadNotificationsCount > 9) "9+" else unreadNotificationsCount.toString(),
+                            color = Color.White,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
@@ -322,7 +331,7 @@ fun MgLudoTopPills(
         MgLudoTopCard(
             icon = "🏆",
             title = "Ranking",
-            subtitle = "54.20h",
+            subtitle = "Global",
             modifier = Modifier.weight(1f),
             onClick = onRankingClick
         )
@@ -331,7 +340,7 @@ fun MgLudoTopPills(
         MgLudoTopCard(
             icon = "📅",
             title = "Leaderboard",
-            subtitle = "66.7h",
+            subtitle = "Friends",
             modifier = Modifier.weight(1f),
             onClick = onLeaderboardClick
         )
@@ -563,7 +572,7 @@ fun MgLudoLeftActionColumn(
  */
 @Composable
 fun MgLudoRightActionColumn(
-    mailCount: Int = 5,
+    mailCount: Int = 0,
     onDailyRewardClick: () -> Unit,
     onMissionsClick: () -> Unit,
     onTasksClick: () -> Unit,
@@ -589,7 +598,7 @@ fun MgLudoRightActionColumn(
         MgLudoSideActionButton(
             icon = "📋",
             label = "Missions",
-            badgeText = "NEW",
+            badgeText = "LIVE",
             badgeColor = Color(0xFFFF1744),
             onClick = onMissionsClick
         )
@@ -605,7 +614,7 @@ fun MgLudoRightActionColumn(
         MgLudoSideActionButton(
             icon = "✉️",
             label = "Mail",
-            badgeText = mailCount.toString(),
+            badgeText = if (mailCount > 0) mailCount.toString() else null,
             badgeColor = Color(0xFFFF1744),
             onClick = onMailClick
         )
@@ -880,6 +889,8 @@ private fun QuickPlayModeCard(
 @Composable
 fun MgLudoBottomDock(
     currentScreen: AppScreen,
+    inventoryBadge: String? = null,
+    friendsBadge: String? = null,
     onScreenSelected: (AppScreen) -> Unit,
     onInventoryClick: () -> Unit,
     onFriendsClick: () -> Unit,
@@ -889,6 +900,7 @@ fun MgLudoBottomDock(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .navigationBarsPadding()
             .height(68.dp)
             .shadow(16.dp),
         color = Color(0xFF05153A),
@@ -914,7 +926,7 @@ fun MgLudoBottomDock(
                 icon = "🎒",
                 label = "Inventory",
                 isSelected = false,
-                badge = "2"
+                badge = inventoryBadge
             ) {
                 onInventoryClick()
             }
@@ -951,7 +963,7 @@ fun MgLudoBottomDock(
                 icon = "👥",
                 label = "Friends",
                 isSelected = false,
-                badge = "8"
+                badge = friendsBadge
             ) {
                 onFriendsClick()
             }
@@ -960,7 +972,7 @@ fun MgLudoBottomDock(
             DockTabItem(
                 icon = "🏆",
                 label = "Club",
-                isSelected = false,
+                isSelected = currentScreen == AppScreen.VOICE_CLUB,
                 badge = null
             ) {
                 onClubClick()

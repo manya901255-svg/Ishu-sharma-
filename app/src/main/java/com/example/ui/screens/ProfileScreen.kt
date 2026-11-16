@@ -117,51 +117,13 @@ fun ProfileScreen(
         }
     }
 
-    val achievements = remember {
-        listOf(
-            ProfileAchievement(
-                id = "ach_defender",
-                title = "The Defender",
-                description = "Capture 500 pawns",
-                currentProgress = 230,
-                targetProgress = 500,
-                xpReward = 50,
-                coinReward = 10000L,
-                medalsEarned = 1
-            ),
-            ProfileAchievement(
-                id = "ach_ludo_love",
-                title = "Ludo Love",
-                description = "Complete 500 online games",
-                currentProgress = 66,
-                targetProgress = 500,
-                xpReward = 200,
-                coinReward = 50000L,
-                medalsEarned = 2
-            ),
-            ProfileAchievement(
-                id = "ach_six_cliques",
-                title = "Six Cliques",
-                description = "Get 1000 6s in dice rolls",
-                currentProgress = 1000,
-                targetProgress = 1000,
-                xpReward = 100,
-                coinReward = 25000L,
-                isCompleted = true,
-                medalsEarned = 3
-            ),
-            ProfileAchievement(
-                id = "ach_home_runner",
-                title = "Home Runner",
-                description = "Take Home 300 Pawns in online",
-                currentProgress = 224,
-                targetProgress = 300,
-                xpReward = 50,
-                coinReward = 10000L,
-                medalsEarned = 1
-            )
-        )
-    }
+    val displayReferralCode = uiState.referralCode.ifBlank { "MGL-000000" }
+    val xpIntoLevel = uiState.playerXp % 250
+    val xpTarget = 250
+    val xpProgress = (xpIntoLevel.toFloat() / xpTarget.toFloat()).coerceIn(0f, 1f)
+    val winRatioPct = if (uiState.totalGamesPlayed > 0) {
+        (uiState.totalWins * 100) / uiState.totalGamesPlayed
+    } else 0
 
     Box(
         modifier = Modifier
@@ -356,13 +318,16 @@ fun ProfileScreen(
                                                     )
                                                 }
 
-                                                // Referral Code: GNFR200 [copy]
+                                                // Live Referral Code [copy]
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
-                                                    modifier = Modifier.clickable {
-                                                        clipboardManager.setText(AnnotatedString("GNFR200"))
-                                                        Toast.makeText(context, "Referral Code Copied! 📋", Toast.LENGTH_SHORT).show()
-                                                    }
+                                                    modifier = Modifier
+                                                        .minimumInteractiveComponentSize()
+                                                        .clickable {
+                                                            clipboardManager.setText(AnnotatedString(displayReferralCode))
+                                                            Toast.makeText(context, "Referral Code Copied! 📋", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                        .testTag("copy_referral_code_button")
                                                 ) {
                                                     Text(
                                                         text = "Referral Code: ",
@@ -370,7 +335,7 @@ fun ProfileScreen(
                                                         fontSize = 11.sp
                                                     )
                                                     Text(
-                                                        text = "GNFR200",
+                                                        text = displayReferralCode,
                                                         color = Color(0xFF1565C0),
                                                         fontSize = 11.sp,
                                                         fontWeight = FontWeight.Bold
@@ -378,7 +343,7 @@ fun ProfileScreen(
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Icon(
                                                         imageVector = Icons.Default.ContentCopy,
-                                                        contentDescription = "Copy",
+                                                        contentDescription = "Copy Referral Code",
                                                         tint = Color(0xFF757575),
                                                         modifier = Modifier.size(13.dp)
                                                     )
@@ -386,7 +351,7 @@ fun ProfileScreen(
 
                                                 Spacer(modifier = Modifier.height(4.dp))
 
-                                                // Level: 19  68 of 1570 Progress Bar
+                                                // Dynamic Level & XP Progress Bar
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     modifier = Modifier.fillMaxWidth()
@@ -400,12 +365,12 @@ fun ProfileScreen(
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Box(
                                                         modifier = Modifier
-                                                            .size(18.dp)
+                                                            .size(20.dp)
                                                             .clip(CircleShape)
                                                             .background(Color(0xFFFFA000)),
                                                         contentAlignment = Alignment.Center
                                                     ) {
-                                                        Text("19", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                                                        Text("${uiState.playerLevel}", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black)
                                                     }
                                                     Spacer(modifier = Modifier.width(6.dp))
                                                     Box(
@@ -419,12 +384,12 @@ fun ProfileScreen(
                                                         Box(
                                                             modifier = Modifier
                                                                 .fillMaxHeight()
-                                                                .fillMaxWidth(68f / 1570f)
+                                                                .fillMaxWidth(xpProgress)
                                                                 .align(Alignment.CenterStart)
                                                                 .background(Color(0xFF00E676))
                                                         )
                                                         Text(
-                                                            text = "68 of 1570",
+                                                            text = "$xpIntoLevel of $xpTarget XP",
                                                             color = Color.White,
                                                             fontSize = 8.sp,
                                                             fontWeight = FontWeight.Bold
@@ -486,7 +451,7 @@ fun ProfileScreen(
 
                                         Spacer(modifier = Modifier.height(8.dp))
 
-                                        // Authentic Stats List (matching Screenshot 5)
+                                        // Dynamic Stats List from real player gameplay
                                         Card(
                                             modifier = Modifier.fillMaxWidth(),
                                             shape = RoundedCornerShape(14.dp),
@@ -495,14 +460,15 @@ fun ProfileScreen(
                                         ) {
                                             Column(modifier = Modifier.padding(vertical = 4.dp)) {
                                                 listOf(
-                                                    Pair("Total Earnings", "2.36 M"),
-                                                    Pair("Games Won", "53 of 113"),
-                                                    Pair("Win ratio", "46%"),
-                                                    Pair("Current win streak", "6"),
-                                                    Pair("Max win streak", "9"),
-                                                    Pair("2 Player Wins", "42"),
-                                                    Pair("4 Player Wins", "0"),
-                                                    Pair("Pawns Captured", "376")
+                                                    Pair("Total Earnings", formatCompactCoins(uiState.totalEarnings)),
+                                                    Pair("Games Won", "${uiState.totalWins} of ${uiState.totalGamesPlayed}"),
+                                                    Pair("Win ratio", "$winRatioPct%"),
+                                                    Pair("Current win streak", "${uiState.winStreak}"),
+                                                    Pair("Max win streak", "${uiState.bestWinStreak}"),
+                                                    Pair("Total Dice Rolls", "${uiState.totalRolls}"),
+                                                    Pair("Pawns Captured", "${uiState.totalCaptures}"),
+                                                    Pair("Today's Matches", "${uiState.todayActivity.matchesPlayed}"),
+                                                    Pair("Verified Invites", "${uiState.verifiedReferralsCount}")
                                                 ).forEachIndexed { idx, (label, value) ->
                                                     Row(
                                                         modifier = Modifier
@@ -528,15 +494,10 @@ fun ProfileScreen(
                                                 }
                                             }
                                         }
-                                    }
-                                }
-                            } else {
-                                // Achievements Tab Content (Screenshot 12)
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxSize(),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    items(uiState.achievements) { ach ->
+
+                                        Spacer(modifier = Modifier.height(14.dp))
+
+                                        // Theme, Notifications & Account Controls
                                         Card(
                                             modifier = Modifier.fillMaxWidth(),
                                             shape = RoundedCornerShape(14.dp),
@@ -546,98 +507,281 @@ fun ProfileScreen(
                                             Column(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .padding(10.dp)
+                                                    .padding(12.dp),
+                                                verticalArrangement = Arrangement.spacedBy(10.dp)
                                             ) {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    // Medal / Icon
-                                                    Text(ach.iconEmoji, fontSize = 24.sp)
-
-                                                    Spacer(modifier = Modifier.width(10.dp))
-
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Text(
-                                                            text = ach.title,
-                                                            color = Color(0xFF3E2723),
-                                                            fontSize = 13.sp,
-                                                            fontWeight = FontWeight.Black
-                                                        )
-                                                        Text(
-                                                            text = ach.description,
-                                                            color = Color(0xFF5D4037),
-                                                            fontSize = 10.sp
-                                                        )
-                                                        Spacer(modifier = Modifier.height(4.dp))
-
-                                                        // Progress Bar
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .fillMaxWidth()
-                                                                .height(14.dp)
-                                                                .clip(RoundedCornerShape(7.dp))
-                                                                .background(Color(0xFF6A1B9A)),
-                                                            contentAlignment = Alignment.Center
-                                                        ) {
-                                                            Box(
-                                                                modifier = Modifier
-                                                                    .fillMaxHeight()
-                                                                    .fillMaxWidth((ach.currentProgress.toFloat() / ach.targetProgress).coerceIn(0f, 1f))
-                                                                    .align(Alignment.CenterStart)
-                                                                    .background(
-                                                                        Brush.horizontalGradient(
-                                                                            listOf(Color(0xFF29B6F6), Color(0xFF0288D1))
-                                                                        )
-                                                                    )
-                                                            )
-                                                            Text(
-                                                                text = "${ach.currentProgress} / ${ach.targetProgress}",
-                                                                color = Color.White,
-                                                                fontSize = 9.sp,
-                                                                fontWeight = FontWeight.Bold
-                                                            )
-                                                        }
-                                                    }
-                                                }
-
-                                                Spacer(modifier = Modifier.height(6.dp))
-
-                                                // Rewards & Completed / Claim action
+                                                Text(
+                                                    text = "Preferences & Account",
+                                                    color = Color(0xFF3E2723),
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Black
+                                                )
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth(),
                                                     horizontalArrangement = Arrangement.SpaceBetween,
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Text("Rewards:", color = Color(0xFF5D4037), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text("⭐ ${ach.xpReward} XP", color = Color(0xFFF57F17), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                                                        Spacer(modifier = Modifier.width(8.dp))
-                                                        Text("🪙 ${formatCompactCoins(ach.coinReward)}", color = Color(0xFFE65100), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(
+                                                            text = if (uiState.isDarkTheme) "Dark Royal Theme" else "Light Royal Theme",
+                                                            color = Color(0xFF3E2723),
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                        Text(
+                                                            text = "Switch between Dark & Light appearance",
+                                                            color = Color(0xFF5D4037),
+                                                            fontSize = 10.sp
+                                                        )
                                                     }
+                                                    Switch(
+                                                        checked = uiState.isDarkTheme,
+                                                        onCheckedChange = { viewModel.toggleDarkTheme(it) },
+                                                        modifier = Modifier.testTag("theme_mode_switch")
+                                                    )
+                                                }
 
-                                                    if (ach.isClaimed) {
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .clip(RoundedCornerShape(8.dp))
-                                                                .background(Color(0xFFC8E6C9))
-                                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                                        ) {
-                                                            Text("✓ Claimed", color = Color(0xFF1B5E20), fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                                                val unreadNotif = uiState.notifications.count { !it.isRead }
+                                                OutlinedButton(
+                                                    onClick = { viewModel.toggleNotificationsDialog(true) },
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .minimumInteractiveComponentSize()
+                                                        .testTag("open_notifications_button"),
+                                                    shape = RoundedCornerShape(12.dp)
+                                                ) {
+                                                    Text(
+                                                        text = if (unreadNotif > 0) "🔔 Notifications ($unreadNotif Unread)" else "🔔 Notifications & Alerts",
+                                                        color = Color(0xFF1565C0),
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+
+                                                if (uiState.isFirebaseConfigured && uiState.isSignedIn) {
+                                                    if (!uiState.authUserEmail.isNullOrBlank()) {
+                                                        Text(
+                                                            text = "Signed in: ${uiState.authUserEmail}",
+                                                            color = Color(0xFF5D4037),
+                                                            fontSize = 11.sp
+                                                        )
+                                                    }
+                                                    Button(
+                                                        onClick = { viewModel.signOutGoogleUser() },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .minimumInteractiveComponentSize()
+                                                            .testTag("google_sign_out_button")
+                                                    ) {
+                                                        Text("Sign Out", color = Color.White, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Verified Achievements Tab Content
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    if (uiState.verifiedAchievements.isNotEmpty()) {
+                                        items(uiState.verifiedAchievements, key = { it.taskId }) { ach ->
+                                            val target = ach.target.coerceAtLeast(1)
+                                            val prog = (ach.progress.toFloat() / target.toFloat()).coerceIn(0f, 1f)
+                                            val badgeEmoji = when (ach.taskId) {
+                                                "ach_first_blood" -> "🥇"
+                                                "ach_ten_wins" -> "👑"
+                                                "ach_fifty_captures" -> "⚔️"
+                                                "ach_hundred_rolls" -> "🎲"
+                                                else -> "🏆"
+                                            }
+                                            Card(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .testTag("verified_achievement_${ach.taskId}"),
+                                                shape = RoundedCornerShape(14.dp),
+                                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF3E5D0)),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7CCC8))
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(10.dp)
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(badgeEmoji, fontSize = 24.sp)
+                                                        Spacer(modifier = Modifier.width(10.dp))
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(
+                                                                text = ach.title,
+                                                                color = Color(0xFF3E2723),
+                                                                fontSize = 13.sp,
+                                                                fontWeight = FontWeight.Black
+                                                            )
+                                                            Text(
+                                                                text = ach.description,
+                                                                color = Color(0xFF5D4037),
+                                                                fontSize = 10.sp
+                                                            )
+                                                            Spacer(modifier = Modifier.height(4.dp))
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .height(14.dp)
+                                                                    .clip(RoundedCornerShape(7.dp))
+                                                                    .background(Color(0xFF6A1B9A)),
+                                                                contentAlignment = Alignment.Center
+                                                            ) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .fillMaxHeight()
+                                                                        .fillMaxWidth(prog)
+                                                                        .align(Alignment.CenterStart)
+                                                                        .background(
+                                                                            Brush.horizontalGradient(
+                                                                                listOf(Color(0xFF29B6F6), Color(0xFF0288D1))
+                                                                            )
+                                                                        )
+                                                                )
+                                                                Text(
+                                                                    text = "${ach.progress} / ${ach.target}",
+                                                                    color = Color.White,
+                                                                    fontSize = 9.sp,
+                                                                    fontWeight = FontWeight.Bold
+                                                                )
+                                                            }
                                                         }
-                                                    } else if (ach.currentProgress >= ach.targetProgress || ach.isCompleted) {
-                                                        Button(
-                                                            onClick = { viewModel.claimAchievement(ach) },
-                                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676)),
-                                                            shape = RoundedCornerShape(8.dp),
-                                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                                                            modifier = Modifier.height(26.dp)
-                                                        ) {
-                                                            Text("Claim 🎁", color = Color(0xFF003300), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                                    }
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Text("Rewards:", color = Color(0xFF5D4037), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                            if (ach.rewardXp > 0) {
+                                                                Spacer(modifier = Modifier.width(4.dp))
+                                                                Text("⭐ ${ach.rewardXp} XP", color = Color(0xFFF57F17), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                                            }
+                                                            if (ach.rewardCoins > 0) {
+                                                                Spacer(modifier = Modifier.width(8.dp))
+                                                                Text("🪙 ${formatCompactCoins(ach.rewardCoins.toLong())}", color = Color(0xFFE65100), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                                            }
                                                         }
-                                                    } else {
-                                                        Text("In Progress", color = Color(0xFF8D6E63), fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold)
+                                                        when (ach.status) {
+                                                            TaskStatus.CLAIMED -> {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .clip(RoundedCornerShape(8.dp))
+                                                                        .background(Color(0xFFC8E6C9))
+                                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                                ) {
+                                                                    Text("✓ Claimed", color = Color(0xFF1B5E20), fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                                                                }
+                                                            }
+                                                            TaskStatus.COMPLETED -> {
+                                                                Button(
+                                                                    onClick = { viewModel.claimVerifiedTaskReward(ach.taskId) },
+                                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676)),
+                                                                    shape = RoundedCornerShape(8.dp),
+                                                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                                                    modifier = Modifier.minimumInteractiveComponentSize()
+                                                                ) {
+                                                                    Text("Claim Reward", color = Color(0xFF003300), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                                                }
+                                                            }
+                                                            TaskStatus.IN_PROGRESS -> {
+                                                                Text("In Progress", color = Color(0xFF8D6E63), fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        items(uiState.achievements) { ach ->
+                                            Card(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(14.dp),
+                                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF3E5D0)),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7CCC8))
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(10.dp)
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(ach.iconEmoji, fontSize = 24.sp)
+                                                        Spacer(modifier = Modifier.width(10.dp))
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(ach.title, color = Color(0xFF3E2723), fontSize = 13.sp, fontWeight = FontWeight.Black)
+                                                            Text(ach.description, color = Color(0xFF5D4037), fontSize = 10.sp)
+                                                            Spacer(modifier = Modifier.height(4.dp))
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .height(14.dp)
+                                                                    .clip(RoundedCornerShape(7.dp))
+                                                                    .background(Color(0xFF6A1B9A)),
+                                                                contentAlignment = Alignment.Center
+                                                            ) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .fillMaxHeight()
+                                                                        .fillMaxWidth((ach.currentProgress.toFloat() / ach.targetProgress).coerceIn(0f, 1f))
+                                                                        .align(Alignment.CenterStart)
+                                                                        .background(Brush.horizontalGradient(listOf(Color(0xFF29B6F6), Color(0xFF0288D1))))
+                                                                )
+                                                                Text("${ach.currentProgress} / ${ach.targetProgress}", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                            }
+                                                        }
+                                                    }
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Text("Rewards:", color = Color(0xFF5D4037), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                            Spacer(modifier = Modifier.width(4.dp))
+                                                            Text("⭐ ${ach.xpReward} XP", color = Color(0xFFF57F17), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                                            Spacer(modifier = Modifier.width(8.dp))
+                                                            Text("🪙 ${formatCompactCoins(ach.coinReward)}", color = Color(0xFFE65100), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                                        }
+                                                        if (ach.isClaimed) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .clip(RoundedCornerShape(8.dp))
+                                                                    .background(Color(0xFFC8E6C9))
+                                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            ) {
+                                                                Text("✓ Claimed", color = Color(0xFF1B5E20), fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                                                            }
+                                                        } else if (ach.currentProgress >= ach.targetProgress || ach.isCompleted) {
+                                                            Button(
+                                                                onClick = { viewModel.claimAchievement(ach) },
+                                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676)),
+                                                                shape = RoundedCornerShape(8.dp),
+                                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                                                modifier = Modifier.minimumInteractiveComponentSize()
+                                                            ) {
+                                                                Text("Claim Reward", color = Color(0xFF003300), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                                            }
+                                                        } else {
+                                                            Text("In Progress", color = Color(0xFF8D6E63), fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold)
+                                                        }
                                                     }
                                                 }
                                             }
@@ -673,24 +817,29 @@ fun ProfileScreen(
                 }
 
                 // Top-right Close Button (X)
-                Box(
+                IconButton(
+                    onClick = onBack,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 10.dp, end = 6.dp)
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE53935))
-                        .border(2.dp, Color.White, CircleShape)
-                        .clickable { onBack() }
-                        .testTag("profile_close_button"),
-                    contentAlignment = Alignment.Center
+                        .padding(top = 6.dp, end = 2.dp)
+                        .minimumInteractiveComponentSize()
+                        .testTag("profile_close_button")
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE53935))
+                            .border(2.dp, Color.White, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }

@@ -28,31 +28,25 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.model.FriendshipItem
 import com.example.ui.theme.*
-import com.example.util.SocialInviteUtils
 
 data class FriendKeySlot(
-    val id: Int,
+    val id: String,
     val name: String,
     val avatar: String,
     val level: Int
 )
 
-val DEFAULT_FRIEND_SLOTS = listOf(
-    FriendKeySlot(1, "Prince Aryan", "👑", 21),
-    FriendKeySlot(2, "Princess Diya", "👸", 19),
-    FriendKeySlot(3, "Commander Kabir", "⚔️", 24)
-)
-
 /**
- * GoldenVaultKeyDialog: Friends can send keys to each other.
- * As explicitly required: In the key section, when friends send us the key and that key becomes 3,
- * only then the rewards will open.
+ * GoldenVaultKeyDialog: Friends send keys to each other over Firestore.
+ * Rewards open strictly when keysReceivedCount >= 3.
  */
 @Composable
 fun GoldenVaultKeyDialog(
-    keysReceivedCount: Int = 1,
-    keysSentCount: Int = 1,
+    keysReceivedCount: Int = 0,
+    keysSentCount: Int = 0,
+    friends: List<FriendshipItem> = emptyList(),
     onSendKeyToFriend: (String) -> Unit = {},
     onReceiveKeyFromFriend: (String) -> Unit = {},
     onClaimVaultReward: () -> Unit,
@@ -312,80 +306,73 @@ fun GoldenVaultKeyDialog(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    DEFAULT_FRIEND_SLOTS.forEach { friend ->
-                        val timesSent = friendSentCounts[friend.name] ?: 0
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF0F2044))
-                                .border(1.dp, if (timesSent > 0) Color(0xFF00E676) else Color(0xFF1D3B73), RoundedCornerShape(12.dp))
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                    if (friends.isEmpty()) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF0F2044)
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF22427C)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(friend.avatar, fontSize = 18.sp)
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(friend.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .clip(CircleShape)
-                                                .background(Color(0xFF00E676))
+                            Text(
+                                text = "Add real friends in the Friends Hub to exchange Vault Keys!",
+                                color = TextMuted,
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(14.dp)
+                            )
+                        }
+                    } else {
+                        friends.take(5).forEach { friend ->
+                            val timesSent = friendSentCounts[friend.friendName] ?: 0
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFF0F2044))
+                                    .border(1.dp, if (timesSent > 0) Color(0xFF00E676) else Color(0xFF1D3B73), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF22427C)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(friend.avatarEmoji.ifBlank { "👑" }, fontSize = 18.sp)
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(friend.friendName, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            text = if (timesSent > 0) "Key Sent ($timesSent) 🔑" else "Tap to send a Vault Key",
+                                            color = if (timesSent > 0) Color(0xFF81C784) else Color(0xFFA5D6A7),
+                                            fontSize = 10.sp
                                         )
                                     }
-                                    Text(
-                                        text = if (timesSent > 0) "Lvl ${friend.level} • Sent: $timesSent times 🔑" else "Lvl ${friend.level} • Online ✓",
-                                        color = if (timesSent > 0) Color(0xFF81C784) else Color(0xFFA5D6A7),
-                                        fontSize = 10.sp
-                                    )
                                 }
-                            }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                // Unlimited sends allowed - button is always clickable
                                 Button(
                                     onClick = {
-                                        val current = friendSentCounts[friend.name] ?: 0
-                                        friendSentCounts = friendSentCounts + (friend.name to current + 1)
-                                        onSendKeyToFriend(friend.name)
+                                        val current = friendSentCounts[friend.friendName] ?: 0
+                                        friendSentCounts = friendSentCounts + (friend.friendName to current + 1)
+                                        onSendKeyToFriend(friend.friendName)
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = RoyalGold),
                                     shape = RoundedCornerShape(8.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                    modifier = Modifier.height(32.dp).testTag("send_key_button_${friend.id}")
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .minimumInteractiveComponentSize()
+                                        .testTag("send_key_button_${friend.friendUid}")
                                 ) {
                                     Text(
-                                        text = if (timesSent > 0) "Send Again 🔑" else "Send Key 🔑",
+                                        text = if (timesSent > 0) "Sent Again 🔑" else "Send Key 🔑",
                                         color = RoyalNavyDark,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.ExtraBold
                                     )
-                                }
-
-                                // Friend sends key back action until 3 keys reached
-                                if (keysReceivedCount < 3) {
-                                    Button(
-                                        onClick = { onReceiveKeyFromFriend(friend.name) },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C853)),
-                                        shape = RoundedCornerShape(8.dp),
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                        modifier = Modifier.height(32.dp).testTag("receive_key_button_${friend.id}")
-                                    ) {
-                                        Text("Get Key 🎁", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    }
                                 }
                             }
                         }

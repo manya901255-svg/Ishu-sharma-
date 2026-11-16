@@ -13,7 +13,20 @@ val CinzelDecorativeFontFamily = FontFamily(
 )
 
 val CinzelFontFamily = FontFamily(
-    Font(R.font.cinzel, FontWeight.Normal)
+    Font(R.font.cinzel, FontWeight.Normal),
+    Font(R.font.cinzel, FontWeight.Bold)
+)
+
+val PlusJakartaSansFontFamily = FontFamily(
+    Font(R.font.plus_jakarta_sans, FontWeight.Normal),
+    Font(R.font.plus_jakarta_sans, FontWeight.Medium),
+    Font(R.font.plus_jakarta_sans, FontWeight.SemiBold),
+    Font(R.font.plus_jakarta_sans, FontWeight.Bold)
+)
+
+val JetBrainsMonoFontFamily = FontFamily(
+    Font(R.font.jetbrains_mono, FontWeight.Normal),
+    Font(R.font.jetbrains_mono, FontWeight.Bold)
 )
 
 val Typography = Typography(
@@ -39,24 +52,44 @@ val Typography = Typography(
         letterSpacing = 0.15.sp
     ),
     titleMedium = TextStyle(
-        fontFamily = CinzelFontFamily,
-        fontWeight = FontWeight.Medium,
+        fontFamily = PlusJakartaSansFontFamily,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 16.sp,
         lineHeight = 22.sp,
         letterSpacing = 0.15.sp
     ),
     bodyLarge = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = PlusJakartaSansFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.5.sp
+        fontSize = 15.sp,
+        lineHeight = 22.sp,
+        letterSpacing = 0.25.sp
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = PlusJakartaSansFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        letterSpacing = 0.2.sp
+    ),
+    bodySmall = TextStyle(
+        fontFamily = PlusJakartaSansFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+        lineHeight = 16.sp
     ),
     labelLarge = TextStyle(
-        fontFamily = CinzelFontFamily,
+        fontFamily = PlusJakartaSansFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
+    ),
+    labelMedium = TextStyle(
+        fontFamily = JetBrainsMonoFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.2.sp
     )
 )

@@ -131,45 +131,7 @@ class LudoRepository(context: Context) {
     }
 
     suspend fun initializeSampleHistoryIfEmpty() {
-        if (matchHistoryDao.getMatchCount() == 0) {
-            val now = System.currentTimeMillis()
-            val sampleMatches = listOf(
-                MatchHistoryEntity(
-                    timestamp = now - 1000 * 60 * 35, // 35 min ago
-                    gameMode = "vs Royal AI",
-                    wager = 500,
-                    coinsWon = 1500,
-                    userRank = 1,
-                    winnerName = "Ishu",
-                    winnerColor = "Yellow",
-                    durationSeconds = 240,
-                    leaderboardSummary = "1:Ishu:Yellow:4;2:Raja Vikram:Red:3;3:Maharani Tara:Green:2;4:Senapati Amar:Blue:1"
-                ),
-                MatchHistoryEntity(
-                    timestamp = now - 1000 * 60 * 180, // 3 hours ago
-                    gameMode = "Online Match",
-                    wager = 2000,
-                    coinsWon = -2000,
-                    userRank = 2,
-                    winnerName = "Crown_Kabir",
-                    winnerColor = "Red",
-                    durationSeconds = 310,
-                    leaderboardSummary = "1:Crown_Kabir:Red:4;2:Ishu:Yellow:3;3:Delhi_Tiger:Green:1;4:RoyalKnight:Blue:0"
-                ),
-                MatchHistoryEntity(
-                    timestamp = now - 1000 * 60 * 60 * 24, // 1 day ago
-                    gameMode = "Quick Rush Mode",
-                    wager = 5000,
-                    coinsWon = 15000,
-                    userRank = 1,
-                    winnerName = "Ishu",
-                    winnerColor = "Yellow",
-                    durationSeconds = 125,
-                    leaderboardSummary = "1:Ishu:Yellow:1;2:Raja Vikram:Red:0;3:Maharani Tara:Green:0;4:Senapati Amar:Blue:0"
-                )
-            )
-            sampleMatches.forEach { matchHistoryDao.insertMatch(it) }
-        }
+        // Real matches only: do not seed fake match history on clean startup
     }
 
     suspend fun getUserProfile(): UserProfileEntity {

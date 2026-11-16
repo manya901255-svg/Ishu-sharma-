@@ -43,11 +43,15 @@ import com.example.util.SocialInviteUtils
 @Composable
 fun InviteFriendsDialog(
     roomCode: String,
-    onRewardEarned: (coins: Long, gems: Int) -> Unit,
+    referralCode: String = roomCode,
+    verifiedReferralsCount: Int = 0,
+    onRedeemReferralCode: (String) -> Unit = {},
+    onRewardEarned: (coins: Long, gems: Int) -> Unit = { _, _ -> },
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     var copiedFeedback by remember { mutableStateOf(false) }
+    var redeemInput by remember { mutableStateOf("") }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -139,13 +143,13 @@ fun InviteFriendsDialog(
                                 letterSpacing = 1.sp
                             )
                             Text(
-                                text = "+5,000 Coins & +20 Gems",
+                                text = "+200 Coins (Verified Task)",
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "for each friend who joins your match!",
+                                text = "Earned ONLY when a friend joins using your code! Joined: $verifiedReferralsCount",
                                 color = TextMuted,
                                 fontSize = 10.sp
                             )
@@ -156,9 +160,8 @@ fun InviteFriendsDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Room / Invite Code Box
                 Text(
-                    text = "YOUR MATCH & INVITE CODE",
+                    text = "YOUR REFERRAL & INVITE CODE",
                     color = TextMuted,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold
@@ -178,14 +181,14 @@ fun InviteFriendsDialog(
                 ) {
                     Column {
                         Text(
-                            text = roomCode,
+                            text = referralCode.ifBlank { roomCode },
                             color = RoyalGoldLight,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = 2.sp
                         )
                         Text(
-                            text = "mgludo.app/play?room=$roomCode",
+                            text = "Share Room $roomCode • Code: $referralCode",
                             color = TextMuted,
                             fontSize = 9.sp
                         )
@@ -193,14 +196,13 @@ fun InviteFriendsDialog(
 
                     Button(
                         onClick = {
-                            SocialInviteUtils.copyToClipboard(context, SocialInviteUtils.getInviteMessage(roomCode))
+                            SocialInviteUtils.copyToClipboard(context, SocialInviteUtils.getInviteMessage(referralCode.ifBlank { roomCode }))
                             copiedFeedback = true
-                            onRewardEarned(1000, 5)
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = RoyalGold),
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.height(36.dp)
+                        modifier = Modifier.minimumInteractiveComponentSize().testTag("copy_invite_code_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.ContentCopy,
@@ -224,12 +226,39 @@ fun InviteFriendsDialog(
                     exit = fadeOut()
                 ) {
                     Text(
-                        text = "✓ Invite message copied! Ready to paste anywhere.",
+                        text = "✓ Invite code copied! Rewards unlock once a friend joins with it.",
                         color = Color(0xFF00E676),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(top = 4.dp)
                     )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Redeem Friend's Referral Code
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = redeemInput,
+                        onValueChange = { redeemInput = it.uppercase() },
+                        label = { Text("Enter Friend's Referral Code", fontSize = 11.sp) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f).testTag("redeem_referral_input")
+                    )
+                    Button(
+                        enabled = redeemInput.isNotBlank(),
+                        onClick = {
+                            onRedeemReferralCode(redeemInput.trim())
+                            redeemInput = ""
+                        },
+                        modifier = Modifier.minimumInteractiveComponentSize().testTag("redeem_referral_code_button")
+                    ) {
+                        Text("Redeem", fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(18.dp))
@@ -254,8 +283,7 @@ fun InviteFriendsDialog(
                     ),
                     testTag = "invite_whatsapp_button",
                     onClick = {
-                        SocialInviteUtils.shareToWhatsApp(context, roomCode)
-                        onRewardEarned(2500, 10)
+                        SocialInviteUtils.shareToWhatsApp(context, referralCode.ifBlank { roomCode })
                     }
                 )
 
@@ -271,8 +299,7 @@ fun InviteFriendsDialog(
                     ),
                     testTag = "invite_instagram_button",
                     onClick = {
-                        SocialInviteUtils.shareToInstagram(context, roomCode)
-                        onRewardEarned(2500, 10)
+                        SocialInviteUtils.shareToInstagram(context, referralCode.ifBlank { roomCode })
                     }
                 )
 
@@ -288,8 +315,7 @@ fun InviteFriendsDialog(
                     ),
                     testTag = "invite_facebook_button",
                     onClick = {
-                        SocialInviteUtils.shareToFacebook(context, roomCode)
-                        onRewardEarned(2500, 10)
+                        SocialInviteUtils.shareToFacebook(context, referralCode.ifBlank { roomCode })
                     }
                 )
 
@@ -298,8 +324,7 @@ fun InviteFriendsDialog(
                 // 4. More Options (System Chooser)
                 OutlinedButton(
                     onClick = {
-                        SocialInviteUtils.shareGeneral(context, roomCode)
-                        onRewardEarned(1000, 5)
+                        SocialInviteUtils.shareGeneral(context, referralCode.ifBlank { roomCode })
                     },
                     modifier = Modifier
                         .fillMaxWidth()

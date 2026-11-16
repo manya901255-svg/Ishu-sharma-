@@ -30,13 +30,31 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.model.DailyMission
+import com.example.model.RewardHistoryEntry
+import com.example.model.VerifiedTaskItem
 
 @Composable
 fun DailyMissionsDialog(
     missions: List<DailyMission>,
+    verifiedTasks: List<VerifiedTaskItem> = emptyList(),
+    verifiedAchievements: List<VerifiedTaskItem> = emptyList(),
+    rewardHistory: List<RewardHistoryEntry> = emptyList(),
+    loginStreak: Int = 0,
+    onClaimVerifiedTask: (String) -> Unit = {},
     onClaimMission: (DailyMission) -> Unit,
     onDismiss: () -> Unit
 ) {
+    if (verifiedTasks.isNotEmpty()) {
+        TasksAndRewardsDialog(
+            tasks = verifiedTasks,
+            achievements = verifiedAchievements,
+            rewardHistory = rewardHistory,
+            loginStreak = loginStreak,
+            onClaimTask = onClaimVerifiedTask,
+            onDismiss = onDismiss
+        )
+        return
+    }
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)

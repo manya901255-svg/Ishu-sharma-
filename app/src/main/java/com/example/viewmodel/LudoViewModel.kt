@@ -26,7 +26,8 @@ enum class AppScreen {
     PREMIUM_DICE_STORE,
     INVENTORY,
     PROFILE,
-    TECH_BLUEPRINT
+    TECH_BLUEPRINT,
+    VOICE_CLUB
 }
 
 enum class MatchConnectionState {
@@ -144,16 +145,27 @@ data class LudoUiState(
     val playerCrownAvatar: String = "crown_imperial_gold",
     val customProfilePhotoUri: String? = null,
     val playerTitle: String = "Maharaja",
-    val playerLevel: Int = 18,
-    val playerXp: Int = 68,
-    // Player Career Statistics
-    val totalWins: Int = 28,
-    val totalGamesPlayed: Int = 42,
-    val totalCaptures: Int = 89,
-    val winStreak: Int = 4,
+    val playerLevel: Int = 1,
+    val playerXp: Int = 0,
+    // Player Career Statistics (real gameplay values only)
+    val totalWins: Int = 0,
+    val totalGamesPlayed: Int = 0,
+    val totalCaptures: Int = 0,
+    val winStreak: Int = 0,
+    val bestWinStreak: Int = 0,
+    val totalRolls: Int = 0,
+    val totalEarnings: Long = 0L,
+    val referralCode: String = "",
+    val verifiedReferralsCount: Int = 0,
     val equippedPawnCrownAvatar: String = "crown_imperial_gold",
     val inventoryUiState: InventoryUiState = InventoryUiState(),
     val diceStoreUiState: DiceStoreUiState = DiceStoreUiState(),
+    // Auth & Theme State
+    val isFirebaseConfigured: Boolean = false,
+    val isSignedIn: Boolean = false,
+    val authUserId: String? = null,
+    val authUserEmail: String? = null,
+    val isDarkTheme: Boolean = true,
     // Audio & Atmosphere - Continuous Background Music Sequential Playlist (44 Songs)
     val isBgmEnabled: Boolean = true,
     val isSfxEnabled: Boolean = true,
@@ -164,16 +176,20 @@ data class LudoUiState(
     val currentBgmTrack: com.example.model.BgmTrack? = null,
     val currentBgmTrackIndex: Int = -1,
     val bgmPlaylist: List<com.example.model.BgmTrack> = com.example.model.BGM_PLAYLIST,
-    // Power-up Dice & In-game Features
-    val activePowerUp: String? = null, // "EVEN", "ODD", "HIGH", "LOW", "LIGHTNING"
+    // Power-up Dice & Real In-game Voice Chat Features
+    val activePowerUp: String? = null,
     val lightningCount: Int = 3,
-    val isVoiceActive: Boolean = true,
-    val isMicMuted: Boolean = false,
+    val isVoiceActive: Boolean = false,
+    val isMicMuted: Boolean = true,
     val isSpeakerMuted: Boolean = false,
     val voiceLevel: Float = 0f,
     val isLocalSpeaking: Boolean = false,
     val activeSpeakerId: String? = null,
     val voiceChatNotification: String? = null,
+    val voiceConnectionState: com.example.util.VoiceConnectionState = com.example.util.VoiceConnectionState.DISCONNECTED,
+    val voiceChannelMode: VoiceChannelMode = VoiceChannelMode.ROOM,
+    val voiceParticipants: Map<String, VoiceParticipantState> = emptyMap(),
+    val isAllPeersMuted: Boolean = false,
     // Welcome & Main Menu Overlays and 3D Board
     val showWelcomeOverlay: Boolean = true,
     val showMainMenuOverlay: Boolean = false,
@@ -204,7 +220,33 @@ data class LudoUiState(
     val showDynamicProfileDialog: Boolean = false,
     val showMatchReplayDialog: Boolean = false,
     val showDailyMissionsDialog: Boolean = false,
+    val showVerifiedTasksDialog: Boolean = false,
+    val showNotificationsDialog: Boolean = false,
     val achievements: List<com.example.data.AchievementEntity> = com.example.data.DEFAULT_ACHIEVEMENTS,
+    // Verified Tasks, Rewards, Voice Club, Social, Leaderboard & Notifications
+    val verifiedTasks: List<VerifiedTaskItem> = emptyList(),
+    val verifiedAchievements: List<VerifiedTaskItem> = emptyList(),
+    val rewardHistory: List<RewardHistoryEntry> = emptyList(),
+    val todayActivity: DailyActivitySummary = DailyActivitySummary(),
+    val loginStreak: Int = 0,
+    val claimedBonusIds: Set<String> = emptySet(),
+    val myClubs: List<VoiceClubItem> = emptyList(),
+    val publicClubs: List<VoiceClubItem> = emptyList(),
+    val activeClub: VoiceClubItem? = null,
+    val clubMembers: List<VoiceClubMemberItem> = emptyList(),
+    val clubMessages: List<ClubChatMessageItem> = emptyList(),
+    val clubVoiceRooms: List<ClubVoiceRoomItem> = emptyList(),
+    val clubInvitations: List<ClubInvitationItem> = emptyList(),
+    val activeClubVoiceRoomId: String? = null,
+    val friends: List<FriendshipItem> = emptyList(),
+    val friendRequests: List<FriendRequestItem> = emptyList(),
+    val followedPlayerIds: Set<String> = emptySet(),
+    val activePrivateChatFriend: FriendshipItem? = null,
+    val privateChatMessages: List<PrivateChatMessageItem> = emptyList(),
+    val publicLeaderboard: List<PublicProfileItem> = emptyList(),
+    val notifications: List<AppNotificationItem> = emptyList(),
+    val notificationPrefs: NotificationPreferences = NotificationPreferences(),
+    val activeOnlineRoom: MatchRoomItem? = null,
     val hasNoAds: Boolean = false,
     val hasVoicePass: Boolean = true,
     val voicePassDaysRemaining: Int = 30,
@@ -241,12 +283,22 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = com.example.data.LudoRepository(application)
     val inventoryRepository = com.example.data.InventoryRepository(application)
     val diceStoreRepository = com.example.data.DiceStoreRepository(application, inventoryRepository)
+    val taskRewardRepository = com.example.data.TaskRewardRepository(application)
+    val voiceClubRepository = com.example.data.VoiceClubRepository(application)
+    val socialRepository = com.example.data.SocialAndLeaderboardRepository(application)
+    val matchRoomRepository = com.example.data.OnlineMatchRoomRepository(application)
+    private val themePrefs = com.example.util.ThemeAndNotificationPreferences(application)
     val playBillingManager = com.example.billing.PlayBillingManager(application) { sku ->
         _uiState.value.diceStoreUiState.catalog.firstOrNull { it.skuId == sku }?.id
     }
 
     private val _uiState = MutableStateFlow(LudoUiState())
     val uiState: StateFlow<LudoUiState> = _uiState.asStateFlow()
+
+    private var clubDetailJob: Job? = null
+    private var privateChatJob: Job? = null
+    private var onlineRoomJob: Job? = null
+    private var cloudListenersJob: Job? = null
 
     private var turnTimerJob: Job? = null
     private var aiTurnJob: Job? = null
@@ -294,7 +346,16 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         }
         val savedFavorites = profilePreferences.getFavoriteSongIds()
 
-        // Daily missions persistence & daily reset
+        val savedXp = profilePreferences.getPlayerXp()
+        val bestStreak = profilePreferences.getBestWinStreak()
+        val totalRolls = profilePreferences.getTotalRolls()
+        val totalEarnings = profilePreferences.getTotalEarnings()
+        val referralCode = profilePreferences.getOrCreateReferralCode()
+        val claimedKeys = profilePreferences.getClaimedBonusKeys()
+        val fbReady = com.example.util.FirebaseProviders.isFirebaseReady(application)
+        val currentFirebaseUser = com.example.util.FirebaseProviders.getAuthOrNull(application)?.currentUser
+
+        // Daily missions persistence & UTC daily reset
         val currentDay = System.currentTimeMillis() / (1000L * 60L * 60L * 24L)
         val lastResetDay = profilePreferences.getLastMissionResetDay()
         if (lastResetDay == 0L || currentDay > lastResetDay) {
@@ -315,11 +376,21 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 customProfilePhotoUri = savedPhotoUri,
                 playerTitle = savedTitle,
                 playerLevel = savedLevel,
+                playerXp = savedXp,
                 totalWins = wins,
                 totalGamesPlayed = games,
                 onlineGamesPlayedCount = savedOnlineCount,
                 winStreak = streak,
+                bestWinStreak = bestStreak,
                 totalCaptures = captures,
+                totalRolls = totalRolls,
+                totalEarnings = totalEarnings,
+                referralCode = referralCode,
+                claimedBonusIds = claimedKeys,
+                isFirebaseConfigured = fbReady,
+                isSignedIn = currentFirebaseUser != null,
+                authUserId = currentFirebaseUser?.uid,
+                authUserEmail = currentFirebaseUser?.email,
                 equippedPawnCrownAvatar = pawnCrown,
                 equippedPawnSkin = savedTokenSkin,
                 equippedDiceSkin = savedDiceSkin,
@@ -337,57 +408,54 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 isMusicShuffleEnabled = profilePreferences.isMusicShuffleEnabled(),
                 favoriteSongIds = savedFavorites,
                 dailyMissions = initialMissions,
-                savedReplays = listOf(
-                    com.example.model.MatchReplaySession(
-                        id = "replay_royal_cup_01",
-                        matchTitle = "Maharaja Championship Final 🏆",
-                        timestamp = System.currentTimeMillis() - 1800000L,
-                        gameMode = "Online Multiplayer",
-                        wager = 5000L,
-                        winnerName = savedNickname,
-                        winnerColor = com.example.model.LudoColor.YELLOW,
-                        winnerAvatar = savedAvatar,
-                        totalMovesCount = 12,
-                        durationFormatted = "4m 15s",
-                        moves = listOf(
-                            com.example.model.ReplayMove(1, savedNickname, com.example.model.LudoColor.YELLOW, savedAvatar, 6, 0, -1, 0, false, null, false, "Rolled 6! Deployed Gold Pawn #1 to Board"),
-                            com.example.model.ReplayMove(2, "Computer 2", com.example.model.LudoColor.RED, "crown_peacock_throne", 4, 0, -1, -1, false, null, false, "Rolled 4. No pawn can leave base yet"),
-                            com.example.model.ReplayMove(3, savedNickname, com.example.model.LudoColor.YELLOW, savedAvatar, 5, 0, 0, 5, false, null, false, "Advanced Gold Pawn #1 by 5 tiles"),
-                            com.example.model.ReplayMove(4, "Computer 2", com.example.model.LudoColor.RED, "crown_peacock_throne", 6, 0, -1, 13, false, null, false, "Rolled 6! Deployed Red Pawn #1 to Board"),
-                            com.example.model.ReplayMove(5, savedNickname, com.example.model.LudoColor.YELLOW, savedAvatar, 6, 1, -1, 0, false, null, false, "Rolled 6! Deployed Gold Pawn #2 to Board"),
-                            com.example.model.ReplayMove(6, savedNickname, com.example.model.LudoColor.YELLOW, savedAvatar, 4, 1, 0, 4, false, null, false, "Moved Gold Pawn #2 to tile 4"),
-                            com.example.model.ReplayMove(7, "Computer 2", com.example.model.LudoColor.RED, "crown_peacock_throne", 3, 0, 13, 16, false, null, false, "Advanced Red Pawn to tile 16"),
-                            com.example.model.ReplayMove(8, savedNickname, com.example.model.LudoColor.YELLOW, savedAvatar, 4, 0, 5, 9, false, null, false, "Moved to Star Safe Zone ⭐! Immune to attacks"),
-                            com.example.model.ReplayMove(9, "Computer 3", com.example.model.LudoColor.GREEN, "crown_maharaja", 2, 0, -1, -1, false, null, false, "Rolled 2. Awaiting 6"),
-                            com.example.model.ReplayMove(10, savedNickname, com.example.model.LudoColor.YELLOW, savedAvatar, 6, 0, 9, 15, false, null, false, "Rolled 6! Galloped toward center path"),
-                            com.example.model.ReplayMove(11, savedNickname, com.example.model.LudoColor.YELLOW, savedAvatar, 1, 0, 15, 16, true, "Computer 2", false, "⚔️ ROYAL CAPTURE! Captured Red Pawn and sent back to base!"),
-                            com.example.model.ReplayMove(12, savedNickname, com.example.model.LudoColor.YELLOW, savedAvatar, 6, 0, 16, 56, false, null, true, "🏛️ PALACE FINISH! Reached center finish triangle! VICTORY! 👑")
-                        )
-                    ),
-                    com.example.model.MatchReplaySession(
-                        id = "replay_quick_rush_02",
-                        matchTitle = "Quick Rush Blitz ⚡",
-                        timestamp = System.currentTimeMillis() - 7200000L,
-                        gameMode = "Quick Rush",
-                        wager = 2500L,
-                        winnerName = savedNickname,
-                        winnerColor = com.example.model.LudoColor.YELLOW,
-                        winnerAvatar = "avatar_rajput_king",
-                        totalMovesCount = 8,
-                        durationFormatted = "2m 10s",
-                        moves = listOf(
-                            com.example.model.ReplayMove(1, savedNickname, com.example.model.LudoColor.YELLOW, "avatar_rajput_king", 6, 0, 0, 6, false, null, false, "Blitz start: Gold pawn dashed 6 tiles"),
-                            com.example.model.ReplayMove(2, "Computer 2", com.example.model.LudoColor.RED, "crown_imperial_gold", 5, 0, 13, 18, false, null, false, "Rival Red advanced rapidly"),
-                            com.example.model.ReplayMove(3, savedNickname, com.example.model.LudoColor.YELLOW, "avatar_rajput_king", 6, 0, 6, 12, false, null, false, "Rolled 6! Double speed boost"),
-                            com.example.model.ReplayMove(4, savedNickname, com.example.model.LudoColor.YELLOW, "avatar_rajput_king", 5, 0, 12, 17, false, null, false, "Approached home entrance"),
-                            com.example.model.ReplayMove(5, "Computer 2", com.example.model.LudoColor.RED, "crown_imperial_gold", 3, 0, 18, 21, false, null, false, "Red moved into Star zone"),
-                            com.example.model.ReplayMove(6, savedNickname, com.example.model.LudoColor.YELLOW, "avatar_rajput_king", 4, 0, 17, 21, true, "Computer 2", false, "⚔️ BLITZ CAPTURE! Struck down enemy pawn!"),
-                            com.example.model.ReplayMove(7, savedNickname, com.example.model.LudoColor.YELLOW, "avatar_rajput_king", 6, 0, 21, 51, false, null, false, "Entered home stretch hallway"),
-                            com.example.model.ReplayMove(8, savedNickname, com.example.model.LudoColor.YELLOW, "avatar_rajput_king", 5, 0, 51, 56, false, null, true, "🏛️ First Pawn Home! Blitz Champion! 🏆")
-                        )
-                    )
-                )
+                savedReplays = emptyList()
             )
+        }
+
+        // Initialize Verified Task Engine & Theme/Notification Preferences
+        val activeTaskUid = currentFirebaseUser?.uid ?: profilePreferences.getCurrentPlayerId()
+        taskRewardRepository.initializeForUser(activeTaskUid)
+        viewModelScope.launch {
+            taskRewardRepository.recordDailyLogin(activeTaskUid)
+            taskRewardRepository.recordPlayerLevel(savedLevel, activeTaskUid)
+        }
+        viewModelScope.launch {
+            taskRewardRepository.tasks.collect { list ->
+                _uiState.update { it.copy(verifiedTasks = list) }
+            }
+        }
+        viewModelScope.launch {
+            taskRewardRepository.achievements.collect { list ->
+                _uiState.update { it.copy(verifiedAchievements = list) }
+            }
+        }
+        viewModelScope.launch {
+            taskRewardRepository.rewardHistory.collect { list ->
+                _uiState.update { it.copy(rewardHistory = list) }
+            }
+        }
+        viewModelScope.launch {
+            taskRewardRepository.todayActivity.collect { summary ->
+                _uiState.update { it.copy(todayActivity = summary) }
+            }
+        }
+        viewModelScope.launch {
+            taskRewardRepository.loginStreak.collect { s ->
+                _uiState.update { it.copy(loginStreak = s) }
+            }
+        }
+        viewModelScope.launch {
+            themePrefs.isDarkThemeFlow.collect { dark ->
+                _uiState.update { it.copy(isDarkTheme = dark) }
+            }
+        }
+        viewModelScope.launch {
+            themePrefs.notificationPrefsFlow.collect { nPrefs ->
+                _uiState.update { it.copy(notificationPrefs = nPrefs) }
+            }
+        }
+        if (currentFirebaseUser != null) {
+            startCloudRealtimeListeners(currentFirebaseUser.uid)
         }
 
         // Initialize Room Database persistence for Inventory, Premium Dice Store, Match History and Daily Rewards
@@ -528,6 +596,37 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         viewModelScope.launch {
+            voiceChatManager.isVoiceConnected.collect { active ->
+                _uiState.update { it.copy(isVoiceActive = active) }
+            }
+        }
+        viewModelScope.launch {
+            voiceChatManager.connectionState.collect { st ->
+                _uiState.update { it.copy(voiceConnectionState = st) }
+            }
+        }
+        viewModelScope.launch {
+            voiceChatManager.channelMode.collect { mode ->
+                _uiState.update { it.copy(voiceChannelMode = mode) }
+            }
+        }
+        viewModelScope.launch {
+            voiceChatManager.isAllPeersMuted.collect { mutedAll ->
+                _uiState.update { it.copy(isAllPeersMuted = mutedAll) }
+            }
+        }
+        viewModelScope.launch {
+            voiceChatManager.participants.collect { map ->
+                _uiState.update { s ->
+                    val updatedPlayers = s.players.map { p ->
+                        val vp = map[p.id]
+                        if (vp != null) p.copy(isSpeaking = vp.isSpeaking) else p
+                    }
+                    s.copy(voiceParticipants = map, players = updatedPlayers)
+                }
+            }
+        }
+        viewModelScope.launch {
             voiceChatManager.localVoiceLevel.collect { lvl ->
                 _uiState.update { it.copy(voiceLevel = lvl) }
             }
@@ -544,14 +643,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             voiceChatManager.activeSpeakerId.collect { spkId ->
-                _uiState.update { s ->
-                    val updated = s.players.map { p ->
-                        if (p.id == spkId) p.copy(isSpeaking = true)
-                        else if (p.isAi) p.copy(isSpeaking = false)
-                        else p
-                    }
-                    s.copy(activeSpeakerId = spkId, players = updated)
-                }
+                _uiState.update { it.copy(activeSpeakerId = spkId) }
             }
         }
         viewModelScope.launch {
@@ -731,74 +823,130 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun claimMaharajaVaultReward() {
-        if (_uiState.value.keysReceivedCount < 3) return
+        val periodKey = "vault_${com.example.util.LudoPeriodKeys.currentDayKey()}"
+        if (_uiState.value.keysReceivedCount < 3 || periodKey in _uiState.value.claimedBonusIds) return
         soundAndHaptics.vibrateVictory()
         soundAndHaptics.playCoinReward()
         triggerCelebration(CelebrationType.MATCH_WON)
-        val vaultCoins = 500000L
-        val vaultGems = 5000
-        _uiState.update {
-            val newCoins = it.userCoins + vaultCoins
-            val newGems = it.userGems + vaultGems
+        val vaultCoins = 5000L
+        val vaultGems = 50
+        profilePreferences.markBonusKeyClaimed(periodKey)
+        viewModelScope.launch {
+            taskRewardRepository.recordVerifiedBonusReward(
+                sourceType = "VAULT",
+                sourceId = "maharaja_vault",
+                periodKey = periodKey,
+                coinsDelta = vaultCoins.toInt(),
+                cashDelta = vaultGems,
+                description = "Claimed Maharaja 3-Key Vault Reward",
+                uid = currentAuthOrLocalUid()
+            )
+            val newCoins = _uiState.value.userCoins + vaultCoins
+            val newGems = _uiState.value.userGems + vaultGems
             profilePreferences.setUserCoins(newCoins)
             profilePreferences.setUserGems(newGems)
-            it.copy(
-                userCoins = newCoins,
-                userGems = newGems,
-                keysReceivedCount = 0,
-                bannerNotice = "🎉 Lucky Chest Opened! +🪙 500,000 Coins & +💎 5,000 Cash awarded!"
-            )
+            inventoryRepository.syncWalletBalance(goldCoins = newCoins, cashNotes = newGems)
+            _uiState.update {
+                it.copy(
+                    userCoins = newCoins,
+                    userGems = newGems,
+                    keysReceivedCount = 0,
+                    claimedBonusIds = profilePreferences.getClaimedBonusKeys(),
+                    bannerNotice = "🎉 Royal Vault Opened! +🪙 5,000 Coins & +💎 50 Cash awarded!"
+                )
+            }
         }
         showPopUpNotice(
-            title = "🎉 Lucky Chest Opened! 🎁",
-            message = "Lucky Chest Unlocked by finger tap! +🪙 500,000 Coins and +💎 5,000 Cash added to your balance!",
+            title = "🎉 Royal Vault Opened! 🎁",
+            message = "All 3 Friend Keys collected! +🪙 5,000 Coins and +💎 50 Cash added to your account!",
             icon = "🎁",
             type = "REWARD"
         )
     }
 
-    fun claimEventReward(coins: Long, gems: Int, eventName: String) {
+    fun claimEventReward(coins: Long, gems: Int, eventName: String, periodSourceId: String? = null) {
+        val dedupId = periodSourceId ?: "${eventName}_${com.example.util.LudoPeriodKeys.currentWeekKey()}"
+        if (dedupId in _uiState.value.claimedBonusIds) {
+            _uiState.update { it.copy(bannerNotice = "Reward already claimed for $eventName.") }
+            return
+        }
         soundAndHaptics.vibrateVictory()
         soundAndHaptics.playCoinReward()
         triggerCelebration(CelebrationType.MATCH_WON)
-        val newCoins = _uiState.value.userCoins + coins
-        val newGems = _uiState.value.userGems + gems
-        profilePreferences.setUserCoins(newCoins)
-        profilePreferences.setUserGems(newGems)
-        _uiState.update {
-            it.copy(
-                userCoins = newCoins,
-                userGems = newGems,
-                bannerNotice = "🎯 $eventName Reward Claimed: +🪙 ${com.example.ui.components.formatCompactCoins(coins)} & +💎 $gems Gems!"
+        profilePreferences.markBonusKeyClaimed(dedupId)
+        viewModelScope.launch {
+            taskRewardRepository.recordVerifiedBonusReward(
+                sourceType = "EVENT",
+                sourceId = dedupId,
+                periodKey = com.example.util.LudoPeriodKeys.currentWeekKey(),
+                coinsDelta = coins.toInt(),
+                cashDelta = gems,
+                description = "Event Reward: $eventName",
+                uid = currentAuthOrLocalUid()
             )
+            val newCoins = _uiState.value.userCoins + coins
+            val newGems = _uiState.value.userGems + gems
+            profilePreferences.setUserCoins(newCoins)
+            profilePreferences.setUserGems(newGems)
+            inventoryRepository.syncWalletBalance(goldCoins = newCoins, cashNotes = newGems)
+            _uiState.update {
+                it.copy(
+                    userCoins = newCoins,
+                    userGems = newGems,
+                    claimedBonusIds = profilePreferences.getClaimedBonusKeys(),
+                    bannerNotice = "🎯 $eventName Reward Claimed: +🪙 ${com.example.ui.components.formatCompactCoins(coins)} & +💎 $gems Cash!"
+                )
+            }
         }
         showPopUpNotice(
             title = "🎯 $eventName Reward! 🏆",
-            message = "Congratulations! You claimed +🪙 ${com.example.ui.components.formatCompactCoins(coins)} Coins and +💎 $gems Gems from $eventName!",
+            message = "Congratulations! You claimed +🪙 ${com.example.ui.components.formatCompactCoins(coins)} Coins and +💎 $gems Cash from $eventName!",
             icon = "🏆",
             type = "REWARD"
         )
     }
 
     fun openWonChestBox() {
+        val chestName = _uiState.value.wonChestBoxName ?: return
+        val dayKey = com.example.util.LudoPeriodKeys.currentDayKey()
+        val dedupId = "won_chest_${chestName.lowercase().replace(" ", "_")}_${_uiState.value.totalWins}"
+        if (dedupId in _uiState.value.claimedBonusIds) {
+            _uiState.update { it.copy(wonChestBoxName = null) }
+            return
+        }
         soundAndHaptics.vibrateVictory()
         triggerCelebration(CelebrationType.MATCH_WON)
         val bonusCoins = 3000L + Random.nextInt(5000)
         val bonusGems = 10 + Random.nextInt(15)
+        profilePreferences.markBonusKeyClaimed(dedupId)
+        val newCoins = _uiState.value.userCoins + bonusCoins
+        val newGems = _uiState.value.userGems + bonusGems
+        profilePreferences.setUserCoins(newCoins)
+        profilePreferences.setUserGems(newGems)
         _uiState.update {
-            val newCoins = it.userCoins + bonusCoins
-            val newGems = it.userGems + bonusGems
-            profilePreferences.setUserCoins(newCoins)
-            profilePreferences.setUserGems(newGems)
             it.copy(
                 userCoins = newCoins,
                 userGems = newGems,
-                bannerNotice = "📦 Chest Opened! Found +🪙 ${com.example.ui.components.formatCompactCoins(bonusCoins)} Coins and +💎 $bonusGems Gems!"
+                wonChestBoxName = null,
+                claimedBonusIds = profilePreferences.getClaimedBonusKeys(),
+                bannerNotice = "📦 $chestName Opened! Found +🪙 ${com.example.ui.components.formatCompactCoins(bonusCoins)} Coins & +💎 $bonusGems Cash!"
+            )
+        }
+        viewModelScope.launch {
+            inventoryRepository.syncWalletBalance(goldCoins = newCoins, cashNotes = newGems)
+            taskRewardRepository.recordVerifiedBonusReward(
+                sourceType = "CHEST",
+                sourceId = dedupId,
+                periodKey = dayKey,
+                coinsDelta = bonusCoins.toInt(),
+                cashDelta = bonusGems,
+                description = "Victory Chest: $chestName",
+                uid = currentAuthOrLocalUid()
             )
         }
         showPopUpNotice(
-            title = "📦 Mystery Chest Opened! 🎁",
-            message = "Found +🪙 ${com.example.ui.components.formatCompactCoins(bonusCoins)} Coins & +💎 $bonusGems Gems!",
+            title = "📦 $chestName Opened! 🎁",
+            message = "Found +🪙 ${com.example.ui.components.formatCompactCoins(bonusCoins)} Coins & +💎 $bonusGems Cash!",
             icon = "📦",
             type = "CHEST"
         )
@@ -827,24 +975,42 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(showSeasonPassDialog = show) }
     }
 
-    fun claimSeasonPassRewards(coins: Long, gems: Int) {
+    fun claimSeasonPassRewards(coins: Long, gems: Int, tierKey: String = "season_pass_${com.example.util.LudoPeriodKeys.currentWeekKey()}") {
+        if (tierKey in _uiState.value.claimedBonusIds) {
+            _uiState.update { it.copy(bannerNotice = "Season Pass rewards already claimed for this tier!") }
+            return
+        }
         soundAndHaptics.vibrateVictory()
         soundAndHaptics.playCoinReward()
         triggerCelebration(CelebrationType.MATCH_WON)
-        _uiState.update {
-            val newCoins = it.userCoins + coins
-            val newGems = it.userGems + gems
+        profilePreferences.markBonusKeyClaimed(tierKey)
+        viewModelScope.launch {
+            taskRewardRepository.recordVerifiedBonusReward(
+                sourceType = "SEASON_PASS",
+                sourceId = tierKey,
+                periodKey = com.example.util.LudoPeriodKeys.currentWeekKey(),
+                coinsDelta = coins.toInt(),
+                cashDelta = gems,
+                description = "Royal Season Pass Reward",
+                uid = currentAuthOrLocalUid()
+            )
+            val newCoins = _uiState.value.userCoins + coins
+            val newGems = _uiState.value.userGems + gems
             profilePreferences.setUserCoins(newCoins)
             profilePreferences.setUserGems(newGems)
-            it.copy(
-                userCoins = newCoins,
-                userGems = newGems,
-                showSeasonPassDialog = false
-            )
+            inventoryRepository.syncWalletBalance(goldCoins = newCoins, cashNotes = newGems)
+            _uiState.update {
+                it.copy(
+                    userCoins = newCoins,
+                    userGems = newGems,
+                    claimedBonusIds = profilePreferences.getClaimedBonusKeys(),
+                    showSeasonPassDialog = false
+                )
+            }
         }
         showPopUpNotice(
             title = "👑 Royal Season Pass Claimed!",
-            message = "Claimed all rewards: +🪙 ${com.example.ui.components.formatCompactCoins(coins)} Coins & +💎 $gems Gems!",
+            message = "Claimed rewards: +🪙 ${com.example.ui.components.formatCompactCoins(coins)} Coins & +💎 $gems Cash!",
             icon = "🎁",
             type = "SEASON_PASS"
         )
@@ -886,20 +1052,38 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun claimAchievement(achievement: com.example.data.AchievementEntity) {
+        val current = _uiState.value.achievements.firstOrNull { it.id == achievement.id } ?: achievement
+        if (current.isClaimed || current.currentProgress < current.targetProgress) {
+            _uiState.update {
+                it.copy(bannerNotice = "Achievement incomplete (${current.currentProgress}/${current.targetProgress}) or already claimed.")
+            }
+            return
+        }
         soundAndHaptics.vibrateVictory()
         triggerCelebration(CelebrationType.MATCH_WON)
         viewModelScope.launch {
-            repository.claimAchievement(achievement.id)
-            val updatedCoins = _uiState.value.userCoins + achievement.coinReward
-            val updatedGems = _uiState.value.userGems + (achievement.xpReward / 10).coerceAtLeast(5)
+            repository.claimAchievement(current.id)
+            val cashBonus = (current.xpReward / 25).coerceAtLeast(1)
+            taskRewardRepository.recordVerifiedBonusReward(
+                sourceType = "ACHIEVEMENT",
+                sourceId = current.id,
+                periodKey = "LIFETIME",
+                coinsDelta = current.coinReward.toInt(),
+                cashDelta = cashBonus,
+                description = "Achievement: ${current.title}",
+                uid = currentAuthOrLocalUid()
+            )
+            val updatedCoins = _uiState.value.userCoins + current.coinReward
+            val updatedGems = _uiState.value.userGems + cashBonus
             profilePreferences.setUserCoins(updatedCoins)
             profilePreferences.setUserGems(updatedGems)
+            inventoryRepository.syncWalletBalance(goldCoins = updatedCoins, cashNotes = updatedGems)
             _uiState.update { state ->
                 state.copy(
                     userCoins = updatedCoins,
                     userGems = updatedGems,
                     achievements = state.achievements.map {
-                        if (it.id == achievement.id) it.copy(isClaimed = true) else it
+                        if (it.id == current.id) it.copy(isClaimed = true) else it
                     }
                 )
             }
@@ -1182,23 +1366,47 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun claimDailySpinReward(coins: Long, gems: Int) {
+        val now = System.currentTimeMillis()
+        val lastSpin = _uiState.value.lastSpinTimestampMillis
+        val cooldownMs = 24L * 60L * 60L * 1000L
+        if (lastSpin > 0L && (now - lastSpin) < cooldownMs) {
+            _uiState.update { it.copy(bannerNotice = "Daily Spin already claimed today! Come back tomorrow.") }
+            return
+        }
+        val dayKey = com.example.util.LudoPeriodKeys.currentDayKey(now)
+        val spinKey = "daily_spin_$dayKey"
+        if (spinKey in _uiState.value.claimedBonusIds) {
+            _uiState.update { it.copy(bannerNotice = "Daily Spin reward already claimed for $dayKey.") }
+            return
+        }
         soundAndHaptics.vibrateVictory()
         soundAndHaptics.playCoinReward()
-        val now = System.currentTimeMillis()
+        profilePreferences.markBonusKeyClaimed(spinKey)
         viewModelScope.launch {
             repository.updateDailySpinTimestamp(now)
-        }
-        _uiState.update {
-            val newCoins = it.userCoins + coins
-            val newGems = it.userGems + gems
+            taskRewardRepository.recordVerifiedBonusReward(
+                sourceType = "DAILY_SPIN",
+                sourceId = spinKey,
+                periodKey = dayKey,
+                coinsDelta = coins.toInt(),
+                cashDelta = gems,
+                description = "Daily Fortune Wheel Spin",
+                uid = currentAuthOrLocalUid()
+            )
+            val newCoins = _uiState.value.userCoins + coins
+            val newGems = _uiState.value.userGems + gems
             profilePreferences.setUserCoins(newCoins)
             profilePreferences.setUserGems(newGems)
-            it.copy(
-                userCoins = newCoins,
-                userGems = newGems,
-                lastSpinTimestampMillis = now,
-                bannerNotice = "Maharaja Treasury: +$coins Coins, +$gems Diamonds awarded!"
-            )
+            inventoryRepository.syncWalletBalance(goldCoins = newCoins, cashNotes = newGems)
+            _uiState.update {
+                it.copy(
+                    userCoins = newCoins,
+                    userGems = newGems,
+                    lastSpinTimestampMillis = now,
+                    claimedBonusIds = profilePreferences.getClaimedBonusKeys(),
+                    bannerNotice = "Maharaja Treasury: +$coins Coins, +$gems Cash awarded!"
+                )
+            }
         }
     }
 
@@ -1261,6 +1469,15 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         return true
     }
 
+    fun validatePrivateRoomAccess(
+        room: com.example.model.MatchRoomItem,
+        enteredCode: String?
+    ): Boolean = com.example.data.OnlineMatchRoomRepository.canJoinRoom(
+        room = room,
+        candidateUid = currentAuthOrLocalUid(),
+        enteredCode = enteredCode
+    )
+
     fun startMatchmaking(
         mode: GameMode,
         playerCount: Int = 4,
@@ -1268,6 +1485,12 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         wager: Long = 1500L,
         customRoomCode: String? = null
     ) {
+        if (mode == GameMode.PRIVATE_ROOM && customRoomCode != null && customRoomCode.trim().length < 4) {
+            _uiState.update {
+                it.copy(bannerNotice = "Enter a valid private room code (at least 4 characters).")
+            }
+            return
+        }
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -1378,7 +1601,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 else -> "avatar_flora"
             }
             val playerLevel = when (index) {
-                0 -> 18
+                0 -> _uiState.value.playerLevel
                 1 -> 10
                 2 -> 14
                 else -> 12
@@ -1414,7 +1637,7 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         val modeBanner = when (mode) {
             GameMode.TEAM_2VS2 -> "🤝 Team Ludo 2 vs 2! Team Sun (Yellow & Green) vs Team Moon (Red & Blue)! Protect your partner!"
             GameMode.PRACTICE -> "🎓 Royal Practice Academy! Strategy hints & Undo Move enabled!"
-            GameMode.FRIENDS_CHALLENGE -> "⚔️ Royal Duel! You vs Prince Aryan in a direct 1-on-1 battle!"
+            GameMode.FRIENDS_CHALLENGE -> "⚔️ Royal Duel! You vs Friend in a direct 1-on-1 battle!"
             else -> "Royal ${mode.title} begins! Wager: 🪙 ${com.example.ui.components.formatCompactCoins(wager)} • 2X Double Prize Active!"
         }
 
@@ -1455,25 +1678,20 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
 
         if (!isInitialSetup) {
             persistActiveMatchSnapshot()
+            val localUid = currentAuthOrLocalUid()
+            voiceChatManager.startVoiceChat(
+                roomId = roomCode,
+                localUid = localUid,
+                localName = _uiState.value.playerNickname,
+                startMuted = _uiState.value.isMicMuted
+            )
+            voiceChatManager.syncRosterPlayers(
+                players.mapIndexed { idx, pl -> (if (idx == 0) localUid else pl.id) to pl.name },
+                localUid = localUid
+            )
         }
-        voiceChatManager.startVoiceChat()
         startTurnTimer()
         checkAiTurn()
-
-        // After game is completely opened, show option to invite online friend or ignore
-        if (mode != GameMode.PASS_AND_PLAY) {
-            viewModelScope.launch {
-                delay(5000)
-                if (_uiState.value.currentScreen == AppScreen.GAME && _uiState.value.winner == null) {
-                    showPopUpNotice(
-                        title = "Prince Aryan is Online! 🟢✓",
-                        message = "Prince Aryan is online with a green tick! Would you like to invite him to this game or ignore?",
-                        icon = "👑",
-                        type = "FRIEND_ONLINE"
-                    )
-                }
-            }
-        }
     }
 
     private fun startTurnTimer() {
@@ -1574,10 +1792,19 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             if (!currentPlayer.isAi) {
+                val rollEventId = "roll_${latestState.roomCode}_seq${latestState.moveSequenceNumber}_${UUID.randomUUID().toString().take(6)}"
+                val newRolls = profilePreferences.incrementTotalRolls(1)
+                _uiState.update { it.copy(totalRolls = newRolls) }
                 updateMissionProgress("task_roll_dice", 1)
                 viewModelScope.launch {
                     val (_, dSnap) = diceStoreRepository.incrementChallengeProgress(delta = 1)
                     applyDiceStoreSnapshot(dSnap)
+                    val completed = taskRewardRepository.recordDiceRolled(
+                        rolledValue = rollValue,
+                        eventId = rollEventId,
+                        uid = currentAuthOrLocalUid()
+                    )
+                    notifyNewlyCompletedTasks(completed)
                 }
             }
 
@@ -1769,6 +1996,17 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 bannerMsg = "⚔️ Capture! ${currentPlayer.name} captured $enemyNames! Extra Turn awarded!"
                 gaveExtraTurn = true
                 updateMissionProgress("quest_capture_pawns", captures.size)
+                if (!currentPlayer.isAi) {
+                    viewModelScope.launch {
+                        repeat(captures.size) { idx ->
+                            val completed = taskRewardRepository.recordPawnCaptured(
+                                eventId = "${moveDedupeId}_cap_$idx",
+                                uid = currentAuthOrLocalUid()
+                            )
+                            notifyNewlyCompletedTasks(completed)
+                        }
+                    }
+                }
             } else if (LudoEngine.isSafePosition(movedPawn.trackPosition) || movedPawn.state == PawnState.IN_HOME_STRETCH) {
                 // Landing on safe tile / star square / safe column
                 soundAndHaptics.playSafeTile()
@@ -1882,6 +2120,10 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val xpGain = (if (isHumanWin) 120 else 35) * (if (activeXpBoost) 2 else 1)
                 val recoveredCoins = if (!isHumanWin && activeRecoverShield && matchWager > 0) matchWager / 2 else 0L
+                val updatedTotalXp = _uiState.value.playerXp + xpGain
+                val updatedLevel = (1 + (updatedTotalXp / 250)).coerceAtLeast(_uiState.value.playerLevel)
+                profilePreferences.setPlayerLevelAndXp(updatedLevel, updatedTotalXp)
+                val updatedEarnings = if (isHumanWin) profilePreferences.addTotalEarnings(coinWinnings) else _uiState.value.totalEarnings
 
                     val nextSeq = _uiState.value.moveSequenceNumber + 1L
                     val nextChecksum = LudoEngine.computeMatchStateHash(updatedPlayers, state.currentPlayerIndex, nextSeq)
@@ -1904,11 +2146,14 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                             showSpecialOfferDialog = triggerSpecialOffer,
                             onlineGamesPlayedCount = newOnlineCount,
                             wonChestBoxName = wonChest,
-                            playerXp = s.playerXp + xpGain,
+                            playerLevel = updatedLevel,
+                            playerXp = updatedTotalXp,
                             totalWins = profilePreferences.getTotalWins(),
                             totalGamesPlayed = profilePreferences.getGamesPlayed(),
                             winStreak = profilePreferences.getWinStreak(),
+                            bestWinStreak = profilePreferences.getBestWinStreak(),
                             totalCaptures = profilePreferences.getTotalCaptures(),
+                            totalEarnings = updatedEarnings,
                             bannerNotice = when {
                                 isHumanWin -> "🏆 2X DOUBLE PRIZE! ${updatedCurrentPlayer.name} won +🪙 ${com.example.ui.components.formatCompactCoins(coinWinnings)} (+${xpGain} XP)!"
                                 recoveredCoins > 0L -> "🛡️ Recover Coins Shield activated! Recovered 🪙 ${com.example.ui.components.formatCompactCoins(recoveredCoins)}!"
@@ -1924,10 +2169,18 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
                         val current = _uiState.value
                         val snap = inventoryRepository.syncWalletBalance(goldCoins = current.userCoins, cashNotes = current.userGems)
                         applyInventorySnapshot(snap)
-                        if (!isHumanWin || isHumanWin) {
-                            val (_, evSnap) = inventoryRepository.incrementEventItemProgress(itemId = "emoji_squall", delta = 1)
-                            applyInventorySnapshot(evSnap)
-                        }
+                        val matchEventId = "match_${state.roomCode}_${System.currentTimeMillis()}"
+                        val completedMatchTasks = taskRewardRepository.recordMatchCompleted(
+                            didWin = isHumanWin,
+                            isOnlineOrTournament = isOnlineMatch || state.gameMode == GameMode.QUICK_RUSH || state.gameMode == GameMode.RUSH,
+                            matchId = matchEventId,
+                            uid = currentAuthOrLocalUid()
+                        )
+                        val completedLevelTasks = taskRewardRepository.recordPlayerLevel(updatedLevel, currentAuthOrLocalUid())
+                        notifyNewlyCompletedTasks(completedMatchTasks + completedLevelTasks)
+                        syncCloudProfileNow()
+                        val (_, evSnap) = inventoryRepository.incrementEventItemProgress(itemId = "emoji_squall", delta = 1)
+                        applyInventorySnapshot(evSnap)
                     }
                     turnTimerJob?.cancel()
                     if (triggerSpecialOffer) {
@@ -2002,7 +2255,6 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         persistActiveMatchSnapshot()
 
         startTurnTimer()
-        voiceChatManager.onPlayerTurnStart(nextPlayer.id, nextPlayer.isAi)
         checkAiTurn()
     }
 
@@ -2903,26 +3155,32 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         soundAndHaptics.vibrateClick()
         val newVoice = !_uiState.value.isVoiceActive
         if (newVoice) {
-            voiceChatManager.startVoiceChat()
+            val uid = currentAuthOrLocalUid()
+            voiceChatManager.startVoiceChat(
+                roomId = _uiState.value.roomCode,
+                localUid = uid,
+                localName = _uiState.value.playerNickname,
+                startMuted = _uiState.value.isMicMuted
+            )
         } else {
             voiceChatManager.stopVoiceChat()
         }
-        _uiState.update { 
+        _uiState.update {
             it.copy(
                 isVoiceActive = newVoice,
-                bannerNotice = if (newVoice) "🎙️ Voice Room Connected! Mic Live" else "🎙️ Voice Room Disconnected"
+                bannerNotice = if (newVoice) "🎙️ Voice Room Connected!" else "🎙️ Voice Room Disconnected"
             )
         }
     }
 
     fun toggleMic() {
         soundAndHaptics.vibrateClick()
-        voiceChatManager.toggleMic()
+        voiceChatManager.toggleMic(currentAuthOrLocalUid())
         val isMuted = voiceChatManager.isMicMuted.value
         _uiState.update {
             it.copy(
                 isMicMuted = isMuted,
-                bannerNotice = if (isMuted) "🔇 Microphone Muted" else "🎙️ Microphone Live - Speak freely!"
+                bannerNotice = if (isMuted) "🔇 Microphone Muted (0 packets sent)" else "🎙️ Microphone Live"
             )
         }
     }
@@ -2934,13 +3192,526 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update {
             it.copy(
                 isSpeakerMuted = isMuted,
-                bannerNotice = if (isMuted) "🔈 Room Audio Muted" else "🔊 Room Audio Unmuted"
+                bannerNotice = if (isMuted) "🔈 Speaker Audio Muted" else "🔊 Speaker Audio On"
             )
         }
     }
 
+    fun setVoiceChannelMode(mode: VoiceChannelMode) {
+        soundAndHaptics.vibrateClick()
+        voiceChatManager.setChannelMode(mode, currentAuthOrLocalUid())
+    }
+
+    fun setPeerVoiceVolume(uid: String, volume: Float) {
+        voiceChatManager.setPeerVolume(uid, volume)
+    }
+
+    fun muteAllVoicePeers() {
+        soundAndHaptics.vibrateClick()
+        if (voiceChatManager.isAllPeersMuted.value) {
+            voiceChatManager.unmuteAllPeers()
+        } else {
+            voiceChatManager.muteAllPeers()
+        }
+    }
+
+    fun blockVoicePeer(uid: String, displayName: String) {
+        soundAndHaptics.vibrateClick()
+        voiceChatManager.toggleBlockPeer(uid, blocked = true)
+        _uiState.update { it.copy(bannerNotice = "🚫 Muted & blocked voice audio from $displayName.") }
+    }
+
+    fun reconnectVoiceChat() {
+        soundAndHaptics.vibrateClick()
+        voiceChatManager.reconnect(_uiState.value.roomCode)
+        _uiState.update { it.copy(bannerNotice = "🔄 Voice channel reconnected!") }
+    }
+
     fun onRecordPermissionGranted() {
-        voiceChatManager.startAudioCaptureIfPermitted()
+        voiceChatManager.startAudioCaptureIfPermitted(currentAuthOrLocalUid())
+    }
+
+    // =========================================================================
+    // AUTHENTICATION, VERIFIED TASKS, VOICE CLUBS, SOCIAL, THEME & NOTIFS
+    // =========================================================================
+
+    private fun currentAuthOrLocalUid(): String =
+        com.example.util.FirebaseProviders.getAuthOrNull(getApplication())?.currentUser?.uid
+            ?: _uiState.value.authUserId
+            ?: profilePreferences.getCurrentPlayerId()
+
+    fun onGoogleUserSignedIn(user: com.google.firebase.auth.FirebaseUser) {
+        val display = user.displayName?.takeIf { it.isNotBlank() } ?: _uiState.value.playerNickname
+        profilePreferences.setNickname(display)
+        _uiState.update {
+            it.copy(
+                isSignedIn = true,
+                authUserId = user.uid,
+                authUserEmail = user.email,
+                playerNickname = display,
+                showWelcomeOverlay = false,
+                bannerNotice = "👑 Signed in as $display"
+            )
+        }
+        viewModelScope.launch {
+            taskRewardRepository.syncWithFirestore(user.uid)
+            taskRewardRepository.recordDailyLogin(user.uid)
+            syncCloudProfileNow()
+            startCloudRealtimeListeners(user.uid)
+        }
+    }
+
+    fun signOutGoogleUser() {
+        viewModelScope.launch {
+            cloudListenersJob?.cancel()
+            com.example.util.GoogleAuthHelper.signOut(getApplication())
+            _uiState.update {
+                it.copy(
+                    isSignedIn = false,
+                    authUserId = null,
+                    authUserEmail = null,
+                    bannerNotice = "Signed out securely."
+                )
+            }
+        }
+    }
+
+    private fun startCloudRealtimeListeners(uid: String) {
+        cloudListenersJob?.cancel()
+        cloudListenersJob = viewModelScope.launch {
+            launch { taskRewardRepository.syncWithFirestore(uid) }
+            launch {
+                val refsCount = socialRepository.getVerifiedReferralsCount()
+                _uiState.update { it.copy(verifiedReferralsCount = refsCount) }
+            }
+            launch {
+                voiceClubRepository.observePublicClubs().collect { clubs ->
+                    _uiState.update { s ->
+                        val updatedActive = s.activeClub?.let { cur ->
+                            clubs.firstOrNull { it.clubId == cur.clubId } ?: cur
+                        }
+                        s.copy(publicClubs = clubs, activeClub = updatedActive)
+                    }
+                }
+            }
+            launch {
+                voiceClubRepository.observeMyClubs().collect { clubs ->
+                    _uiState.update { s ->
+                        val updatedActive = s.activeClub?.let { cur ->
+                            clubs.firstOrNull { it.clubId == cur.clubId } ?: cur
+                        }
+                        s.copy(myClubs = clubs, activeClub = updatedActive)
+                    }
+                }
+            }
+            launch {
+                voiceClubRepository.observeMyClubInvitations().collect { invites ->
+                    _uiState.update { it.copy(clubInvitations = invites) }
+                }
+            }
+            launch {
+                socialRepository.observeFriends().collect { f ->
+                    _uiState.update { it.copy(friends = f) }
+                }
+            }
+            launch {
+                socialRepository.observeFriendRequests().collect { reqs ->
+                    _uiState.update { it.copy(friendRequests = reqs) }
+                }
+            }
+            launch {
+                socialRepository.observeFollowedPlayerIds().collect { ids ->
+                    _uiState.update { it.copy(followedPlayerIds = ids) }
+                }
+            }
+            launch {
+                socialRepository.observePublicProfiles().collect { profiles ->
+                    _uiState.update { it.copy(publicLeaderboard = profiles) }
+                }
+            }
+            launch {
+                socialRepository.observeNotifications().collect { items ->
+                    _uiState.update { it.copy(notifications = items) }
+                }
+            }
+        }
+    }
+
+    private suspend fun syncCloudProfileNow() {
+        val s = _uiState.value
+        if (!s.isSignedIn) return
+        socialRepository.syncPlayerProfiles(
+            displayName = s.playerNickname,
+            email = s.authUserEmail,
+            avatarEmoji = "👑",
+            goldCoins = s.userCoins.toInt(),
+            cashNotes = s.userGems,
+            xp = s.playerXp,
+            level = s.playerLevel,
+            matchesPlayed = s.totalGamesPlayed,
+            matchesWon = s.totalWins,
+            winStreak = s.winStreak,
+            bestWinStreak = s.bestWinStreak,
+            totalDiceRolls = s.totalRolls,
+            totalCaptures = s.totalCaptures,
+            totalEarnings = s.totalEarnings.toInt(),
+            referralCode = s.referralCode,
+            activeClubId = s.activeClub?.clubId,
+            clubName = s.activeClub?.name,
+            isOnline = true
+        )
+    }
+
+    fun toggleDarkTheme(isDark: Boolean) {
+        soundAndHaptics.vibrateClick()
+        _uiState.update { it.copy(isDarkTheme = isDark) }
+        viewModelScope.launch {
+            themePrefs.setDarkTheme(isDark)
+        }
+    }
+
+    fun toggleVerifiedTasksDialog(show: Boolean) {
+        soundAndHaptics.vibrateClick()
+        if (show) {
+            taskRewardRepository.initializeForUser(currentAuthOrLocalUid())
+        }
+        _uiState.update { it.copy(showVerifiedTasksDialog = show) }
+    }
+
+    fun toggleNotificationsDialog(show: Boolean) {
+        soundAndHaptics.vibrateClick()
+        _uiState.update { it.copy(showNotificationsDialog = show) }
+    }
+
+    fun updateNotificationPrefs(prefs: NotificationPreferences) {
+        _uiState.update { it.copy(notificationPrefs = prefs) }
+        viewModelScope.launch {
+            themePrefs.updateNotificationPrefs(prefs)
+        }
+    }
+
+    fun markNotificationRead(notifId: String) {
+        _uiState.update { s ->
+            s.copy(notifications = s.notifications.map { if (it.notifId == notifId) it.copy(isRead = true) else it })
+        }
+        viewModelScope.launch {
+            socialRepository.markNotificationRead(notifId)
+        }
+    }
+
+    fun claimVerifiedTaskReward(taskId: String) {
+        viewModelScope.launch {
+            val outcome = taskRewardRepository.claimTaskReward(taskId = taskId, uid = currentAuthOrLocalUid())
+            if (outcome.success) {
+                soundAndHaptics.vibrateVictory()
+                soundAndHaptics.playCoinReward()
+                triggerCelebration(CelebrationType.MATCH_WON)
+                var syncedCoins = 0L
+                var syncedGems = 0
+                var syncedLevel = 1
+                _uiState.update { s ->
+                    val newCoins = s.userCoins + outcome.coinsGranted
+                    val newGems = s.userGems + outcome.cashGranted
+                    val newXp = s.playerXp + outcome.xpGranted
+                    val newLevel = (1 + (newXp / 250)).coerceAtLeast(s.playerLevel)
+                    syncedCoins = newCoins
+                    syncedGems = newGems
+                    syncedLevel = newLevel
+                    profilePreferences.setUserCoins(newCoins)
+                    profilePreferences.setUserGems(newGems)
+                    profilePreferences.setPlayerLevelAndXp(newLevel, newXp)
+                    s.copy(
+                        userCoins = newCoins,
+                        userGems = newGems,
+                        playerXp = newXp,
+                        playerLevel = newLevel,
+                        bannerNotice = outcome.message
+                    )
+                }
+                showPopUpNotice(
+                    title = "Verified Reward Claimed! 🎁",
+                    message = outcome.message,
+                    icon = "🎁",
+                    type = "REWARD"
+                )
+                inventoryRepository.syncWalletBalance(goldCoins = syncedCoins, cashNotes = syncedGems)
+                taskRewardRepository.recordPlayerLevel(syncedLevel, currentAuthOrLocalUid())
+                syncCloudProfileNow()
+            } else {
+                soundAndHaptics.playInvalidMove()
+                _uiState.update { it.copy(bannerNotice = outcome.message) }
+            }
+        }
+    }
+
+    private fun notifyNewlyCompletedTasks(completed: List<VerifiedTaskItem>) {
+        if (completed.isEmpty()) return
+        val prefs = _uiState.value.notificationPrefs
+        completed.forEachIndexed { idx, task ->
+            com.example.util.LudoNotificationHelper.postNotificationIfPermitted(
+                context = getApplication(),
+                id = 4000 + task.taskId.hashCode() + idx,
+                category = NotificationCategory.TASK_COMPLETE,
+                title = "Task Completed: ${task.title}",
+                body = "Claim +${task.rewardCoins} coins now in Daily Tasks!",
+                prefs = prefs
+            )
+            _uiState.update {
+                it.copy(bannerNotice = "✅ Task Complete: ${task.title}! Tap Tasks to claim +${task.rewardCoins} coins.")
+            }
+        }
+    }
+
+    fun redeemReferralCode(code: String) {
+        viewModelScope.launch {
+            val res = socialRepository.redeemReferralCode(code, _uiState.value.playerNickname)
+            res.onSuccess { referrerUid ->
+                _uiState.update { it.copy(bannerNotice = "🤝 Referral code verified! Bonus credited.") }
+                taskRewardRepository.recordVerifiedFriendInvite(
+                    referralId = "ref_${referrerUid}_${currentAuthOrLocalUid()}",
+                    uid = referrerUid
+                )
+            }.onFailure { err ->
+                _uiState.update { it.copy(bannerNotice = err.message ?: "Unable to verify referral code.") }
+            }
+        }
+    }
+
+    // --- Voice Club Actions ---
+
+    fun selectActiveClub(club: VoiceClubItem?) {
+        _uiState.update { it.copy(activeClub = club, clubMembers = emptyList(), clubMessages = emptyList(), clubVoiceRooms = emptyList()) }
+        clubDetailJob?.cancel()
+        if (club == null) return
+        clubDetailJob = viewModelScope.launch {
+            launch {
+                voiceClubRepository.observeClubMembers(club.clubId).collect { members ->
+                    _uiState.update { it.copy(clubMembers = members) }
+                }
+            }
+            launch {
+                voiceClubRepository.observeClubMessages(club.clubId, !club.isPrivate).collect { msgs ->
+                    _uiState.update { it.copy(clubMessages = msgs) }
+                }
+            }
+            launch {
+                voiceClubRepository.observeClubVoiceRooms(club.clubId, !club.isPrivate).collect { rooms ->
+                    _uiState.update { it.copy(clubVoiceRooms = rooms) }
+                }
+            }
+        }
+    }
+
+    fun createVoiceClub(name: String, description: String, avatarEmoji: String, isPrivate: Boolean) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            val res = voiceClubRepository.createClub(
+                name = name,
+                description = description,
+                avatarEmoji = avatarEmoji,
+                isPrivate = isPrivate,
+                ownerDisplayName = _uiState.value.playerNickname
+            )
+            res.onSuccess { club ->
+                soundAndHaptics.vibrateVictory()
+                _uiState.update {
+                    it.copy(
+                        myClubs = listOf(club) + it.myClubs,
+                        bannerNotice = "👑 Created Voice Club '${club.name}'!"
+                    )
+                }
+                selectActiveClub(club)
+            }.onFailure { err ->
+                _uiState.update { it.copy(bannerNotice = err.message ?: "Unable to create club.") }
+            }
+        }
+    }
+
+    fun joinVoiceClub(club: VoiceClubItem, enteredInviteCode: String? = null) {
+        viewModelScope.launch {
+            val res = voiceClubRepository.joinClub(club, _uiState.value.playerNickname, enteredInviteCode)
+            res.onSuccess {
+                soundAndHaptics.playCoinReward()
+                val updated = club.copy(memberUids = (club.memberUids + currentAuthOrLocalUid()).distinct())
+                _uiState.update { it.copy(bannerNotice = "🎉 Joined ${club.name}!") }
+                selectActiveClub(updated)
+            }.onFailure { err ->
+                _uiState.update { it.copy(bannerNotice = err.message ?: "Failed to join club.") }
+            }
+        }
+    }
+
+    fun sendClubChatMessage(club: VoiceClubItem, text: String, isAnnouncement: Boolean = false) {
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            val res = voiceClubRepository.sendClubMessage(
+                club = club,
+                senderName = _uiState.value.playerNickname,
+                text = text,
+                isAnnouncement = isAnnouncement
+            )
+            res.onSuccess {
+                val completed = taskRewardRepository.recordClubActivity(
+                    activityEventId = "club_msg_${UUID.randomUUID().toString().take(8)}",
+                    uid = currentAuthOrLocalUid()
+                )
+                notifyNewlyCompletedTasks(completed)
+            }.onFailure { err ->
+                _uiState.update { it.copy(bannerNotice = err.message ?: "Message failed.") }
+            }
+        }
+    }
+
+    fun createClubVoiceRoom(club: VoiceClubItem, title: String) {
+        viewModelScope.launch {
+            val res = voiceClubRepository.createVoiceRoom(club, title)
+            res.onSuccess { room ->
+                val completed = taskRewardRepository.recordClubActivity(
+                    activityEventId = "club_vr_${room.roomId}",
+                    uid = currentAuthOrLocalUid()
+                )
+                notifyNewlyCompletedTasks(completed)
+                joinClubVoiceRoom(room.roomId)
+            }.onFailure { err ->
+                _uiState.update { it.copy(bannerNotice = err.message ?: "Unable to create voice room.") }
+            }
+        }
+    }
+
+    fun joinClubVoiceRoom(roomId: String) {
+        val uid = currentAuthOrLocalUid()
+        voiceChatManager.startVoiceChat(
+            roomId = roomId,
+            localUid = uid,
+            localName = _uiState.value.playerNickname,
+            startMuted = _uiState.value.isMicMuted
+        )
+        _uiState.update { it.copy(activeClubVoiceRoomId = roomId, bannerNotice = "🎙️ Joined live Club Voice Room!") }
+    }
+
+    fun leaveClubVoiceRoom() {
+        voiceChatManager.stopVoiceChat()
+        _uiState.update { it.copy(activeClubVoiceRoomId = null, bannerNotice = "Left Club Voice Room.") }
+    }
+
+    fun inviteFriendToClub(club: VoiceClubItem, friendUid: String) {
+        viewModelScope.launch {
+            val res = voiceClubRepository.invitePlayerToClub(club, _uiState.value.playerNickname, friendUid)
+            res.onSuccess {
+                socialRepository.sendUserNotification(
+                    recipientUid = friendUid,
+                    category = NotificationCategory.CLUB_INVITE,
+                    title = "Voice Club Invite: ${club.name}",
+                    body = "${_uiState.value.playerNickname} invited you to join ${club.name}!",
+                    targetId = club.clubId
+                )
+                _uiState.update { it.copy(bannerNotice = "Invitation sent!") }
+            }.onFailure { err ->
+                _uiState.update { it.copy(bannerNotice = err.message ?: "Invite failed.") }
+            }
+        }
+    }
+
+    fun respondToClubInvite(invite: ClubInvitationItem, accept: Boolean) {
+        viewModelScope.launch {
+            voiceClubRepository.respondToClubInvite(invite, accept, _uiState.value.playerNickname)
+            _uiState.update {
+                it.copy(
+                    clubInvitations = it.clubInvitations.filterNot { i -> i.inviteId == invite.inviteId },
+                    bannerNotice = if (accept) "Joined ${invite.clubName}!" else "Declined invitation."
+                )
+            }
+        }
+    }
+
+    fun updateClubMemberRole(clubId: String, targetUid: String, role: VoiceClubRole) {
+        viewModelScope.launch {
+            voiceClubRepository.updateMemberRole(clubId, targetUid, role)
+        }
+    }
+
+    fun kickAndBlockClubMember(club: VoiceClubItem, targetUid: String, reason: String) {
+        viewModelScope.launch {
+            val res = voiceClubRepository.kickAndBlockMember(club, targetUid, reason)
+            res.onSuccess {
+                _uiState.update { it.copy(bannerNotice = "🚫 Member removed and blocked from ${club.name}.") }
+            }
+        }
+    }
+
+    // --- Social: Friends, Requests, 1:1 Private Chat, Follow & Match Rooms ---
+
+    fun sendFriendRequest(targetProfile: PublicProfileItem) {
+        viewModelScope.launch {
+            val res = socialRepository.sendFriendRequest(
+                fromName = _uiState.value.playerNickname,
+                toUid = targetProfile.userId,
+                toName = targetProfile.displayName
+            )
+            res.onSuccess {
+                _uiState.update { it.copy(bannerNotice = "Friend request sent to ${targetProfile.displayName}!") }
+            }.onFailure { err ->
+                _uiState.update { it.copy(bannerNotice = err.message ?: "Request failed.") }
+            }
+        }
+    }
+
+    fun respondToFriendRequest(req: FriendRequestItem, accept: Boolean) {
+        viewModelScope.launch {
+            socialRepository.respondToFriendRequest(req, accept)
+            _uiState.update {
+                it.copy(
+                    friendRequests = it.friendRequests.filterNot { r -> r.requestId == req.requestId },
+                    bannerNotice = if (accept) "🤝 Added ${req.fromName} as friend!" else "Declined request."
+                )
+            }
+        }
+    }
+
+    fun toggleFollowPlayer(targetUid: String, targetName: String) {
+        val currentlyFollowing = targetUid in _uiState.value.followedPlayerIds
+        viewModelScope.launch {
+            socialRepository.toggleFollow(targetUid, targetName, currentlyFollowing)
+        }
+    }
+
+    fun openPrivateChatWithFriend(friend: FriendshipItem) {
+        _uiState.update { it.copy(activePrivateChatFriend = friend, privateChatMessages = emptyList()) }
+        privateChatJob?.cancel()
+        privateChatJob = viewModelScope.launch {
+            socialRepository.observePrivateChatMessages(friend.friendUid).collect { msgs ->
+                _uiState.update { it.copy(privateChatMessages = msgs) }
+            }
+        }
+    }
+
+    fun closePrivateChat() {
+        privateChatJob?.cancel()
+        _uiState.update { it.copy(activePrivateChatFriend = null, privateChatMessages = emptyList()) }
+    }
+
+    fun sendPrivateChatMessage(text: String) {
+        val friend = _uiState.value.activePrivateChatFriend ?: return
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            socialRepository.sendPrivateMessage(friend.friendUid, _uiState.value.playerNickname, text)
+        }
+    }
+
+    fun submitAbuseReport(targetUid: String, contextType: String, contextId: String, reason: String) {
+        viewModelScope.launch {
+            socialRepository.submitModerationReport(
+                ModerationReportItem(
+                    reporterUid = currentAuthOrLocalUid(),
+                    targetUid = targetUid,
+                    contextType = contextType,
+                    contextId = contextId,
+                    reason = reason
+                )
+            ).onSuccess {
+                _uiState.update { it.copy(bannerNotice = "🛡️ Moderation report submitted.") }
+            }
+        }
     }
 
     fun activatePowerUp(type: String) {
@@ -2980,7 +3751,26 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun claimSpecialOfferDeal(coins: Long = 100000L, gems: Int = 250) {
+        val played = _uiState.value.onlineGamesPlayedCount
+        if (played < 5) {
+            _uiState.update {
+                it.copy(bannerNotice = "Play ${5 - played} more online matches to unlock the 5-Game Milestone Offer ($played/5)!")
+            }
+            return
+        }
+        val milestoneIndex = played / 5
+        val offerKey = "special_offer_milestone_$milestoneIndex"
+        if (offerKey in _uiState.value.claimedBonusIds) {
+            _uiState.update {
+                it.copy(
+                    showSpecialOfferDialog = false,
+                    bannerNotice = "Special Offer #$milestoneIndex already claimed! Play ${(milestoneIndex + 1) * 5} matches for the next milestone."
+                )
+            }
+            return
+        }
         soundAndHaptics.vibrateVictory()
+        profilePreferences.markBonusKeyClaimed(offerKey)
         val newCoins = _uiState.value.userCoins + coins
         val newGems = _uiState.value.userGems + gems
         profilePreferences.setUserCoins(newCoins)
@@ -2989,13 +3779,26 @@ class LudoViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 userCoins = newCoins,
                 userGems = newGems,
+                claimedBonusIds = profilePreferences.getClaimedBonusKeys(),
                 showSpecialOfferDialog = false,
-                bannerNotice = "🎉 5-Game Milestone Offer Claimed! +🪙 ${com.example.ui.components.formatCompactCoins(coins)} & +💎 $gems Gems!"
+                bannerNotice = "🎉 5-Game Milestone Offer Claimed! +🪙 ${com.example.ui.components.formatCompactCoins(coins)} & +💎 $gems Cash!"
+            )
+        }
+        viewModelScope.launch {
+            inventoryRepository.syncWalletBalance(goldCoins = newCoins, cashNotes = newGems)
+            taskRewardRepository.recordVerifiedBonusReward(
+                sourceType = "OFFER",
+                sourceId = offerKey,
+                periodKey = com.example.util.LudoPeriodKeys.currentWeekKey(),
+                coinsDelta = coins.toInt(),
+                cashDelta = gems,
+                description = "5-Match Milestone Offer #$milestoneIndex",
+                uid = currentAuthOrLocalUid()
             )
         }
         showPopUpNotice(
             title = "🎉 Special Offer Claimed!",
-            message = "Congratulations on playing 5 online games! You received +🪙 ${com.example.ui.components.formatCompactCoins(coins)} and +💎 $gems Gems!",
+            message = "Congratulations on completing ${milestoneIndex * 5} online matches! You received +🪙 ${com.example.ui.components.formatCompactCoins(coins)} Coins and +💎 $gems Cash!",
             icon = "🔥",
             type = "REWARD"
         )

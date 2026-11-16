@@ -30,7 +30,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.model.GameMode
+import com.example.ui.theme.RoyalGoldLight
+import com.example.util.LudoPeriodKeys
 import com.example.viewmodel.LudoUiState
+import kotlin.random.Random
 
 enum class EventHubFeatureType {
     ALBUM_HUNT,
@@ -49,12 +52,21 @@ enum class EventHubFeatureType {
 fun EventsHubDialog(
     uiState: LudoUiState,
     onClaimEventReward: (Long, Int, String) -> Unit,
+    onClaimEventWithKey: (Long, Int, String, String) -> Unit = { c, g, n, _ -> onClaimEventReward(c, g, n) },
+    onClaimVerifiedTask: (String) -> Unit = {},
     onJoinTournament: (GameMode, Int) -> Unit,
+    onOpenLeaderboard: () -> Unit = {},
     onClaimMission: (com.example.model.DailyMission) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var activeFeature by remember { mutableStateOf<EventHubFeatureType?>(null) }
-    var dailyChestClaimed by remember { mutableStateOf(false) }
+    val dayKey = LudoPeriodKeys.currentDayKey()
+    val weekKey = LudoPeriodKeys.currentWeekKey()
+    val chestKey = "event_chest_$dayKey"
+    val albumKey = "event_album_$weekKey"
+    val puzzleKey = "event_puzzle_$dayKey"
+    val weeklyQualKey = "event_weekly_qual_$weekKey"
+    val dailyChestClaimed = chestKey in uiState.claimedBonusIds
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -136,12 +148,13 @@ fun EventsHubDialog(
                 ) {
                     // 1. Album Hunt
                     item {
+                        val albumStickers = (uiState.totalGamesPlayed).coerceAtMost(6)
                         EventHubCardItem(
-                            timer = "Ends in: 28d 20h",
+                            timer = "Weekly Album",
                             title = "Album\nHunt",
                             icon = "🎲📖",
-                            badge = "6/6",
-                            badgeColor = Color(0xFF00C853),
+                            badge = "$albumStickers/6",
+                            badgeColor = if (albumStickers >= 6) Color(0xFF00C853) else Color(0xFF0288D1),
                             bgGradient = listOf(Color(0xFFE1F5FE), Color(0xFFB3E5FC)),
                             onOpen = { activeFeature = EventHubFeatureType.ALBUM_HUNT }
                         )
@@ -150,10 +163,11 @@ fun EventsHubDialog(
                     // 2. Puzzle Mania
                     item {
                         EventHubCardItem(
-                            timer = "Ends in: 9d 1h",
+                            timer = if (puzzleKey in uiState.claimedBonusIds) "Solved Today ✓" else "Daily Puzzle",
                             title = "Puzzle\nMania",
                             icon = "🧩",
-                            subPill = "Puzzle #4",
+                            subPill = "Roll 6 Challenge",
+                            isClaimed = puzzleKey in uiState.claimedBonusIds,
                             bgGradient = listOf(Color(0xFFEDE7F6), Color(0xFFD1C4E9)),
                             onOpen = { activeFeature = EventHubFeatureType.PUZZLE_MANIA }
                         )
@@ -174,10 +188,10 @@ fun EventsHubDialog(
                     // 4. Weekly Event
                     item {
                         EventHubCardItem(
-                            timer = "Ends in: 6d 18h",
+                            timer = "Weekly Cup",
                             title = "Weekly\nEvent",
                             icon = "🏆⭐",
-                            subPill = "1M Pot",
+                            subPill = "Leaderboard",
                             bgGradient = listOf(Color(0xFFFFFDE7), Color(0xFFFFF59D)),
                             onOpen = { activeFeature = EventHubFeatureType.WEEKLY_EVENT }
                         )
@@ -185,11 +199,16 @@ fun EventsHubDialog(
 
                     // 5. Collect Quest
                     item {
+                        val questsReady = listOf(
+                            uiState.todayActivity.diceRolls >= 15,
+                            uiState.keysSentCount >= 1,
+                            uiState.totalWins >= 2
+                        ).count { it }
                         EventHubCardItem(
-                            timer = "Ends in: 12h 52m",
+                            timer = "Daily Goals",
                             title = "Collect\nQuest",
                             icon = "🎒⚽",
-                            subPill = "3/5 Ready",
+                            subPill = "$questsReady/3 Ready",
                             bgGradient = listOf(Color(0xFFE3F2FD), Color(0xFFBBDEFB)),
                             onOpen = { activeFeature = EventHubFeatureType.COLLECT_QUEST }
                         )
@@ -198,7 +217,7 @@ fun EventsHubDialog(
                     // 6. Mini Event
                     item {
                         EventHubCardItem(
-                            timer = "Ends in: 18h 2m",
+                            timer = "Blitz Arena",
                             title = "Mini\nEvent",
                             icon = "⏱️💨",
                             subPill = "Blitz 2P",
@@ -210,10 +229,10 @@ fun EventsHubDialog(
                     // 7. Win Streak
                     item {
                         EventHubCardItem(
-                            timer = "Active Streak",
+                            timer = "Streak: ${uiState.winStreak}",
                             title = "Win\nStreak",
                             icon = "🔥",
-                            subPill = "2.5X Boost",
+                            subPill = "Ranked Boost",
                             bgGradient = listOf(Color(0xFFFFF3E0), Color(0xFFFFE0B2)),
                             onOpen = { activeFeature = EventHubFeatureType.WIN_STREAK }
                         )
@@ -221,8 +240,13 @@ fun EventsHubDialog(
 
                     // 8. Daily Chest
                     item {
+                        val chestEligible = uiState.todayActivity.matchesPlayed >= 1
                         EventHubCardItem(
-                            timer = if (dailyChestClaimed) "Next: 2h 32m" else "Ready!",
+                            timer = when {
+                                dailyChestClaimed -> "Claimed ✓"
+                                chestEligible -> "Unlocked!"
+                                else -> "Play 1 Match"
+                            },
                             title = "Daily\nChest",
                             icon = if (dailyChestClaimed) "🎁" else "📦",
                             isClaimed = dailyChestClaimed,
@@ -245,11 +269,12 @@ fun EventsHubDialog(
 
                     // 10. Daily Missions
                     item {
+                        val completedTasks = uiState.verifiedTasks.count { it.canClaim }
                         EventHubCardItem(
-                            timer = "${uiState.dailyMissions.count { it.isCompleted }}/${uiState.dailyMissions.size} Ready",
-                            title = "Daily\nMissions",
+                            timer = "$completedTasks/${uiState.verifiedTasks.size.coerceAtLeast(1)} Ready",
+                            title = "Daily\nTasks",
                             icon = "📜👑",
-                            subPill = "Regal Quests",
+                            subPill = "Verified",
                             bgGradient = listOf(Color(0xFFFFF8E1), Color(0xFFFFECB3)),
                             onOpen = { activeFeature = EventHubFeatureType.DAILY_MISSIONS }
                         )
@@ -261,8 +286,10 @@ fun EventsHubDialog(
             when (activeFeature) {
                 EventHubFeatureType.ALBUM_HUNT -> {
                     AlbumHuntDialog(
+                        stickersUnlocked = uiState.totalGamesPlayed.coerceAtMost(6),
+                        isAlreadyClaimed = albumKey in uiState.claimedBonusIds,
                         onClaimReward = { coins, gems ->
-                            onClaimEventReward(coins, gems, "Album Hunt")
+                            onClaimEventWithKey(coins, gems, "Album Hunt", albumKey)
                             activeFeature = null
                         },
                         onDismiss = { activeFeature = null }
@@ -270,8 +297,10 @@ fun EventsHubDialog(
                 }
                 EventHubFeatureType.PUZZLE_MANIA -> {
                     PuzzleManiaDialog(
+                        isAlreadyClaimed = puzzleKey in uiState.claimedBonusIds,
+                        canAttemptToday = uiState.todayActivity.matchesPlayed >= 1,
                         onSolvePuzzle = { coins, gems ->
-                            onClaimEventReward(coins, gems, "Puzzle Mania")
+                            onClaimEventWithKey(coins, gems, "Puzzle Mania", puzzleKey)
                             activeFeature = null
                         },
                         onDismiss = { activeFeature = null }
@@ -281,27 +310,35 @@ fun EventsHubDialog(
                     TeamPartyDialog(
                         onPlay2v2 = {
                             activeFeature = null
-                            onJoinTournament(GameMode.PASS_AND_PLAY, 4)
+                            onJoinTournament(GameMode.TEAM_2VS2, 4)
                         },
                         onDismiss = { activeFeature = null }
                     )
                 }
                 EventHubFeatureType.WEEKLY_EVENT -> {
                     WeeklyTournamentDialog(
+                        uiState = uiState,
+                        isBonusClaimed = weeklyQualKey in uiState.claimedBonusIds,
                         onEnterMatch = {
                             activeFeature = null
                             onJoinTournament(GameMode.TOURNAMENT, 4)
                         },
                         onClaimBonus = { coins, gems ->
-                            onClaimEventReward(coins, gems, "Weekly Tournament Qualifier")
+                            onClaimEventWithKey(coins, gems, "Weekly Tournament Qualifier", weeklyQualKey)
+                        },
+                        onOpenLeaderboard = {
+                            activeFeature = null
+                            onOpenLeaderboard()
                         },
                         onDismiss = { activeFeature = null }
                     )
                 }
                 EventHubFeatureType.COLLECT_QUEST -> {
                     CollectQuestDialog(
-                        onClaimQuest = { coins, gems, questName ->
-                            onClaimEventReward(coins, gems, questName)
+                        uiState = uiState,
+                        weekKey = weekKey,
+                        onClaimQuest = { coins, gems, questName, dedupKey ->
+                            onClaimEventWithKey(coins, gems, questName, dedupKey)
                         },
                         onDismiss = { activeFeature = null }
                     )
@@ -328,9 +365,9 @@ fun EventsHubDialog(
                 EventHubFeatureType.DAILY_CHEST -> {
                     DailyChestSubDialog(
                         isClaimed = dailyChestClaimed,
+                        isUnlocked = uiState.todayActivity.matchesPlayed >= 1,
                         onClaimChest = {
-                            dailyChestClaimed = true
-                            onClaimEventReward(20000L, 20, "Daily Mystery Chest")
+                            onClaimEventWithKey(200L, 2, "Daily Mystery Chest", chestKey)
                             activeFeature = null
                         },
                         onDismiss = { activeFeature = null }
@@ -345,6 +382,11 @@ fun EventsHubDialog(
                 EventHubFeatureType.DAILY_MISSIONS -> {
                     DailyMissionsDialog(
                         missions = uiState.dailyMissions,
+                        verifiedTasks = uiState.verifiedTasks,
+                        verifiedAchievements = uiState.verifiedAchievements,
+                        rewardHistory = uiState.rewardHistory,
+                        loginStreak = uiState.loginStreak,
+                        onClaimVerifiedTask = onClaimVerifiedTask,
                         onClaimMission = { mission ->
                             onClaimMission(mission)
                         },
@@ -465,17 +507,19 @@ private fun EventHubCardItem(
 // 1. Album Hunt Sub-Dialog
 @Composable
 private fun AlbumHuntDialog(
+    stickersUnlocked: Int,
+    isAlreadyClaimed: Boolean,
     onClaimReward: (Long, Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var claimed by remember { mutableStateOf(false) }
+    val canClaim = stickersUnlocked >= 6 && !isAlreadyClaimed
     val cards = listOf(
-        Triple("👑", "Maharaja Crown", "⭐ 5-Star"),
-        Triple("🐎", "Royal Steed", "⭐ 3-Star"),
-        Triple("🦚", "Peacock Throne", "⭐ 4-Star"),
-        Triple("🎲", "Golden Dice", "⭐ 5-Star"),
-        Triple("🐘", "Imperial Elephant", "⭐ 4-Star"),
-        Triple("🏰", "Jaipur Palace", "⭐ 5-Star")
+        Triple("👑", "Maharaja Crown", "Match #1"),
+        Triple("🐎", "Royal Steed", "Match #2"),
+        Triple("🦚", "Peacock Throne", "Match #3"),
+        Triple("🎲", "Golden Dice", "Match #4"),
+        Triple("🐘", "Imperial Elephant", "Match #5"),
+        Triple("🏰", "Jaipur Palace", "Match #6")
     )
 
     Dialog(onDismissRequest = onDismiss) {
@@ -494,13 +538,13 @@ private fun AlbumHuntDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("📖 Album Hunt: Royal Heritage", color = Color(0xFFFFD54F), fontSize = 16.sp, fontWeight = FontWeight.Black)
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    Text("📖 Album Hunt ($stickersUnlocked/6)", color = Color(0xFFFFD54F), fontSize = 16.sp, fontWeight = FontWeight.Black)
+                    IconButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) {
                         Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
-                Text("Collect all 6 heritage stickers to claim the Royal Bounty!", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
+                Text("Play 6 complete Ludo matches to unlock all stickers!", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
                 Spacer(modifier = Modifier.height(12.dp))
 
                 LazyVerticalGrid(
@@ -511,17 +555,18 @@ private fun AlbumHuntDialog(
                 ) {
                     items(cards.size) { i ->
                         val item = cards[i]
+                        val unlocked = i < stickersUnlocked
                         Card(
                             shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF14346E)),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E676))
+                            colors = CardDefaults.cardColors(containerColor = if (unlocked) Color(0xFF14346E) else Color(0xFF0B1733)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (unlocked) Color(0xFF00E676) else Color(0xFF37474F))
                         ) {
                             Column(
                                 modifier = Modifier.fillMaxSize().padding(6.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
                             ) {
-                                Text(item.first, fontSize = 22.sp)
+                                Text(if (unlocked) item.first else "🔒", fontSize = 22.sp)
                                 Text(item.second, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                                 Text(item.third, color = Color(0xFFFFD54F), fontSize = 8.sp)
                             }
@@ -531,17 +576,18 @@ private fun AlbumHuntDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
                 Button(
-                    onClick = {
-                        claimed = true
-                        onClaimReward(100000L, 250)
-                    },
-                    enabled = !claimed,
-                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    onClick = { onClaimReward(1000L, 10) },
+                    enabled = canClaim,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C853)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        if (claimed) "Bounty Claimed ✓" else "🎉 Claim Album Bounty (+🪙 100K & +💎 250)",
+                        when {
+                            isAlreadyClaimed -> "Bounty Claimed ✓"
+                            stickersUnlocked < 6 -> "Unlock ${6 - stickersUnlocked} more via Matches"
+                            else -> "🎉 Claim Album Bounty (+🪙 1,000 & +💎 10)"
+                        },
                         color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Black
@@ -552,13 +598,15 @@ private fun AlbumHuntDialog(
     }
 }
 
-// 2. Puzzle Mania Sub-Dialog
+// 2. Puzzle Mania Sub-Dialog (Fair roll — gated to 1 match played today and 1 claim per day)
 @Composable
 private fun PuzzleManiaDialog(
+    isAlreadyClaimed: Boolean,
+    canAttemptToday: Boolean,
     onSolvePuzzle: (Long, Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var diceRolled by remember { mutableStateOf(false) }
+    var lastRoll by remember { mutableIntStateOf(0) }
     var puzzleSolved by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -578,15 +626,19 @@ private fun PuzzleManiaDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("🧩 Puzzle Mania: Escape Trap", color = Color(0xFFE1BEE7), fontSize = 16.sp, fontWeight = FontWeight.Black)
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) {
                         Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
-                Text("Your Yellow pawn is being chased! Roll a 6 to jump directly to the Star Safe Zone!", color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp, textAlign = TextAlign.Center)
-                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = if (!canAttemptToday) "Complete 1 Ludo match today to unlock Puzzle Mania!" else "Roll a fair 6 to jump directly to the Star Safe Zone!",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Puzzle board track representation
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -612,30 +664,47 @@ private fun PuzzleManiaDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                if (lastRoll > 0 && !puzzleSolved) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Rolled $lastRoll — roll again to hit a 6!", color = RoyalGoldLight, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
 
-                if (puzzleSolved) {
-                    Text("🎉 Safe Star Reached! Enemy evaded!", color = Color(0xFF00E676), fontSize = 13.sp, fontWeight = FontWeight.Black)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Button(
-                        onClick = { onSolvePuzzle(25000L, 50) },
-                        modifier = Modifier.fillMaxWidth().height(46.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Claim Reward: +🪙 25,000 & +💎 50", color = Color.White, fontWeight = FontWeight.Black)
+                Spacer(modifier = Modifier.height(14.dp))
+
+                when {
+                    isAlreadyClaimed -> {
+                        Button(
+                            onClick = {},
+                            enabled = false,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        ) {
+                            Text("Solved & Claimed Today ✓")
+                        }
                     }
-                } else {
-                    Button(
-                        onClick = {
-                            diceRolled = true
-                            puzzleSolved = true
-                        },
-                        modifier = Modifier.fillMaxWidth().height(46.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFAB47BC)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("🎲 Roll Puzzle Dice (Guaranteed 6)", color = Color.White, fontWeight = FontWeight.Black)
+                    puzzleSolved -> {
+                        Button(
+                            onClick = { onSolvePuzzle(250L, 3) },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Claim Reward: +🪙 250 & +💎 3", color = Color.White, fontWeight = FontWeight.Black)
+                        }
+                    }
+                    else -> {
+                        Button(
+                            enabled = canAttemptToday,
+                            onClick = {
+                                val r = Random.nextInt(1, 7)
+                                lastRoll = r
+                                if (r == 6) puzzleSolved = true
+                            },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFAB47BC)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("🎲 Roll Fair Puzzle Dice", color = Color.White, fontWeight = FontWeight.Black)
+                        }
                     }
                 }
             }
@@ -717,11 +786,15 @@ private fun TeamPartyDialog(
 // 4. Weekly Tournament Sub-Dialog
 @Composable
 private fun WeeklyTournamentDialog(
+    uiState: LudoUiState,
+    isBonusClaimed: Boolean,
     onEnterMatch: () -> Unit,
     onClaimBonus: (Long, Int) -> Unit,
+    onOpenLeaderboard: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    var bonusClaimed by remember { mutableStateOf(false) }
+    val canClaimQualifier = uiState.onlineGamesPlayedCount >= 3 && !isBonusClaimed
+    val topStandings = uiState.publicLeaderboard.sortedByDescending { it.matchesWon }.take(4)
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -740,11 +813,11 @@ private fun WeeklyTournamentDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("🏆 Weekly Maharaja Cup", color = Color(0xFFFFD54F), fontSize = 16.sp, fontWeight = FontWeight.Black)
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) {
                         Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                     }
                 }
-                Text("Prize Pool: 🪙 1,000,000 Coins • Ends in 6d 18h", color = Color(0xFF81C784), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("Play Online & Tournament matches to climb the live standings", color = Color(0xFF81C784), fontSize = 11.sp, fontWeight = FontWeight.Bold)
 
                 Spacer(modifier = Modifier.height(10.dp))
                 Column(
@@ -752,19 +825,31 @@ private fun WeeklyTournamentDialog(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color(0xFF111129))
-                        .padding(8.dp),
+                        .padding(10.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text("1. 👑 Maharaja_Vikram - 4,820 pts (Prize: 🪙 500K)", color = Color(0xFFFFD54F), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text("2. 🥈 Queen_Sanjana - 3,940 pts (Prize: 🪙 250K)", color = Color.White, fontSize = 10.sp)
-                    Text("3. 🥉 Raja_Dev - 3,110 pts (Prize: 🪙 100K)", color = Color.White, fontSize = 10.sp)
-                    Text("7. 🎖️ You (Ishu) - 1,840 pts (Prize: 🪙 25K)", color = Color(0xFF00E676), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    if (topStandings.isEmpty()) {
+                        Text(
+                            text = "No ranked matches recorded yet this week. Play Tournament Round to set the #1 mark!",
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 11.sp
+                        )
+                    } else {
+                        topStandings.forEachIndexed { idx, player ->
+                            Text(
+                                text = "${idx + 1}. ${player.avatarEmoji} ${player.displayName} — ${player.matchesWon} Wins (${player.xp} XP)",
+                                color = if (idx == 0) Color(0xFFFFD54F) else Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(
                     onClick = onEnterMatch,
-                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -773,31 +858,47 @@ private fun WeeklyTournamentDialog(
 
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedButton(
-                    onClick = {
-                        bonusClaimed = true
-                        onClaimBonus(15000L, 20)
-                    },
-                    enabled = !bonusClaimed,
-                    modifier = Modifier.fillMaxWidth().height(38.dp),
+                    onClick = { onClaimBonus(1500L, 5) },
+                    enabled = canClaimQualifier,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     shape = RoundedCornerShape(12.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E676))
                 ) {
-                    Text(if (bonusClaimed) "Claimed ✓" else "🎁 Claim Qualifier Bonus (+🪙 15K)", color = Color(0xFF00E676), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        when {
+                            isBonusClaimed -> "Qualifier Claimed ✓"
+                            uiState.onlineGamesPlayedCount < 3 -> "Play ${3 - uiState.onlineGamesPlayedCount} more online matches to qualify"
+                            else -> "🎁 Claim Qualifier Bonus (+🪙 1,500)"
+                        },
+                        color = Color(0xFF00E676),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                TextButton(onClick = onOpenLeaderboard, modifier = Modifier.minimumInteractiveComponentSize()) {
+                    Text("View Full Global Leaderboard", color = RoyalGoldLight, fontSize = 11.sp)
                 }
             }
         }
     }
 }
 
-// 5. Collect Quest Sub-Dialog
+// 5. Collect Quest Sub-Dialog (Every claim gated by real stats + persisted dedup keys)
 @Composable
 private fun CollectQuestDialog(
-    onClaimQuest: (Long, Int, String) -> Unit,
+    uiState: LudoUiState,
+    weekKey: String,
+    onClaimQuest: (Long, Int, String, String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var quest1Claimed by remember { mutableStateOf(false) }
-    var quest2Claimed by remember { mutableStateOf(false) }
-    var quest3Claimed by remember { mutableStateOf(false) }
+    val q1Key = "event_quest_rolls_$weekKey"
+    val q2Key = "event_quest_key_$weekKey"
+    val q3Key = "event_quest_wins_$weekKey"
+
+    val q1Done = uiState.todayActivity.diceRolls >= 15
+    val q2Done = uiState.keysSentCount >= 1
+    val q3Done = uiState.totalWins >= 2
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -816,25 +917,37 @@ private fun CollectQuestDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("🎒 Collect Quests Milestone", color = Color(0xFF4FC3F7), fontSize = 16.sp, fontWeight = FontWeight.Black)
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) {
                         Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                     }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
 
-                QuestItemRow("Roll three 6s in one match", "+🪙 20,000", quest1Claimed) {
-                    quest1Claimed = true
-                    onClaimQuest(20000L, 0, "Quest: Three 6s")
+                QuestItemRow(
+                    title = "Roll 15 dice today (${uiState.todayActivity.diceRolls}/15)",
+                    reward = "+🪙 300",
+                    isReady = q1Done,
+                    isClaimed = q1Key in uiState.claimedBonusIds
+                ) {
+                    onClaimQuest(300L, 0, "Quest: Roll 15 Dice", q1Key)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
-                QuestItemRow("Send key to a royal friend", "+💎 50 Gems", quest2Claimed) {
-                    quest2Claimed = true
-                    onClaimQuest(0L, 50, "Quest: Send Key")
+                QuestItemRow(
+                    title = "Send a vault key to a friend (${uiState.keysSentCount}/1)",
+                    reward = "+💎 5 Cash",
+                    isReady = q2Done,
+                    isClaimed = q2Key in uiState.claimedBonusIds
+                ) {
+                    onClaimQuest(0L, 5, "Quest: Send Key", q2Key)
                 }
                 Spacer(modifier = Modifier.height(6.dp))
-                QuestItemRow("Reach home with 2 pawns", "+🪙 35,000", quest3Claimed) {
-                    quest3Claimed = true
-                    onClaimQuest(35000L, 10, "Quest: 2 Pawns Home")
+                QuestItemRow(
+                    title = "Win 2 Ludo matches (${uiState.totalWins}/2)",
+                    reward = "+🪙 500 & +💎 3",
+                    isReady = q3Done,
+                    isClaimed = q3Key in uiState.claimedBonusIds
+                ) {
+                    onClaimQuest(500L, 3, "Quest: 2 Match Wins", q3Key)
                 }
             }
         }
@@ -845,6 +958,7 @@ private fun CollectQuestDialog(
 private fun QuestItemRow(
     title: String,
     reward: String,
+    isReady: Boolean,
     isClaimed: Boolean,
     onClaim: () -> Unit
 ) {
@@ -863,13 +977,22 @@ private fun QuestItemRow(
         }
         Button(
             onClick = onClaim,
-            enabled = !isClaimed,
+            enabled = isReady && !isClaimed,
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C853)),
             shape = RoundedCornerShape(8.dp),
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-            modifier = Modifier.height(32.dp)
+            modifier = Modifier.minimumInteractiveComponentSize()
         ) {
-            Text(if (isClaimed) "Done ✓" else "Claim", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = when {
+                    isClaimed -> "Done ✓"
+                    isReady -> "Claim"
+                    else -> "Locked"
+                },
+                color = Color.White,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -966,13 +1089,15 @@ private fun WinStreakDialog(
     }
 }
 
-// 8. Daily Chest Sub-Dialog (Opens with finger tap!)
+// 8. Daily Chest Sub-Dialog (Requires 1 match played today & allows 1 claim/day)
 @Composable
 private fun DailyChestSubDialog(
     isClaimed: Boolean,
+    isUnlocked: Boolean,
     onClaimChest: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val canClaim = isUnlocked && !isClaimed
     val infiniteTransition = rememberInfiniteTransition(label = "daily_finger_bounce")
     val fingerOffset by infiniteTransition.animateFloat(
         initialValue = -4f,
@@ -1001,14 +1126,17 @@ private fun DailyChestSubDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("📦 Daily Mystery Chest", color = Color(0xFFFFD54F), fontSize = 16.sp, fontWeight = FontWeight.Black)
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.minimumInteractiveComponentSize()) {
                         Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    if (isClaimed) "You already opened today's chest! Next chest in 2h 32m."
-                    else "Tap the chest box below with your finger to open today's rewards!",
+                    when {
+                        isClaimed -> "You already opened today's chest! Resets at midnight UTC."
+                        !isUnlocked -> "Complete at least 1 match today to unlock this Daily Chest!"
+                        else -> "Unlocked! Tap the chest below to claim today's verified reward."
+                    },
                     color = Color.White.copy(alpha = 0.85f),
                     fontSize = 11.sp,
                     textAlign = TextAlign.Center
@@ -1016,18 +1144,17 @@ private fun DailyChestSubDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Interactive Chest Box
                 Box(
                     modifier = Modifier
                         .size(120.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFF0A1838))
-                        .border(2.dp, if (isClaimed) Color.Gray else Color(0xFFFFD54F), RoundedCornerShape(16.dp))
-                        .clickable(enabled = !isClaimed) { onClaimChest() },
+                        .border(2.dp, if (canClaim) Color(0xFFFFD54F) else Color.Gray, RoundedCornerShape(16.dp))
+                        .clickable(enabled = canClaim) { onClaimChest() },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(if (isClaimed) "🎁" else "📦", fontSize = 56.sp)
-                    if (!isClaimed) {
+                    if (canClaim) {
                         Column(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
@@ -1049,7 +1176,7 @@ private fun DailyChestSubDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "Chest Contents: +🪙 20,000 Coins & +💎 20 Gems",
+                    text = "Chest Contents: +🪙 200 Coins & +💵 2 Cash",
                     color = Color(0xFFFFD54F),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
@@ -1058,12 +1185,20 @@ private fun DailyChestSubDialog(
                 Spacer(modifier = Modifier.height(10.dp))
                 Button(
                     onClick = onClaimChest,
-                    enabled = !isClaimed,
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    enabled = canClaim,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C853)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text(if (isClaimed) "Claimed Today ✓" else "🎉 Tap to Claim Rewards", color = Color.White, fontWeight = FontWeight.Black)
+                    Text(
+                        text = when {
+                            isClaimed -> "Claimed Today ✓"
+                            !isUnlocked -> "Play 1 Match Today to Unlock"
+                            else -> "🎉 Tap to Claim Rewards"
+                        },
+                        color = Color.White,
+                        fontWeight = FontWeight.Black
+                    )
                 }
             }
         }

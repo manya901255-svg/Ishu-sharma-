@@ -1,0 +1,878 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL PRIMITIVES ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        ('email' in request.auth.token &&
+         request.auth.token.email == 'manya901255@gmail.com' &&
+         'email_verified' in request.auth.token &&
+         request.auth.token.email_verified == true)
+      );
+    }
+    function isOptString(data, key, maxLen) {
+      return !(key in data) || data[key] == null || (data[key] is string && data[key].size() <= maxLen);
+    }
+    function isOptIntMin(data, key, minVal) {
+      return !(key in data) || data[key] == null || (data[key] is int && data[key] >= minVal);
+    }
+
+    // --- VALIDATION BLUEPRINTS ---
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 40 &&
+             isOptString(data, 'email', 120) &&
+             isOptString(data, 'avatarEmoji', 16) &&
+             data.goldCoins is int && data.goldCoins >= 0 && data.goldCoins <= 1000000000 &&
+             data.cashNotes is int && data.cashNotes >= 0 && data.cashNotes <= 10000000 &&
+             data.xp is int && data.xp >= 0 &&
+             data.level is int && data.level >= 1 && data.level <= 500 &&
+             isOptIntMin(data, 'matchesPlayed', 0) &&
+             isOptIntMin(data, 'matchesWon', 0) &&
+             isOptIntMin(data, 'winStreak', 0) &&
+             isOptIntMin(data, 'bestWinStreak', 0) &&
+             isOptIntMin(data, 'totalDiceRolls', 0) &&
+             isOptIntMin(data, 'totalCaptures', 0) &&
+             isOptIntMin(data, 'totalEarnings', 0) &&
+             isOptIntMin(data, 'loginStreak', 0) &&
+             isOptString(data, 'lastLoginDayKey', 20) &&
+             isOptString(data, 'dailySpinDayKey', 20) &&
+             data.referralCode is string && data.referralCode.size() >= 4 && data.referralCode.size() <= 24 &&
+             isOptString(data, 'referredByUid', 128) &&
+             isOptIntMin(data, 'verifiedInvitesCount', 0) &&
+             isOptString(data, 'activeClubId', 128) &&
+             (!('themeMode' in data) || data.themeMode == null || data.themeMode in ['DARK', 'LIGHT']) &&
+             (!('notificationPrefs' in data) || data.notificationPrefs == null || data.notificationPrefs is map);
+    }
+
+    function isValidPublicProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 40 &&
+             isOptString(data, 'avatarEmoji', 16) &&
+             data.level is int && data.level >= 1 && data.level <= 500 &&
+             data.xp is int && data.xp >= 0 &&
+             data.matchesPlayed is int && data.matchesPlayed >= 0 &&
+             data.matchesWon is int && data.matchesWon >= 0 &&
+             data.matchesWon <= data.matchesPlayed &&
+             isOptIntMin(data, 'winStreak', 0) &&
+             data.totalEarnings is int && data.totalEarnings >= 0 &&
+             isOptString(data, 'referralCode', 24) &&
+             isOptString(data, 'activeClubId', 128) &&
+             isOptString(data, 'clubName', 60) &&
+             (!('isOnline' in data) || data.isOnline is bool);
+    }
+
+    function isValidTaskProgress(data) {
+      return data.taskId is string && data.taskId.size() >= 1 && data.taskId.size() <= 128 &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.category in ['DAILY', 'WEEKLY', 'CHALLENGE', 'LOGIN_STREAK', 'WIN_STREAK', 'CLUB', 'TOURNAMENT', 'LEVEL', 'EVENT', 'ACHIEVEMENT'] &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.progress is int && data.progress >= 0 &&
+             data.target is int && data.target >= 1 && data.target <= 1000000 &&
+             data.rewardCoins is int && data.rewardCoins >= 0 && data.rewardCoins <= 500000 &&
+             data.rewardCash is int && data.rewardCash >= 0 && data.rewardCash <= 5000 &&
+             isOptIntMin(data, 'rewardXp', 0) &&
+             data.status in ['IN_PROGRESS', 'COMPLETED', 'CLAIMED'] &&
+             data.periodKey is string && data.periodKey.size() >= 1 && data.periodKey.size() <= 40 &&
+             (!('verifiedEventIds' in data) || data.verifiedEventIds == null || (data.verifiedEventIds is list && data.verifiedEventIds.size() <= 100 && (data.verifiedEventIds.size() == 0 || data.verifiedEventIds[0] is string))) &&
+             isOptString(data, 'rewardTxId', 128);
+    }
+
+    function isValidRewardHistory(data) {
+      return data.txId is string && data.txId.size() >= 3 && data.txId.size() <= 128 &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.sourceType is string && data.sourceType.size() >= 1 && data.sourceType.size() <= 40 &&
+             data.sourceId is string && data.sourceId.size() >= 1 && data.sourceId.size() <= 128 &&
+             data.periodKey is string && data.periodKey.size() >= 1 && data.periodKey.size() <= 40 &&
+             data.coinsDelta is int && data.coinsDelta >= 0 && data.coinsDelta <= 500000 &&
+             data.cashDelta is int && data.cashDelta >= 0 && data.cashDelta <= 5000 &&
+             isOptIntMin(data, 'xpDelta', 0) &&
+             data.description is string && data.description.size() >= 1 && data.description.size() <= 160;
+    }
+
+    function isValidActivityStats(data) {
+      return data.dayKey is string && data.dayKey.size() >= 4 && data.dayKey.size() <= 20 &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.matchesPlayed is int && data.matchesPlayed >= 0 &&
+             data.matchesWon is int && data.matchesWon >= 0 &&
+             data.diceRolls is int && data.diceRolls >= 0 &&
+             data.captures is int && data.captures >= 0 &&
+             isOptIntMin(data, 'minutesPlayed', 0);
+    }
+
+    function isValidNotification(data) {
+      return data.notifId is string && data.notifId.size() >= 1 && data.notifId.size() <= 128 &&
+             data.recipientUid is string && data.recipientUid.size() >= 1 && data.recipientUid.size() <= 128 &&
+             data.senderId is string && data.senderId.size() >= 1 && data.senderId.size() <= 128 &&
+             data.category in ['FRIEND_REQUEST', 'CLUB_INVITE', 'CLUB_MESSAGE', 'MATCH_INVITE', 'TASK_COMPLETE', 'REWARD_AVAILABLE', 'ACHIEVEMENT'] &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+             data.body is string && data.body.size() >= 1 && data.body.size() <= 300 &&
+             isOptString(data, 'targetId', 128) &&
+             data.isRead is bool;
+    }
+
+    function isValidFriendRequest(data) {
+      return data.requestId is string && data.requestId.size() >= 1 && data.requestId.size() <= 128 &&
+             data.fromUid is string && data.fromUid.size() >= 1 && data.fromUid.size() <= 128 &&
+             data.toUid is string && data.toUid.size() >= 1 && data.toUid.size() <= 128 &&
+             data.fromName is string && data.fromName.size() >= 1 && data.fromName.size() <= 40 &&
+             data.toName is string && data.toName.size() >= 1 && data.toName.size() <= 40 &&
+             data.status in ['PENDING', 'ACCEPTED', 'DECLINED'];
+    }
+
+    function isValidFriendship(data) {
+      return data.friendshipId is string && data.friendshipId.size() >= 1 && data.friendshipId.size() <= 128 &&
+             data.memberUids is list && data.memberUids.size() == 2 &&
+             data.userAUid is string && data.userAUid.size() >= 1 && data.userAUid.size() <= 128 &&
+             data.userBUid is string && data.userBUid.size() >= 1 && data.userBUid.size() <= 128 &&
+             data.userAName is string && data.userAName.size() >= 1 && data.userAName.size() <= 40 &&
+             data.userBName is string && data.userBName.size() >= 1 && data.userBName.size() <= 40;
+    }
+
+    function isValidFollow(data) {
+      return data.followId is string && data.followId.size() >= 1 && data.followId.size() <= 128 &&
+             data.followerUid is string && data.followerUid.size() >= 1 && data.followerUid.size() <= 128 &&
+             data.followedUid is string && data.followedUid.size() >= 1 && data.followedUid.size() <= 128 &&
+             data.followedName is string && data.followedName.size() >= 1 && data.followedName.size() <= 40;
+    }
+
+    function isValidPrivateChatThread(data) {
+      return data.chatId is string && data.chatId.size() >= 1 && data.chatId.size() <= 128 &&
+             data.memberUids is list && data.memberUids.size() == 2 &&
+             data.lastMessage is string && data.lastMessage.size() <= 500;
+    }
+
+    function isValidPrivateChatMessage(data) {
+      return data.messageId is string && data.messageId.size() >= 1 && data.messageId.size() <= 128 &&
+             data.chatId is string && data.chatId.size() >= 1 && data.chatId.size() <= 128 &&
+             data.senderUid is string && data.senderUid.size() >= 1 && data.senderUid.size() <= 128 &&
+             data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 40 &&
+             data.memberUids is list && data.memberUids.size() == 2 &&
+             data.text is string && data.text.size() >= 1 && data.text.size() <= 500;
+    }
+
+    function isValidReferral(data) {
+      return data.inviteeUid is string && data.inviteeUid.size() >= 1 && data.inviteeUid.size() <= 128 &&
+             data.inviteeName is string && data.inviteeName.size() >= 1 && data.inviteeName.size() <= 40 &&
+             data.referrerUid is string && data.referrerUid.size() >= 1 && data.referrerUid.size() <= 128 &&
+             data.referralCode is string && data.referralCode.size() >= 4 && data.referralCode.size() <= 24 &&
+             data.status == 'VERIFIED';
+    }
+
+    function isValidVoiceClub(data) {
+      return data.clubId is string && data.clubId.size() >= 1 && data.clubId.size() <= 128 &&
+             data.name is string && data.name.size() >= 2 && data.name.size() <= 60 &&
+             data.description is string && data.description.size() <= 240 &&
+             data.avatarEmoji is string && data.avatarEmoji.size() >= 1 && data.avatarEmoji.size() <= 16 &&
+             data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+             data.ownerName is string && data.ownerName.size() >= 1 && data.ownerName.size() <= 40 &&
+             data.isPrivate is bool &&
+             isOptString(data, 'inviteCode', 24) &&
+             isOptString(data, 'announcement', 300) &&
+             data.memberCount is int && data.memberCount >= 0 && data.memberCount <= 50 &&
+             data.clubXp is int && data.clubXp >= 0 &&
+             data.memberUids is list && data.memberUids.size() <= 50 &&
+             (data.memberUids.size() == 0 || data.memberUids[0] is string);
+    }
+
+    function isValidClubMember(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.clubId is string && data.clubId.size() >= 1 && data.clubId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 40 &&
+             data.role in ['OWNER', 'ADMIN', 'MODERATOR', 'MEMBER'] &&
+             data.isOnline is bool &&
+             data.isMutedByMod is bool;
+    }
+
+    function isValidClubBanned(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.clubId is string && data.clubId.size() >= 1 && data.clubId.size() <= 128 &&
+             data.bannedByUid is string && data.bannedByUid.size() >= 1 && data.bannedByUid.size() <= 128 &&
+             data.reason is string && data.reason.size() >= 1 && data.reason.size() <= 200;
+    }
+
+    function isValidClubMessage(data) {
+      return data.messageId is string && data.messageId.size() >= 1 && data.messageId.size() <= 128 &&
+             data.clubId is string && data.clubId.size() >= 1 && data.clubId.size() <= 128 &&
+             data.senderUid is string && data.senderUid.size() >= 1 && data.senderUid.size() <= 128 &&
+             data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 40 &&
+             data.text is string && data.text.size() >= 1 && data.text.size() <= 500 &&
+             data.isAnnouncement is bool &&
+             data.isPublicClub is bool &&
+             data.memberUids is list && data.memberUids.size() <= 50 &&
+             (data.memberUids.size() == 0 || data.memberUids[0] is string);
+    }
+
+    function isValidClubInvitation(data) {
+      return data.inviteId is string && data.inviteId.size() >= 1 && data.inviteId.size() <= 128 &&
+             data.clubId is string && data.clubId.size() >= 1 && data.clubId.size() <= 128 &&
+             data.clubName is string && data.clubName.size() >= 1 && data.clubName.size() <= 60 &&
+             data.fromUid is string && data.fromUid.size() >= 1 && data.fromUid.size() <= 128 &&
+             data.fromName is string && data.fromName.size() >= 1 && data.fromName.size() <= 40 &&
+             data.toUid is string && data.toUid.size() >= 1 && data.toUid.size() <= 128 &&
+             data.status in ['PENDING', 'ACCEPTED', 'DECLINED'];
+    }
+
+    function isValidClubVoiceRoom(data) {
+      return data.roomId is string && data.roomId.size() >= 1 && data.roomId.size() <= 128 &&
+             data.clubId is string && data.clubId.size() >= 1 && data.clubId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 80 &&
+             data.hostUid is string && data.hostUid.size() >= 1 && data.hostUid.size() <= 128 &&
+             data.isPublic is bool &&
+             data.allowedUids is list && data.allowedUids.size() <= 50 &&
+             data.isActive is bool;
+    }
+
+    function isValidVoiceParticipant(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 40 &&
+             (!('teamId' in data) || data.teamId == null || (data.teamId is int && data.teamId >= 0 && data.teamId <= 3)) &&
+             (!('voiceChannel' in data) || data.voiceChannel == null || data.voiceChannel in ['ROOM', 'TEAM', 'PRIVATE']) &&
+             data.isMicMuted is bool &&
+             data.isSpeakerMuted is bool &&
+             data.isSpeaking is bool &&
+             data.voiceLevel is number && data.voiceLevel >= 0 && data.voiceLevel <= 1.0 &&
+             data.roomMemberUids is list && data.roomMemberUids.size() <= 50 &&
+             data.isPublic is bool;
+    }
+
+    function isValidVoiceSignal(data) {
+      return data.signalId is string && data.signalId.size() >= 1 && data.signalId.size() <= 128 &&
+             data.senderUid is string && data.senderUid.size() >= 1 && data.senderUid.size() <= 128 &&
+             data.recipientUid is string && data.recipientUid.size() >= 1 && data.recipientUid.size() <= 128 &&
+             data.channelMode in ['ROOM', 'TEAM', 'PRIVATE'] &&
+             data.signalType in ['OFFER', 'ANSWER', 'ICE', 'AUDIO_FRAME'] &&
+             data.payload is string && data.payload.size() >= 1 && data.payload.size() <= 8192 &&
+             data.sequence is int && data.sequence >= 0 &&
+             data.roomMemberUids is list && data.roomMemberUids.size() <= 50;
+    }
+
+    function isValidMatchRoom(data) {
+      return data.roomId is string && data.roomId.size() >= 1 && data.roomId.size() <= 128 &&
+             data.roomCode is string && data.roomCode.size() >= 4 && data.roomCode.size() <= 16 &&
+             isOptString(data, 'attemptedRoomCode', 16) &&
+             data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+             data.isPrivate is bool &&
+             data.allowedUids is list && data.allowedUids.size() <= 10 &&
+             data.invitedUids is list && data.invitedUids.size() <= 20 &&
+             data.playerUids is list && data.playerUids.size() >= 1 && data.playerUids.size() <= 4 &&
+             data.maxPlayers is int && data.maxPlayers >= 2 && data.maxPlayers <= 4 &&
+             data.gameMode is string && data.gameMode.size() >= 1 && data.gameMode.size() <= 40 &&
+             data.wagerCoins is int && data.wagerCoins >= 0 && data.wagerCoins <= 10000000 &&
+             data.status in ['WAITING', 'ACTIVE', 'FINISHED'] &&
+             data.currentTurnUid is string && data.currentTurnUid.size() >= 1 && data.currentTurnUid.size() <= 128 &&
+             data.moveSequence is int && data.moveSequence >= 0 &&
+             isOptString(data, 'stateHash', 128) &&
+             data.boardState is map &&
+             isOptString(data, 'winnerUid', 128) &&
+             isOptIntMin(data, 'turnDeadlineMillis', 0);
+    }
+
+    function isValidModerationReport(data) {
+      return data.reportId is string && data.reportId.size() >= 1 && data.reportId.size() <= 128 &&
+             data.reporterUid is string && data.reporterUid.size() >= 1 && data.reporterUid.size() <= 128 &&
+             data.targetUid is string && data.targetUid.size() >= 1 && data.targetUid.size() <= 128 &&
+             data.contextType in ['VOICE_CLUB', 'MATCH_VOICE', 'PRIVATE_CHAT'] &&
+             data.contextId is string && data.contextId.size() >= 1 && data.contextId.size() <= 128 &&
+             data.reason is string && data.reason.size() >= 3 && data.reason.size() <= 250 &&
+             data.status in ['OPEN', 'REVIEWED'];
+    }
+
+    // --- ADMIN REGISTRY ---
+    match /admins/{adminUid} {
+      allow get: if isOwner(adminUid) || isAdmin();
+      allow list, write: if false;
+    }
+
+    // --- USER PROFILES (PII ISOLATED) ---
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isSignedIn() && isValidId(userId) && isOwner(userId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'goldCoins', 'cashNotes', 'xp', 'level', 'referralCode', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'displayName', 'email', 'avatarEmoji', 'goldCoins', 'cashNotes',
+                         'xp', 'level', 'matchesPlayed', 'matchesWon', 'winStreak', 'bestWinStreak',
+                         'totalDiceRolls', 'totalCaptures', 'totalEarnings', 'loginStreak',
+                         'lastLoginDayKey', 'dailySpinDayKey', 'referralCode', 'referredByUid',
+                         'verifiedInvitesCount', 'activeClubId', 'themeMode', 'notificationPrefs',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin()) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       (
+                         isAdmin() ||
+                         (
+                           (!('referredByUid' in existing()) || incoming().referredByUid == existing().referredByUid) &&
+                           incoming().diff(existing()).affectedKeys().hasOnly([
+                             'displayName', 'avatarEmoji', 'goldCoins', 'cashNotes', 'xp', 'level',
+                             'matchesPlayed', 'matchesWon', 'winStreak', 'bestWinStreak',
+                             'totalDiceRolls', 'totalCaptures', 'totalEarnings', 'loginStreak',
+                             'lastLoginDayKey', 'dailySpinDayKey', 'referredByUid',
+                             'verifiedInvitesCount', 'activeClubId', 'themeMode', 'notificationPrefs', 'updatedAt'
+                           ])
+                         )
+                       );
+
+      allow delete: if isAdmin();
+
+      // --- USER TASKS (SERVER-ENFORCED COMPLETION & CLAIM GATE) ---
+      match /tasks/{taskId} {
+        allow get: if isValidId(taskId) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if isSignedIn() && isValidId(taskId) && (isOwner(userId) || isAdmin()) &&
+                         incoming().userId == userId &&
+                         incoming().taskId == taskId &&
+                         incoming().keys().hasAll(['taskId', 'userId', 'category', 'title', 'progress', 'target', 'rewardCoins', 'rewardCash', 'status', 'periodKey', 'updatedAt']) &&
+                         incoming().keys().hasOnly([
+                           'taskId', 'userId', 'category', 'title', 'progress', 'target',
+                           'rewardCoins', 'rewardCash', 'rewardXp', 'status', 'periodKey',
+                           'verifiedEventIds', 'rewardTxId', 'claimedAt', 'updatedAt'
+                         ]) &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         incoming().status != 'CLAIMED' &&
+                         (incoming().status == 'IN_PROGRESS' || incoming().progress >= incoming().target) &&
+                         isValidTaskProgress(incoming());
+
+        allow update: if isSignedIn() && isValidId(taskId) && (isOwner(userId) || isAdmin()) &&
+                         isValidTaskProgress(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().taskId == existing().taskId &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         (
+                           isAdmin() ||
+                           // Action 1: Gameplay event progress increment (cannot skip straight to CLAIMED)
+                           (
+                             existing().status != 'CLAIMED' &&
+                             incoming().status != 'CLAIMED' &&
+                             incoming().progress >= existing().progress &&
+                             (incoming().status == 'IN_PROGRESS' || incoming().progress >= incoming().target) &&
+                             incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'status', 'verifiedEventIds', 'updatedAt'])
+                           ) ||
+                           // Action 2: Strict reward claim (only if completed, never already claimed, and atomic ledger tx existsAfter)
+                           (
+                             existing().status != 'CLAIMED' &&
+                             existing().progress >= existing().target &&
+                             incoming().progress >= incoming().target &&
+                             incoming().status == 'CLAIMED' &&
+                             incoming().rewardTxId is string && incoming().rewardTxId.size() >= 3 &&
+                             incoming().claimedAt is timestamp && incoming().claimedAt <= request.time &&
+                             incoming().diff(existing()).affectedKeys().hasOnly(['status', 'rewardTxId', 'claimedAt', 'updatedAt']) &&
+                             existsAfter(/databases/$(database)/documents/users/$(userId)/reward_history/$(incoming().rewardTxId))
+                           ) ||
+                           // Action 3: New daily/weekly period reset (strictly resets progress to 0 for a new periodKey)
+                           (
+                             incoming().periodKey != existing().periodKey &&
+                             incoming().progress == 0 &&
+                             incoming().status == 'IN_PROGRESS' &&
+                             incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'status', 'periodKey', 'verifiedEventIds', 'rewardTxId', 'claimedAt', 'updatedAt'])
+                           )
+                         );
+
+        allow delete: if isAdmin();
+      }
+
+      // --- USER ACHIEVEMENTS (SAME STRICT COMPLETION & CLAIM GATE) ---
+      match /achievements/{achId} {
+        allow get: if isValidId(achId) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if isSignedIn() && isValidId(achId) && (isOwner(userId) || isAdmin()) &&
+                         incoming().userId == userId &&
+                         incoming().taskId == achId &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         incoming().status != 'CLAIMED' &&
+                         (incoming().status == 'IN_PROGRESS' || incoming().progress >= incoming().target) &&
+                         isValidTaskProgress(incoming());
+
+        allow update: if isSignedIn() && isValidId(achId) && (isOwner(userId) || isAdmin()) &&
+                         isValidTaskProgress(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().taskId == existing().taskId &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         existing().status != 'CLAIMED' &&
+                         (
+                           isAdmin() ||
+                           (
+                             incoming().status != 'CLAIMED' &&
+                             incoming().progress >= existing().progress &&
+                             (incoming().status == 'IN_PROGRESS' || incoming().progress >= incoming().target) &&
+                             incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'status', 'verifiedEventIds', 'updatedAt'])
+                           ) ||
+                           (
+                             existing().progress >= existing().target &&
+                             incoming().progress >= incoming().target &&
+                             incoming().status == 'CLAIMED' &&
+                             incoming().rewardTxId is string && incoming().rewardTxId.size() >= 3 &&
+                             incoming().claimedAt is timestamp && incoming().claimedAt <= request.time &&
+                             incoming().diff(existing()).affectedKeys().hasOnly(['status', 'rewardTxId', 'claimedAt', 'updatedAt']) &&
+                             existsAfter(/databases/$(database)/documents/users/$(userId)/reward_history/$(incoming().rewardTxId))
+                           )
+                         );
+
+        allow delete: if isAdmin();
+      }
+
+      // --- APPEND-ONLY REWARD HISTORY LEDGER ---
+      match /reward_history/{txId} {
+        allow get: if isValidId(txId) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+        allow create: if isSignedIn() && isValidId(txId) && isOwner(userId) &&
+                         incoming().userId == userId &&
+                         incoming().txId == txId &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         isValidRewardHistory(incoming());
+        allow update, delete: if false;
+      }
+
+      // --- DAILY PLAYER ACTIVITY ---
+      match /activity/{dayKey} {
+        allow get: if isValidId(dayKey) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+        allow create, update: if isSignedIn() && isValidId(dayKey) && isOwner(userId) &&
+                                 incoming().userId == userId &&
+                                 incoming().dayKey == dayKey &&
+                                 incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                                 isValidActivityStats(incoming());
+        allow delete: if isAdmin();
+      }
+
+      // --- USER NOTIFICATIONS ---
+      match /notifications/{notifId} {
+        allow get: if isValidId(notifId) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+        allow create: if isSignedIn() && isValidId(notifId) &&
+                         incoming().notifId == notifId &&
+                         incoming().recipientUid == userId &&
+                         (incoming().senderId == request.auth.uid || isOwner(userId)) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         isValidNotification(incoming());
+        allow update: if isSignedIn() && isValidId(notifId) && isOwner(userId) &&
+                         isValidNotification(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
+        allow delete: if isValidId(notifId) && isOwner(userId);
+      }
+    }
+
+    // --- PUBLIC PLAYER PROFILES (NON-PII) ---
+    match /public_profiles/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow list: if isSignedIn() && resource.data.level >= 1;
+      allow create: if isSignedIn() && isValidId(userId) && isOwner(userId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidPublicProfile(incoming());
+      allow update: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin()) &&
+                       isValidPublicProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time;
+      allow delete: if isAdmin();
+    }
+
+    // --- FRIEND REQUESTS ---
+    match /friend_requests/{requestId} {
+      allow get: if isSignedIn() && isValidId(requestId) &&
+                    (existing().fromUid == request.auth.uid || existing().toUid == request.auth.uid);
+      allow list: if isSignedIn() &&
+                     (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(requestId) &&
+                       incoming().requestId == requestId &&
+                       incoming().fromUid == request.auth.uid &&
+                       incoming().toUid != request.auth.uid &&
+                       incoming().status == 'PENDING' &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidFriendRequest(incoming());
+      allow update: if isSignedIn() && isValidId(requestId) &&
+                       isValidFriendRequest(incoming()) &&
+                       existing().status == 'PENDING' &&
+                       existing().toUid == request.auth.uid &&
+                       incoming().fromUid == existing().fromUid &&
+                       incoming().toUid == existing().toUid &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(requestId) &&
+                       (existing().fromUid == request.auth.uid || existing().toUid == request.auth.uid);
+    }
+
+    // --- CONFIRMED FRIENDSHIPS ---
+    match /friendships/{friendshipId} {
+      allow get: if isSignedIn() && isValidId(friendshipId) && (request.auth.uid in existing().memberUids);
+      allow list: if isSignedIn() && (request.auth.uid in resource.data.memberUids);
+      allow create: if isSignedIn() && isValidId(friendshipId) &&
+                       incoming().friendshipId == friendshipId &&
+                       (request.auth.uid in incoming().memberUids) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       isValidFriendship(incoming());
+      allow update: if false;
+      allow delete: if isSignedIn() && isValidId(friendshipId) && (request.auth.uid in existing().memberUids);
+    }
+
+    // --- FOLLOW PLAYERS ---
+    match /follows/{followId} {
+      allow get: if isSignedIn() && isValidId(followId) &&
+                    (existing().followerUid == request.auth.uid || existing().followedUid == request.auth.uid);
+      allow list: if isSignedIn() &&
+                     (resource.data.followerUid == request.auth.uid || resource.data.followedUid == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(followId) &&
+                       incoming().followId == followId &&
+                       incoming().followerUid == request.auth.uid &&
+                       incoming().followedUid != request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       isValidFollow(incoming());
+      allow update: if false;
+      allow delete: if isSignedIn() && isValidId(followId) && existing().followerUid == request.auth.uid;
+    }
+
+    // --- 1:1 PRIVATE CHATS ---
+    match /private_chats/{chatId} {
+      allow get: if isSignedIn() && isValidId(chatId) && (request.auth.uid in existing().memberUids);
+      allow list: if isSignedIn() && (request.auth.uid in resource.data.memberUids);
+      allow create: if isSignedIn() && isValidId(chatId) &&
+                       incoming().chatId == chatId &&
+                       (request.auth.uid in incoming().memberUids) &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidPrivateChatThread(incoming());
+      allow update: if isSignedIn() && isValidId(chatId) &&
+                       isValidPrivateChatThread(incoming()) &&
+                       (request.auth.uid in existing().memberUids) &&
+                       incoming().memberUids == existing().memberUids &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'updatedAt']);
+
+      match /messages/{messageId} {
+        allow get: if isSignedIn() && isValidId(messageId) &&
+                      exists(/databases/$(database)/documents/private_chats/$(chatId)) &&
+                      (request.auth.uid in get(/databases/$(database)/documents/private_chats/$(chatId)).data.memberUids);
+        allow list: if isSignedIn() && (request.auth.uid in resource.data.memberUids);
+        allow create: if isSignedIn() && isValidId(messageId) &&
+                         incoming().messageId == messageId &&
+                         incoming().chatId == chatId &&
+                         incoming().senderUid == request.auth.uid &&
+                         (request.auth.uid in incoming().memberUids) &&
+                         exists(/databases/$(database)/documents/private_chats/$(chatId)) &&
+                         (request.auth.uid in get(/databases/$(database)/documents/private_chats/$(chatId)).data.memberUids) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         isValidPrivateChatMessage(incoming());
+        allow update, delete: if false;
+      }
+    }
+
+    // --- VERIFIED REFERRALS ---
+    match /referrals/{referralId} {
+      allow get: if isSignedIn() && isValidId(referralId) &&
+                    (existing().referrerUid == request.auth.uid || existing().inviteeUid == request.auth.uid);
+      allow list: if isSignedIn() &&
+                     (resource.data.referrerUid == request.auth.uid || resource.data.inviteeUid == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(referralId) &&
+                       referralId == request.auth.uid &&
+                       incoming().inviteeUid == request.auth.uid &&
+                       incoming().referrerUid != request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       isValidReferral(incoming());
+      allow update, delete: if false;
+    }
+
+    // --- VOICE CLUBS ---
+    match /voice_clubs/{clubId} {
+      function isClubStaff() {
+        return isSignedIn() && (
+          get(/databases/$(database)/documents/voice_clubs/$(clubId)).data.ownerId == request.auth.uid ||
+          (
+            exists(/databases/$(database)/documents/voice_clubs/$(clubId)/members/$(request.auth.uid)) &&
+            get(/databases/$(database)/documents/voice_clubs/$(clubId)/members/$(request.auth.uid)).data.role in ['OWNER', 'ADMIN', 'MODERATOR']
+          )
+        );
+      }
+
+      function isClubMemberOrPublic() {
+        return isSignedIn() && (
+          !existing().isPrivate ||
+          existing().ownerId == request.auth.uid ||
+          (request.auth.uid in existing().memberUids) ||
+          exists(/databases/$(database)/documents/voice_clubs/$(clubId)/members/$(request.auth.uid))
+        );
+      }
+
+      allow get: if isValidId(clubId) && (isClubMemberOrPublic() || isAdmin());
+      allow list: if isSignedIn() &&
+                     (resource.data.isPrivate == false || resource.data.ownerId == request.auth.uid || (request.auth.uid in resource.data.memberUids));
+
+      allow create: if isSignedIn() && isValidId(clubId) &&
+                       incoming().clubId == clubId &&
+                       incoming().ownerId == request.auth.uid &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidVoiceClub(incoming());
+
+      allow update: if isSignedIn() && isValidId(clubId) &&
+                       isValidVoiceClub(incoming()) &&
+                       incoming().clubId == existing().clubId &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       (
+                         isAdmin() ||
+                         isClubStaff() ||
+                         (
+                           !exists(/databases/$(database)/documents/voice_clubs/$(clubId)/banned/$(request.auth.uid)) &&
+                           (!existing().isPrivate || incoming().inviteCode == existing().inviteCode) &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['memberCount', 'memberUids', 'clubXp', 'updatedAt'])
+                         )
+                       );
+
+      allow delete: if isSignedIn() && isValidId(clubId) && (existing().ownerId == request.auth.uid || isAdmin());
+
+      match /members/{memberUid} {
+        allow get: if isValidId(memberUid) && isSignedIn() &&
+                      (!get(/databases/$(database)/documents/voice_clubs/$(clubId)).data.isPrivate ||
+                       request.auth.uid == memberUid ||
+                       exists(/databases/$(database)/documents/voice_clubs/$(clubId)/members/$(request.auth.uid)));
+        allow list: if isSignedIn() && resource.data.clubId == clubId;
+        allow create: if isSignedIn() && isValidId(memberUid) &&
+                         incoming().uid == memberUid &&
+                         incoming().clubId == clubId &&
+                         incoming().joinedAt is timestamp && incoming().joinedAt <= request.time &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         !exists(/databases/$(database)/documents/voice_clubs/$(clubId)/banned/$(memberUid)) &&
+                         (
+                           (memberUid == request.auth.uid && (incoming().role == 'MEMBER' || getAfter(/databases/$(database)/documents/voice_clubs/$(clubId)).data.ownerId == request.auth.uid)) ||
+                           isClubStaff()
+                         ) &&
+                         isValidClubMember(incoming());
+        allow update: if isSignedIn() && isValidId(memberUid) &&
+                         isValidClubMember(incoming()) &&
+                         incoming().uid == existing().uid &&
+                         incoming().clubId == existing().clubId &&
+                         incoming().joinedAt == existing().joinedAt &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         (
+                           isClubStaff() ||
+                           isAdmin() ||
+                           (request.auth.uid == memberUid && incoming().diff(existing()).affectedKeys().hasOnly(['isOnline', 'displayName', 'updatedAt']))
+                         );
+        allow delete: if isSignedIn() && isValidId(memberUid) &&
+                         (request.auth.uid == memberUid || isClubStaff() || isAdmin());
+      }
+
+      match /banned/{bannedUid} {
+        allow get: if isValidId(bannedUid) && isSignedIn() && (request.auth.uid == bannedUid || isClubStaff() || isAdmin());
+        allow list: if isSignedIn() && isClubStaff();
+        allow create: if isSignedIn() && isValidId(bannedUid) &&
+                         incoming().uid == bannedUid &&
+                         incoming().clubId == clubId &&
+                         incoming().bannedByUid == request.auth.uid &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         isClubStaff() &&
+                         isValidClubBanned(incoming());
+        allow delete: if isSignedIn() && isValidId(bannedUid) && (isClubStaff() || isAdmin());
+      }
+
+      match /messages/{messageId} {
+        allow get: if isValidId(messageId) && isSignedIn() &&
+                      (existing().isPublicClub == true || exists(/databases/$(database)/documents/voice_clubs/$(clubId)/members/$(request.auth.uid)));
+        allow list: if isSignedIn() && (resource.data.isPublicClub == true || resource.data.senderUid == request.auth.uid || (request.auth.uid in resource.data.memberUids));
+        allow create: if isSignedIn() && isValidId(messageId) &&
+                         incoming().messageId == messageId &&
+                         incoming().clubId == clubId &&
+                         incoming().senderUid == request.auth.uid &&
+                         !exists(/databases/$(database)/documents/voice_clubs/$(clubId)/banned/$(request.auth.uid)) &&
+                         exists(/databases/$(database)/documents/voice_clubs/$(clubId)/members/$(request.auth.uid)) &&
+                         (!incoming().isAnnouncement || isClubStaff()) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         isValidClubMessage(incoming());
+        allow update, delete: if isSignedIn() && isValidId(messageId) && (isClubStaff() || isAdmin());
+      }
+
+      match /invitations/{inviteId} {
+        allow get: if isValidId(inviteId) && isSignedIn() && (existing().fromUid == request.auth.uid || existing().toUid == request.auth.uid);
+        allow list: if isSignedIn() && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+        allow create: if isSignedIn() && isValidId(inviteId) &&
+                         incoming().inviteId == inviteId &&
+                         incoming().clubId == clubId &&
+                         incoming().fromUid == request.auth.uid &&
+                         incoming().status == 'PENDING' &&
+                         exists(/databases/$(database)/documents/voice_clubs/$(clubId)/members/$(request.auth.uid)) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         isValidClubInvitation(incoming());
+        allow update: if isSignedIn() && isValidId(inviteId) &&
+                         isValidClubInvitation(incoming()) &&
+                         existing().status == 'PENDING' &&
+                         existing().toUid == request.auth.uid &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+        allow delete: if isSignedIn() && isValidId(inviteId) && (existing().fromUid == request.auth.uid || existing().toUid == request.auth.uid);
+      }
+
+      match /voice_rooms/{roomId} {
+        allow get: if isValidId(roomId) && isSignedIn() && (existing().isPublic == true || (request.auth.uid in existing().allowedUids) || exists(/databases/$(database)/documents/voice_clubs/$(clubId)/members/$(request.auth.uid)));
+        allow list: if isSignedIn() && (resource.data.isPublic == true || resource.data.hostUid == request.auth.uid || (request.auth.uid in resource.data.allowedUids));
+        allow create: if isSignedIn() && isValidId(roomId) &&
+                         incoming().roomId == roomId &&
+                         incoming().clubId == clubId &&
+                         incoming().hostUid == request.auth.uid &&
+                         exists(/databases/$(database)/documents/voice_clubs/$(clubId)/members/$(request.auth.uid)) &&
+                         !exists(/databases/$(database)/documents/voice_clubs/$(clubId)/banned/$(request.auth.uid)) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         isValidClubVoiceRoom(incoming());
+        allow update: if isSignedIn() && isValidId(roomId) &&
+                         isValidClubVoiceRoom(incoming()) &&
+                         (existing().hostUid == request.auth.uid || isClubStaff() || incoming().diff(existing()).affectedKeys().hasOnly(['allowedUids']));
+        allow delete: if isSignedIn() && isValidId(roomId) && (existing().hostUid == request.auth.uid || isClubStaff());
+
+        match /participants/{uid} {
+          allow get: if isValidId(uid) && isSignedIn() && (existing().isPublic == true || (request.auth.uid in existing().roomMemberUids));
+          allow list: if isSignedIn() && (resource.data.isPublic == true || resource.data.uid == request.auth.uid || (request.auth.uid in resource.data.roomMemberUids));
+          allow create, update: if isSignedIn() && isValidId(uid) &&
+                                   (request.auth.uid == uid || isClubStaff()) &&
+                                   !exists(/databases/$(database)/documents/voice_clubs/$(clubId)/banned/$(uid)) &&
+                                   incoming().uid == uid &&
+                                   incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                                   isValidVoiceParticipant(incoming());
+          allow delete: if isSignedIn() && isValidId(uid) && (request.auth.uid == uid || isClubStaff());
+        }
+
+        match /signals/{signalId} {
+          allow get: if isValidId(signalId) && isSignedIn() && (existing().senderUid == request.auth.uid || existing().recipientUid == request.auth.uid || (request.auth.uid in existing().roomMemberUids));
+          allow list: if isSignedIn() && (resource.data.senderUid == request.auth.uid || resource.data.recipientUid == request.auth.uid || (request.auth.uid in resource.data.roomMemberUids));
+          allow create: if isSignedIn() && isValidId(signalId) &&
+                           incoming().signalId == signalId &&
+                           incoming().senderUid == request.auth.uid &&
+                           !exists(/databases/$(database)/documents/voice_clubs/$(clubId)/banned/$(request.auth.uid)) &&
+                           incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                           isValidVoiceSignal(incoming());
+          allow update: if false;
+          allow delete: if isSignedIn() && isValidId(signalId) && (existing().senderUid == request.auth.uid || existing().recipientUid == request.auth.uid);
+        }
+      }
+    }
+
+    // --- MULTIPLAYER & PRIVATE LUDO MATCH ROOMS ---
+    match /match_rooms/{roomId} {
+      function canAccessMatchRoom(room) {
+        return !room.isPrivate ||
+               request.auth.uid == room.ownerId ||
+               (request.auth.uid in room.allowedUids) ||
+               (request.auth.uid in room.invitedUids) ||
+               (request.auth.uid in room.playerUids);
+      }
+
+      allow get: if isSignedIn() && isValidId(roomId) && (canAccessMatchRoom(existing()) || isAdmin());
+      allow list: if isSignedIn() && (
+        resource.data.isPrivate == false ||
+        resource.data.ownerId == request.auth.uid ||
+        (request.auth.uid in resource.data.allowedUids) ||
+        (request.auth.uid in resource.data.invitedUids) ||
+        (request.auth.uid in resource.data.playerUids)
+      );
+
+      allow create: if isSignedIn() && isValidId(roomId) &&
+                       incoming().roomId == roomId &&
+                       incoming().ownerId == request.auth.uid &&
+                       (request.auth.uid in incoming().playerUids) &&
+                       (request.auth.uid in incoming().allowedUids) &&
+                       incoming().status == 'WAITING' &&
+                       incoming().moveSequence == 0 &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidMatchRoom(incoming());
+
+      allow update: if isSignedIn() && isValidId(roomId) &&
+                       isValidMatchRoom(incoming()) &&
+                       incoming().roomId == existing().roomId &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       existing().status != 'FINISHED' &&
+                       (
+                         isAdmin() ||
+                         // Action 1: Authorized join to WAITING room (private rooms strictly reject non-invited callers without matching room code)
+                         (
+                           existing().status == 'WAITING' &&
+                           (!existing().isPrivate ||
+                            (request.auth.uid in existing().invitedUids) ||
+                            (request.auth.uid in existing().allowedUids) ||
+                            (incoming().attemptedRoomCode is string && incoming().attemptedRoomCode == existing().roomCode)) &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['playerUids', 'allowedUids', 'attemptedRoomCode', 'status', 'updatedAt'])
+                         ) ||
+                         // Action 2: Owner updates invitations or starts match
+                         (
+                           existing().ownerId == request.auth.uid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['invitedUids', 'allowedUids', 'status', 'currentTurnUid', 'turnDeadlineMillis', 'updatedAt'])
+                         ) ||
+                         // Action 3: Active gameplay move / turn / reconnect sync by a participant
+                         (
+                           (request.auth.uid in existing().playerUids) &&
+                           incoming().moveSequence >= existing().moveSequence &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['boardState', 'currentTurnUid', 'moveSequence', 'stateHash', 'status', 'winnerUid', 'turnDeadlineMillis', 'updatedAt'])
+                         )
+                       );
+
+      allow delete: if isSignedIn() && isValidId(roomId) && (existing().ownerId == request.auth.uid || isAdmin());
+
+      match /voice_participants/{uid} {
+        allow get: if isValidId(uid) && isSignedIn() && (request.auth.uid in existing().roomMemberUids);
+        allow list: if isSignedIn() && (resource.data.uid == request.auth.uid || (request.auth.uid in resource.data.roomMemberUids));
+        allow create, update: if isSignedIn() && isValidId(uid) &&
+                                 request.auth.uid == uid &&
+                                 exists(/databases/$(database)/documents/match_rooms/$(roomId)) &&
+                                 (request.auth.uid in get(/databases/$(database)/documents/match_rooms/$(roomId)).data.playerUids) &&
+                                 incoming().uid == uid &&
+                                 incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                                 isValidVoiceParticipant(incoming());
+        allow delete: if isSignedIn() && isValidId(uid) && request.auth.uid == uid;
+      }
+
+      match /voice_signals/{signalId} {
+        allow get: if isValidId(signalId) && isSignedIn() && (existing().senderUid == request.auth.uid || existing().recipientUid == request.auth.uid || (request.auth.uid in existing().roomMemberUids));
+        allow list: if isSignedIn() && (resource.data.senderUid == request.auth.uid || resource.data.recipientUid == request.auth.uid || (request.auth.uid in resource.data.roomMemberUids));
+        allow create: if isSignedIn() && isValidId(signalId) &&
+                         incoming().signalId == signalId &&
+                         incoming().senderUid == request.auth.uid &&
+                         exists(/databases/$(database)/documents/match_rooms/$(roomId)) &&
+                         (request.auth.uid in get(/databases/$(database)/documents/match_rooms/$(roomId)).data.playerUids) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         isValidVoiceSignal(incoming());
+        allow update: if false;
+        allow delete: if isSignedIn() && isValidId(signalId) && (existing().senderUid == request.auth.uid || existing().recipientUid == request.auth.uid);
+      }
+    }
+
+    // --- MODERATION REPORTS ---
+    match /moderation_reports/{reportId} {
+      allow get: if isSignedIn() && isValidId(reportId) && (existing().reporterUid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.reporterUid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(reportId) &&
+                       incoming().reportId == reportId &&
+                       incoming().reporterUid == request.auth.uid &&
+                       incoming().status == 'OPEN' &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       isValidModerationReport(incoming());
+      allow update: if isSignedIn() && isValidId(reportId) && isAdmin() && isValidModerationReport(incoming());
+      allow delete: if isAdmin();
+    }
+  }
+}

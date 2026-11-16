@@ -7,11 +7,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val RoyalColorScheme = darkColorScheme(
+private val RoyalDarkColorScheme = darkColorScheme(
     primary = RoyalGold,
     onPrimary = RoyalNavyDark,
     primaryContainer = RoyalBlueSurface,
@@ -20,8 +19,8 @@ private val RoyalColorScheme = darkColorScheme(
     onSecondary = RoyalNavyDark,
     secondaryContainer = RoyalBlueCard,
     onSecondaryContainer = RoyalGoldLight,
-    tertiary = RubyRed,
-    onTertiary = TextLight,
+    tertiary = LudoClubCyanPill,
+    onTertiary = RoyalNavyDark,
     background = RoyalNavyDark,
     onBackground = TextLight,
     surface = RoyalNavy,
@@ -29,7 +28,32 @@ private val RoyalColorScheme = darkColorScheme(
     surfaceVariant = RoyalBlueCard,
     onSurfaceVariant = TextMuted,
     outline = RoyalGoldDark,
-    outlineVariant = RoyalMarbleBorder
+    outlineVariant = RoyalMarbleBorder,
+    error = LudoClubRedBadge,
+    onError = TextLight
+)
+
+private val RoyalLightColorScheme = lightColorScheme(
+    primary = RoyalLightPrimary,
+    onPrimary = TextLight,
+    primaryContainer = RoyalLightPrimaryContainer,
+    onPrimaryContainer = RoyalNavyDark,
+    secondary = RoyalLightSecondary,
+    onSecondary = TextLight,
+    secondaryContainer = RoyalLightSurfaceVariant,
+    onSecondaryContainer = RoyalLightTextPrimary,
+    tertiary = SapphireBlue,
+    onTertiary = TextLight,
+    background = RoyalLightBackground,
+    onBackground = RoyalLightTextPrimary,
+    surface = RoyalLightSurface,
+    onSurface = RoyalLightTextPrimary,
+    surfaceVariant = RoyalLightSurfaceVariant,
+    onSurfaceVariant = RoyalLightTextMuted,
+    outline = RoyalLightBorder,
+    outlineVariant = RoyalMarbleShadow,
+    error = RubyRed,
+    onError = TextLight
 )
 
 @Composable
@@ -42,16 +66,17 @@ fun MyApplicationTheme(
         SideEffect {
             val window = (view.context as? Activity)?.window
             if (window != null) {
-                window.statusBarColor = RoyalNavyDark.toArgb()
-                window.navigationBarColor = RoyalNavyDark.toArgb()
-                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
-                WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
+                val controller = WindowCompat.getInsetsController(window, view)
+                controller.isAppearanceLightStatusBars = !darkTheme
+                controller.isAppearanceLightNavigationBars = !darkTheme
             }
         }
     }
 
+    val colorScheme = if (darkTheme) RoyalDarkColorScheme else RoyalLightColorScheme
+
     MaterialTheme(
-        colorScheme = RoyalColorScheme,
+        colorScheme = colorScheme,
         typography = Typography,
         content = content
     )

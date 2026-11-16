@@ -49,11 +49,11 @@ class ProfilePreferences(private val context: Context) {
         const val DEFAULT_CROWN_AVATAR = "crown_imperial_gold"
         const val DEFAULT_ROYAL_TITLE = "Maharaja"
         const val DEFAULT_SHUFFLE_ENABLED = false
-        const val DEFAULT_PLAYER_LEVEL = 18
-        const val DEFAULT_TOTAL_WINS = 28
-        const val DEFAULT_GAMES_PLAYED = 42
-        const val DEFAULT_WIN_STREAK = 4
-        const val DEFAULT_TOTAL_CAPTURES = 89
+        const val DEFAULT_PLAYER_LEVEL = 1
+        const val DEFAULT_TOTAL_WINS = 0
+        const val DEFAULT_GAMES_PLAYED = 0
+        const val DEFAULT_WIN_STREAK = 0
+        const val DEFAULT_TOTAL_CAPTURES = 0
         const val DEFAULT_PAWN_CROWN_AVATAR = "crown_imperial_gold"
         const val DEFAULT_DICE_SKIN = "dice_imperial_gold"
         const val DEFAULT_TOKEN_SKIN = "crown_maharaja"
@@ -163,6 +163,44 @@ class ProfilePreferences(private val context: Context) {
         return prefs.getInt(KEY_PLAYER_LEVEL, DEFAULT_PLAYER_LEVEL)
     }
 
+    fun getPlayerXp(): Int = prefs.getInt("pref_player_xp", 0)
+    fun setPlayerLevelAndXp(level: Int, xp: Int) {
+        prefs.edit()
+            .putInt(KEY_PLAYER_LEVEL, level.coerceAtLeast(1))
+            .putInt("pref_player_xp", xp.coerceAtLeast(0))
+            .apply()
+    }
+
+    fun getBestWinStreak(): Int = prefs.getInt("pref_best_win_streak", 0)
+    fun getTotalRolls(): Int = prefs.getInt("pref_total_rolls", 0)
+    fun incrementTotalRolls(delta: Int = 1): Int {
+        val next = getTotalRolls() + delta
+        prefs.edit().putInt("pref_total_rolls", next).apply()
+        return next
+    }
+
+    fun getTotalEarnings(): Long = prefs.getLong("pref_total_earnings", 0L)
+    fun addTotalEarnings(delta: Long): Long {
+        val next = getTotalEarnings() + delta.coerceAtLeast(0L)
+        prefs.edit().putLong("pref_total_earnings", next).apply()
+        return next
+    }
+
+    fun getOrCreateReferralCode(): String {
+        val existing = prefs.getString("pref_referral_code", null)
+        if (!existing.isNullOrBlank()) return existing
+        val generated = "MGL-${(100000..999999).random()}"
+        prefs.edit().putString("pref_referral_code", generated).apply()
+        return generated
+    }
+
+    fun getClaimedBonusKeys(): Set<String> = prefs.getStringSet("pref_claimed_bonus_keys", emptySet()) ?: emptySet()
+    fun markBonusKeyClaimed(key: String) {
+        val updated = getClaimedBonusKeys().toMutableSet()
+        updated.add(key)
+        prefs.edit().putStringSet("pref_claimed_bonus_keys", updated).apply()
+    }
+
     fun getTotalWins(): Int = prefs.getInt(KEY_TOTAL_WINS, DEFAULT_TOTAL_WINS)
     fun setTotalWins(wins: Int) = prefs.edit().putInt(KEY_TOTAL_WINS, wins).apply()
 
@@ -195,12 +233,14 @@ class ProfilePreferences(private val context: Context) {
         val currentGames = getGamesPlayed() + 1
         val currentWins = if (isWin) getTotalWins() + 1 else getTotalWins()
         val currentStreak = if (isWin) getWinStreak() + 1 else 0
+        val bestStreak = maxOf(getBestWinStreak(), currentStreak)
         val currentCaptures = getTotalCaptures() + captures
 
         prefs.edit()
             .putInt(KEY_GAMES_PLAYED, currentGames)
             .putInt(KEY_TOTAL_WINS, currentWins)
             .putInt(KEY_WIN_STREAK, currentStreak)
+            .putInt("pref_best_win_streak", bestStreak)
             .putInt(KEY_TOTAL_CAPTURES, currentCaptures)
             .apply()
     }

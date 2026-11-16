@@ -27,7 +27,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.model.MOCK_ROYAL_FRIENDS
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Send
+import com.example.model.FriendRequestItem
+import com.example.model.FriendshipItem
+import com.example.model.PrivateChatMessageItem
+import com.example.model.PublicProfileItem
 import com.example.model.RoyalFriend
 import com.example.model.getCrownAvatarEmoji
 import com.example.ui.theme.*
@@ -38,8 +43,20 @@ fun FriendListDialog(
     userCrownAvatar: String,
     userTitle: String,
     userCustomPhotoUri: String? = null,
-    keysSentCount: Int = 1,
-    keysReceivedCount: Int = 1,
+    keysSentCount: Int = 0,
+    keysReceivedCount: Int = 0,
+    cloudFriends: List<FriendshipItem> = emptyList(),
+    friendRequests: List<FriendRequestItem> = emptyList(),
+    discoverPlayers: List<PublicProfileItem> = emptyList(),
+    followedIds: Set<String> = emptySet(),
+    activeChatFriend: FriendshipItem? = null,
+    privateChatMessages: List<PrivateChatMessageItem> = emptyList(),
+    onSendFriendRequest: (PublicProfileItem) -> Unit = {},
+    onRespondFriendRequest: (FriendRequestItem, Boolean) -> Unit = { _, _ -> },
+    onToggleFollow: (String, String) -> Unit = { _, _ -> },
+    onOpenPrivateChat: (FriendshipItem) -> Unit = {},
+    onClosePrivateChat: () -> Unit = {},
+    onSendPrivateMessage: (String) -> Unit = {},
     onInviteToMatch: (RoyalFriend) -> Unit,
     onSendKey: (RoyalFriend) -> Unit = {},
     onClaimReceivedKey: (String) -> Unit = {},
@@ -47,28 +64,34 @@ fun FriendListDialog(
     onShareInviteLink: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Online, 1: All Friends, 2: Add Friend
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Friends, 1: Requests, 2: Discover/Add
     var searchQuery by remember { mutableStateOf("") }
-    var friendsList by remember { mutableStateOf(MOCK_ROYAL_FRIENDS) }
     var invitedFriendIds by remember { mutableStateOf(setOf<String>()) }
     var sentKeyFriendIds by remember { mutableStateOf(setOf<String>()) }
     var newFriendIdInput by remember { mutableStateOf("") }
     var addFriendFeedback by remember { mutableStateOf<String?>(null) }
+    var privateChatInput by remember { mutableStateOf("") }
 
-    val filteredFriends = remember(selectedTab, searchQuery, friendsList) {
-        val base = when (selectedTab) {
-            0 -> friendsList.filter { it.isOnline }
-            1 -> friendsList
-            else -> friendsList
+    val mappedFriends = remember(cloudFriends, followedIds) {
+        cloudFriends.map { cf ->
+            RoyalFriend(
+                id = cf.friendUid,
+                name = cf.friendName,
+                title = "Friend",
+                crownAvatarId = "crown_imperial_gold",
+                isOnline = true,
+                statusText = "Connected Friend",
+                level = 1,
+                coins = 0L,
+                wins = 0,
+                isFavorite = cf.friendUid in followedIds
+            )
         }
-        if (searchQuery.isBlank()) {
-            base
-        } else {
-            base.filter {
-                it.name.contains(searchQuery, ignoreCase = true) ||
-                    it.title.contains(searchQuery, ignoreCase = true)
-            }
-        }
+    }
+
+    val filteredFriends = remember(searchQuery, mappedFriends) {
+        if (searchQuery.isBlank()) mappedFriends
+        else mappedFriends.filter { it.name.contains(searchQuery, ignoreCase = true) }
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -107,7 +130,7 @@ fun FriendListDialog(
                                 fontWeight = FontWeight.ExtraBold
                             )
                             Text(
-                                text = "${friendsList.count { it.isOnline }} Online Kings & Queens",
+                                text = "${cloudFriends.size} Friends • ${friendRequests.size} Pending Requests",
                                 color = Color(0xFF00E676),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -295,35 +318,18 @@ fun FriendListDialog(
                                 Text("🎉 3/3 KEYS COLLECTED! OPEN REWARD 🎁", color = RoyalNavyDark, fontSize = 11.sp, fontWeight = FontWeight.Black)
                             }
                         } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            Button(
+                                onClick = {},
+                                enabled = false,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    disabledContainerColor = Color(0xFF14244D)
+                                ),
+                                shape = RoundedCornerShape(8.dp)
                             ) {
-                                Button(
-                                    onClick = {},
-                                    enabled = false,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(34.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        disabledContainerColor = Color(0xFF14244D)
-                                    ),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text("LOCKED: $keysReceivedCount/3 Keys Received 🔒", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                }
-
-                                Button(
-                                    onClick = { onClaimReceivedKey("Prince Aryan") },
-                                    modifier = Modifier
-                                        .height(34.dp)
-                                        .testTag("nudge_receive_key_button"),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C853)),
-                                    shape = RoundedCornerShape(8.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp)
-                                ) {
-                                    Text("Get Friend Key 🔑", color = RoyalNavyDark, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                }
+                                Text("LOCKED: $keysReceivedCount/3 Keys Received From Friends 🔒", color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -331,256 +337,316 @@ fun FriendListDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Navigation Tabs (Online, All Friends, Add Friend)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF0B1736))
-                        .padding(3.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    TabButton(
-                        label = "Online (${friendsList.count { it.isOnline }})",
-                        isSelected = selectedTab == 0,
-                        modifier = Modifier.weight(1f),
-                        testTag = "tab_online_friends"
+                if (activeChatFriend != null) {
+                    // 1:1 Private Chat View
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        selectedTab = 0
-                    }
-                    TabButton(
-                        label = "All (${friendsList.size})",
-                        isSelected = selectedTab == 1,
-                        modifier = Modifier.weight(1f),
-                        testTag = "tab_all_friends"
-                    ) {
-                        selectedTab = 1
-                    }
-                    TabButton(
-                        label = "+ Add",
-                        isSelected = selectedTab == 2,
-                        modifier = Modifier.weight(0.8f),
-                        testTag = "tab_add_friend"
-                    ) {
-                        selectedTab = 2
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                if (selectedTab != 2) {
-                    // Search Bar
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
-                            .testTag("search_friends_input"),
-                        placeholder = { Text("Search friends...", color = TextMuted, fontSize = 12.sp) },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = RoyalGold,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(
-                                        Icons.Default.Clear,
-                                        contentDescription = "Clear",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = RoyalGold,
-                            unfocusedBorderColor = Color(0xFF1E3A6E),
-                            focusedContainerColor = Color(0xFF091633),
-                            unfocusedContainerColor = Color(0xFF091633),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Friends List
-                    if (filteredFriends.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            contentAlignment = Alignment.Center
+                        IconButton(
+                            onClick = onClosePrivateChat,
+                            modifier = Modifier.minimumInteractiveComponentSize()
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("👑", fontSize = 36.sp)
-                                Spacer(modifier = Modifier.height(8.dp))
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back to Friends", tint = Color.White)
+                        }
+                        Text(
+                            text = "Private Chat: ${activeChatFriend.friendName}",
+                            color = RoyalGold,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (privateChatMessages.isEmpty()) {
+                            item {
                                 Text(
-                                    text = if (searchQuery.isNotBlank()) "No royal friends match '$searchQuery'" else "No friends currently in this tab",
+                                    text = "Say hello to ${activeChatFriend.friendName}!",
                                     color = TextMuted,
                                     fontSize = 12.sp,
-                                    textAlign = TextAlign.Center
+                                    modifier = Modifier.padding(12.dp)
                                 )
+                            }
+                        } else {
+                            items(privateChatMessages, key = { it.messageId }) { msg ->
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFF132958),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text(msg.senderName, color = RoyalGoldLight, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Text(msg.text, color = Color.White, fontSize = 12.sp)
+                                    }
+                                }
                             }
                         }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = privateChatInput,
+                            onValueChange = { privateChatInput = it },
+                            placeholder = { Text("Message ${activeChatFriend.friendName}...", color = TextMuted, fontSize = 12.sp) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).testTag("private_chat_input"),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = RoyalGold,
+                                unfocusedBorderColor = Color(0xFF1E3A6E)
+                            )
+                        )
+                        FilledIconButton(
+                            onClick = {
+                                if (privateChatInput.isNotBlank()) {
+                                    onSendPrivateMessage(privateChatInput.trim())
+                                    privateChatInput = ""
+                                }
+                            },
+                            modifier = Modifier.minimumInteractiveComponentSize().testTag("send_private_chat_button")
                         ) {
-                            items(filteredFriends, key = { it.id }) { friend ->
-                                val isKeySent = friend.id in sentKeyFriendIds
-                                FriendCardItem(
-                                    friend = friend,
-                                    isInvited = friend.id in invitedFriendIds,
-                                    isKeySent = isKeySent,
-                                    onInviteClick = {
-                                        invitedFriendIds = invitedFriendIds + friend.id
-                                        onInviteToMatch(friend)
-                                    },
-                                    onSendKeyClick = {
-                                        sentKeyFriendIds = sentKeyFriendIds + friend.id
-                                        onSendKey(friend)
-                                    },
-                                    onToggleFavorite = {
-                                        friendsList = friendsList.map {
-                                            if (it.id == friend.id) it.copy(isFavorite = !it.isFavorite) else it
-                                        }
-                                    }
-                                )
-                            }
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
                         }
                     }
                 } else {
-                    // Add Friend Section
-                    Column(
+                    // Navigation Tabs (Friends, Requests, Discover/Add)
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f)
-                            .padding(vertical = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF0B1736))
+                            .padding(3.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "Add New Royal Rival",
-                            color = RoyalGold,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Enter your friend's Player ID or Royal Tag (e.g. MG-5821)",
-                            color = TextMuted,
-                            fontSize = 11.sp,
-                            textAlign = TextAlign.Center
-                        )
+                        TabButton(
+                            label = "Friends (${cloudFriends.size})",
+                            isSelected = selectedTab == 0,
+                            modifier = Modifier.weight(1f),
+                            testTag = "tab_online_friends"
+                        ) { selectedTab = 0 }
+                        TabButton(
+                            label = "Requests (${friendRequests.size})",
+                            isSelected = selectedTab == 1,
+                            modifier = Modifier.weight(1f),
+                            testTag = "tab_all_friends"
+                        ) { selectedTab = 1 }
+                        TabButton(
+                            label = "+ Discover",
+                            isSelected = selectedTab == 2,
+                            modifier = Modifier.weight(0.9f),
+                            testTag = "tab_add_friend"
+                        ) { selectedTab = 2 }
+                    }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                        OutlinedTextField(
-                            value = newFriendIdInput,
-                            onValueChange = {
-                                newFriendIdInput = it
-                                addFriendFeedback = null
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("add_friend_id_input"),
-                            label = { Text("Player ID or Username", color = RoyalGoldLight) },
-                            placeholder = { Text("MG-xxxx or Royal Name", color = TextMuted) },
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = RoyalGold,
-                                unfocusedBorderColor = Color(0xFF1E3A6E),
-                                focusedContainerColor = Color(0xFF091633),
-                                unfocusedContainerColor = Color(0xFF091633),
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Button(
-                            onClick = {
-                                if (newFriendIdInput.isNotBlank()) {
-                                    val newFriend = RoyalFriend(
-                                        id = "f_custom_${System.currentTimeMillis()}",
-                                        name = newFriendIdInput.trim(),
-                                        title = "Yuvraj",
-                                        crownAvatarId = "crown_kohinoor_diamond",
-                                        isOnline = true,
-                                        statusText = "Online • Just Added! 🎲",
-                                        level = 15,
-                                        coins = 35000L,
-                                        wins = 20
-                                    )
-                                    friendsList = listOf(newFriend) + friendsList
-                                    addFriendFeedback = "Added ${newFriend.name} to your Royal Friends list! 👑"
-                                    newFriendIdInput = ""
-                                    selectedTab = 0
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(46.dp)
-                                .testTag("submit_add_friend_button"),
-                            colors = ButtonDefaults.buttonColors(containerColor = RoyalGold),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Send Royal Friend Request", color = RoyalNavyDark, fontWeight = FontWeight.Bold)
-                        }
-
-                        if (addFriendFeedback != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = addFriendFeedback!!,
-                                color = Color(0xFF00E676),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        // Quick Share Promo
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1B3D)),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF23447A))
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(14.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text("📢 Share MG Ludo with Buddies", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Send an invite link on WhatsApp or Instagram and receive 5,000 Coins bonus when they join!",
-                                    color = TextMuted,
-                                    fontSize = 11.sp,
-                                    textAlign = TextAlign.Center
+                    when (selectedTab) {
+                        0 -> {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .testTag("search_friends_input"),
+                                placeholder = { Text("Search friends...", color = TextMuted, fontSize = 12.sp) },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Search, contentDescription = "Search", tint = RoyalGold, modifier = Modifier.size(18.dp))
+                                },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = RoyalGold,
+                                    unfocusedBorderColor = Color(0xFF1E3A6E),
+                                    focusedContainerColor = Color(0xFF091633),
+                                    unfocusedContainerColor = Color(0xFF091633),
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
                                 )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Button(
-                                    onClick = onShareInviteLink,
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C853)),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.testTag("share_invite_promo_button")
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            if (filteredFriends.isEmpty()) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().weight(1f),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Text("Invite via WhatsApp 📲", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("👥", fontSize = 36.sp)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "No friends added yet. Switch to '+ Discover' to send friend requests!",
+                                            color = TextMuted,
+                                            fontSize = 12.sp,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
                                 }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxWidth().weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(filteredFriends, key = { it.id }) { friend ->
+                                        val backing = cloudFriends.firstOrNull { it.friendUid == friend.id }
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(modifier = Modifier.weight(1f)) {
+                                                FriendCardItem(
+                                                    friend = friend,
+                                                    isInvited = friend.id in invitedFriendIds,
+                                                    isKeySent = friend.id in sentKeyFriendIds,
+                                                    onInviteClick = {
+                                                        invitedFriendIds = invitedFriendIds + friend.id
+                                                        onInviteToMatch(friend)
+                                                    },
+                                                    onSendKeyClick = {
+                                                        sentKeyFriendIds = sentKeyFriendIds + friend.id
+                                                        onSendKey(friend)
+                                                    },
+                                                    onToggleFavorite = {
+                                                        onToggleFollow(friend.id, friend.name)
+                                                    }
+                                                )
+                                            }
+                                            if (backing != null) {
+                                                IconButton(
+                                                    onClick = { onOpenPrivateChat(backing) },
+                                                    modifier = Modifier.minimumInteractiveComponentSize().testTag("chat_friend_${friend.id}")
+                                                ) {
+                                                    Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "1:1 Private Chat", tint = RoyalGoldLight)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        1 -> {
+                            if (friendRequests.isEmpty()) {
+                                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                                    Text("No pending friend requests", color = TextMuted, fontSize = 12.sp)
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxWidth().weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(friendRequests, key = { it.requestId }) { req ->
+                                        Card(
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0D2147))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(req.fromName, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                                TextButton(
+                                                    onClick = { onRespondFriendRequest(req, false) },
+                                                    modifier = Modifier.minimumInteractiveComponentSize()
+                                                ) { Text("Decline") }
+                                                Button(
+                                                    onClick = { onRespondFriendRequest(req, true) },
+                                                    modifier = Modifier.minimumInteractiveComponentSize()
+                                                ) { Text("Accept") }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else -> {
+                            OutlinedTextField(
+                                value = newFriendIdInput,
+                                onValueChange = {
+                                    newFriendIdInput = it
+                                    addFriendFeedback = null
+                                },
+                                modifier = Modifier.fillMaxWidth().testTag("add_friend_id_input"),
+                                label = { Text("Search Players by Name or UID", color = RoyalGoldLight) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = RoyalGold,
+                                    unfocusedBorderColor = Color(0xFF1E3A6E),
+                                    focusedContainerColor = Color(0xFF091633),
+                                    unfocusedContainerColor = Color(0xFF091633),
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            val matchingPlayers = remember(newFriendIdInput, discoverPlayers) {
+                                val base = if (newFriendIdInput.isBlank()) discoverPlayers
+                                else discoverPlayers.filter {
+                                    it.displayName.contains(newFriendIdInput, ignoreCase = true) ||
+                                        it.userId.contains(newFriendIdInput, ignoreCase = true)
+                                }
+                                base.take(15)
+                            }
+                            if (matchingPlayers.isEmpty()) {
+                                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("No matching signed-in players found.", color = TextMuted, fontSize = 12.sp)
+                                        Button(
+                                            onClick = onShareInviteLink,
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00C853)),
+                                            modifier = Modifier.minimumInteractiveComponentSize().testTag("share_invite_promo_button")
+                                        ) {
+                                            Text("Share Invite Code", color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxWidth().weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(matchingPlayers, key = { it.userId }) { profile ->
+                                        val alreadyFriend = cloudFriends.any { it.friendUid == profile.userId }
+                                        Card(
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0D2147))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text("${profile.avatarEmoji} ${profile.displayName}", color = Color.White, fontWeight = FontWeight.Bold)
+                                                    Text("Lvl ${profile.level} • 🏆 ${profile.matchesWon} Wins", color = TextMuted, fontSize = 10.sp)
+                                                }
+                                                Button(
+                                                    enabled = !alreadyFriend,
+                                                    onClick = {
+                                                        onSendFriendRequest(profile)
+                                                        addFriendFeedback = "Request sent to ${profile.displayName}!"
+                                                    },
+                                                    modifier = Modifier.minimumInteractiveComponentSize()
+                                                ) {
+                                                    Text(if (alreadyFriend) "Friends ✓" else "Add", fontSize = 11.sp)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if (addFriendFeedback != null) {
+                                Text(addFriendFeedback!!, color = Color(0xFF00E676), fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                             }
                         }
                     }
